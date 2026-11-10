@@ -41,6 +41,14 @@ pub fn paint_background(ctx: &egui::Context, hub: Pos2) {
     }
 }
 
+const ZOOM_SECS: f32 = 0.5;
+const REVEAL_SECS: f32 = 0.35;
+
+/// Painter above everything else, for the zoom into the orb.
+fn zoom_painter(ctx: &egui::Context) -> egui::Painter {
+    ctx.layer_painter(LayerId::new(egui::Order::Foreground, egui::Id::new("green_zoom")))
+}
+
 /// The big animated orb with an emblem in it.
 fn paint_big_orb(painter: &egui::Painter, c: Pos2, r: f32, t: f32) {
     // Outer haze and shells.
@@ -220,10 +228,11 @@ impl App {
         }
     }
 
+    /// Opens a page from home: first the camera zooms into the orb.
     fn green_open(&mut self, page: Page) {
-        self.menu_touched = true;
-        self.page = page;
-        self.green_in_page = true;
+        if self.green_zoom.is_none() {
+            self.green_zoom = Some((page, std::time::Instant::now()));
+        }
     }
 
     /// (top line, bottom line, badge) for the status box.
@@ -243,15 +252,53 @@ impl App {
         let ctx = ui.ctx().clone();
         let t = ctx.input(|i| i.time) as f32;
         let main;
+        // Zoom finished: open the page this frame (no flash of the menu in between).
+        if let Some((page, at)) = self.green_zoom {
+            if at.elapsed().as_secs_f32() >= ZOOM_SECS {
+                self.green_zoom = None;
+                self.menu_touched = true;
+                self.page = page;
+                self.green_in_page = true;
+                self.green_reveal = Some(std::time::Instant::now());
+            }
+        }
         if self.green_in_page {
             paint_background(&ctx, pos2(full.left() + full.width() * 0.2, full.top() + full.height() * 0.15));
             main = self.green_page(ui, full);
+            // The page comes out of the orb's glow.
+            if let Some(at) = self.green_reveal {
+                let k = at.elapsed().as_secs_f32() / REVEAL_SECS;
+                if k >= 1.0 {
+                    self.green_reveal = None;
+                } else {
+                    let a = ((1.0 - k) * (1.0 - k) * 255.0) as u8;
+                    zoom_painter(&ctx).rect_filled(full.expand(20.0), 0.0, rgba(170, 236, 60, a));
+                    ctx.request_repaint();
+                }
+            }
         } else {
             let r = (full.height() * 0.24).min(full.width() * 0.16).max(90.0);
             let orb_c = pos2(full.left() + full.width() * 0.3, full.center().y - 24.0);
             paint_background(&ctx, orb_c);
             self.green_home(ui, full, orb_c, r, t);
             ctx.request_repaint_after(std::time::Duration::from_millis(33));
+            // Zooming into the orb before a page opens.
+            if let Some((page, at)) = self.green_zoom {
+                let k = (at.elapsed().as_secs_f32() / ZOOM_SECS).min(1.0);
+                let _ = page;
+                {
+                    let e = k * k * k; // ease in: slow start, rushing at the end
+                    // Big enough at the end to cover the window from the orb's center.
+                    let reach = (orb_c - full.right_bottom()).length().max((orb_c - full.right_top()).length());
+                    let big = r + (reach * 1.15 - r) * e;
+                    let p = zoom_painter(&ctx);
+                    p.rect_filled(full.expand(20.0), 0.0, rgba(1, 10, 1, (k * 150.0) as u8));
+                    paint_big_orb(&p, orb_c, big, t);
+                    let glow = ((k - 0.55).max(0.0) / 0.45).powi(2);
+                    p.rect_filled(full.expand(20.0), 0.0, rgba(170, 236, 60, (glow * 255.0) as u8));
+                }
+                ctx.request_repaint();
+            }
             main = full;
         }
         self.update_prompt(&ctx);

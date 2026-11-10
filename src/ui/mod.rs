@@ -124,6 +124,10 @@ pub struct App {
     pub green_in_page: bool,
     /// Green dashboard: highlighted menu entry on the home screen.
     pub green_cursor: usize,
+    /// Opening a page from home: zooming into the orb (page, start).
+    pub green_zoom: Option<(Page, Instant)>,
+    /// The page fading in out of the orb's glow.
+    pub green_reveal: Option<Instant>,
 }
 
 impl App {
@@ -200,6 +204,8 @@ impl App {
             leak_open: false,
             green_in_page: false,
             green_cursor: 0,
+            green_zoom: None,
+            green_reveal: None,
         }
     }
 
