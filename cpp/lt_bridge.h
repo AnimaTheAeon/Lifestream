@@ -36,6 +36,8 @@ public:
   void set_file_priority(rust::Str hash, int32_t index, int32_t prio);
   void pause_torrent(rust::Str hash);
   void resume_torrent(rust::Str hash);
+  void stop_torrent(rust::Str hash);
+  void force_start(rust::Str hash);
   void remove_torrent(rust::Str hash, bool delete_files);
   void recheck(rust::Str hash);
   void set_sequential(rust::Str hash, bool on);

@@ -426,6 +426,22 @@ void Engine::resume_torrent(rust::Str hash) {
   h.resume();
 }
 
+// Unlike pause (graceful: finishes pieces in flight), this cuts off now.
+void Engine::stop_torrent(rust::Str hash) {
+  auto h = find(hash);
+  if (!h.is_valid()) return;
+  h.unset_flags(lt::torrent_flags::auto_managed);
+  h.pause();
+}
+
+// Start now even if the queue's active limit is full.
+void Engine::force_start(rust::Str hash) {
+  auto h = find(hash);
+  if (!h.is_valid()) return;
+  h.unset_flags(lt::torrent_flags::auto_managed);
+  h.resume();
+}
+
 void Engine::remove_torrent(rust::Str hash, bool delete_files) {
   auto h = find(hash);
   if (!h.is_valid()) return;

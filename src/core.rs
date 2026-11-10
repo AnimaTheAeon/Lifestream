@@ -31,6 +31,10 @@ pub enum Cmd {
     SetCategory { hash: String, category: String },
     Pause(String),
     Resume(String),
+    /// Stop right away (not graceful) and mark it STOPPED.
+    Stop(String),
+    /// Start a queued torrent now, past the active-torrent limit.
+    ForceStart(String),
     Remove { hash: String, delete_files: bool },
     Recheck(String),
     Sequential(String, bool),
@@ -70,6 +74,8 @@ pub struct TorrentView {
     pub ratio: f64,
     pub eta_secs: Option<i64>,
     pub seed_goal_met: bool,
+    /// Stopped with the Stop button (shown as STOPPED rather than PAUSED).
+    pub stopped: bool,
 }
 
 /// Where traffic comes out on the internet, as seen by ipinfo.io.
@@ -258,6 +264,8 @@ struct Meta {
     final_path: Option<String>,
     /// The seeding goal already fired; don't fire again if the user resumes.
     seed_rule_done: bool,
+    #[serde(default)]
+    stopped: bool,
 }
 
 fn meta_path() -> PathBuf {
@@ -626,9 +634,17 @@ impl Core {
     fn remember(&mut self, hash: &str, category: &str, final_path: Option<String>) {
         self.meta.insert(
             hash.to_string(),
-            Meta { category: category.to_string(), final_path, seed_rule_done: false },
+            Meta { category: category.to_string(), final_path, seed_rule_done: false, stopped: false },
         );
         self.save_meta();
+    }
+
+    fn set_stopped(&mut self, hash: &str, stopped: bool) {
+        let m = self.meta.entry(hash.to_string()).or_default();
+        if m.stopped != stopped {
+            m.stopped = stopped;
+            self.save_meta();
+        }
     }
 
     fn save_meta(&self) {
@@ -759,11 +775,25 @@ impl Core {
                 if let Some(e) = self.engine() {
                     e.pause_torrent(&h)
                 }
+                self.set_stopped(&h, false);
             }
             Cmd::Resume(h) => {
                 if let Some(e) = self.engine() {
                     e.resume_torrent(&h)
                 }
+                self.set_stopped(&h, false);
+            }
+            Cmd::Stop(h) => {
+                if let Some(e) = self.engine() {
+                    e.stop_torrent(&h)
+                }
+                self.set_stopped(&h, true);
+            }
+            Cmd::ForceStart(h) => {
+                if let Some(e) = self.engine() {
+                    e.force_start(&h)
+                }
+                self.set_stopped(&h, false);
             }
             Cmd::Remove { hash, delete_files } => {
                 if let Some(e) = self.engine() {
@@ -1118,8 +1148,11 @@ impl Core {
             let left = (info.total_wanted - info.total_done).max(0);
             let eta = if info.state == 2 && info.dl_rate > 0 { Some(left / info.dl_rate as i64) } else { None };
             let met = self.seed_goal_met(&info, ratio);
-            let category = self.meta.get(&info.hash).map(|m| m.category.clone()).unwrap_or_default();
-            views.push(TorrentView { info, category, ratio, eta_secs: eta, seed_goal_met: met });
+            let m = self.meta.get(&info.hash);
+            let category = m.map(|m| m.category.clone()).unwrap_or_default();
+            // A stopped torrent that's running again (e.g. via the web UI) isn't stopped.
+            let stopped = info.paused && m.map(|m| m.stopped).unwrap_or(false);
+            views.push(TorrentView { info, category, ratio, eta_secs: eta, seed_goal_met: met, stopped });
         }
         views.sort_by_key(|v| (v.info.queue_position < 0, v.info.queue_position, v.info.added_time));
         self.apply_seed_rules(&views);

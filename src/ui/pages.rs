@@ -24,6 +24,9 @@ fn status_of(t: &TorrentView, held: bool) -> (&'static str, Color32) {
     if i.moving {
         return ("MOVING", WARN());
     }
+    if i.paused && t.stopped {
+        return ("STOPPED", BAD());
+    }
     if i.paused {
         return if i.auto_managed { ("QUEUED", TEXT_DIM()) } else { ("PAUSED", WARN()) };
     }
@@ -292,14 +295,17 @@ impl App {
                         ff::tag(ui, &t.category.to_uppercase(), LABEL());
                     }
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        ui.menu_button("More", |ui| self.torrent_menu(ui, t));
+                        let size = egui::vec2(76.0, 24.0);
+                        egui::containers::menu::MenuButton::from_button(egui::Button::new("More").min_size(size))
+                            .ui(ui, |ui| self.torrent_menu(ui, t));
                         let (label, tip) = if i.paused { ("Resume", "Start this torrent") } else { ("Pause", "Pause this torrent") };
-                        if ui.small_button(label).on_hover_text(tip).clicked() {
+                        if ui.add(egui::Button::new(label).min_size(size)).on_hover_text(tip).clicked() {
                             self.core.send(if i.paused { Cmd::Resume(i.hash.clone()) } else { Cmd::Pause(i.hash.clone()) });
                         }
                         ui.label(dim(&human_bytes(i.total_wanted)));
                     });
                 });
+                let mut counts_x = 0.0;
                 ui.horizontal(|ui| {
                     let done = i.state >= 3;
                     ff::stat_label(ui, if done { "UP" } else { "DL" });
@@ -314,12 +320,18 @@ impl App {
                         SeederDisplay::Connected => c.to_string(),
                         SeederDisplay::Swarm => s.max(0).to_string(),
                     };
-                    ff::stat_label(ui, "S").on_hover_text("Seeders: connected (in the whole swarm)");
+                    counts_x = ff::stat_label(ui, "S").on_hover_text("Seeders: connected (in the whole swarm)").rect.left();
                     ui.label(RichText::new(fmt(i.num_seeds, i.swarm_seeds)).strong());
                     ff::stat_label(ui, "L").on_hover_text("Leechers: connected (in the whole swarm)");
                     ui.label(RichText::new(fmt(i.num_peers, i.swarm_peers)).strong());
                     ff::stat_label(ui, "RATIO").on_hover_text("Uploaded ÷ downloaded");
                     ui.label(RichText::new(format!("{:.2}", t.ratio)).strong());
+                });
+                // Start / Pause / Stop, lined up under the S, L and RATIO counts.
+                ui.add_space(3.0);
+                ui.horizontal(|ui| {
+                    ui.add_space((counts_x - ui.cursor().left()).max(0.0));
+                    self.transport_buttons(ui, t);
                 });
                 ui.horizontal(|ui| {
                     let (dr, ur) = if held { (0, 0) } else { (i.dl_rate as i64, i.ul_rate as i64) };
@@ -352,6 +364,42 @@ impl App {
         ui.add_space(4.0);
         ff::divider(ui);
         row.response.rect
+    }
+
+    fn transport_buttons(&mut self, ui: &mut egui::Ui, t: &TorrentView) {
+        let i = &t.info;
+        let h = i.hash.clone();
+        let running = !i.paused;
+        let queued = i.paused && i.auto_managed && !t.stopped;
+        let paused = i.paused && !i.auto_managed && !t.stopped;
+        ui.spacing_mut().item_spacing.x = 8.0;
+
+        let start_tip = if running {
+            "Running."
+        } else if queued {
+            "Waiting in the queue. Start it now anyway, past the active-torrent limit."
+        } else {
+            "Start it again. It picks up right where it left off."
+        };
+        if transport_button(ui, Transport::Start, running, start_tip).clicked() {
+            self.core.send(if queued { Cmd::ForceStart(h.clone()) } else { Cmd::Resume(h.clone()) });
+        }
+        let pause_tip = if paused {
+            "Paused."
+        } else {
+            "Pause once the pieces it's in the middle of are done, so nothing is wasted."
+        };
+        if transport_button(ui, Transport::Pause, paused, pause_tip).clicked() {
+            self.core.send(Cmd::Pause(h.clone()));
+        }
+        let stop_tip = if t.stopped {
+            "Stopped."
+        } else {
+            "Stop right now: drops every connection immediately and closes its files. Shows as STOPPED until you start it."
+        };
+        if transport_button(ui, Transport::Stop, t.stopped, stop_tip).clicked() {
+            self.core.send(Cmd::Stop(h));
+        }
     }
 
     fn torrent_menu(&mut self, ui: &mut egui::Ui, t: &TorrentView) {
@@ -1601,4 +1649,55 @@ fn leak_report(ui: &mut egui::Ui, r: &crate::core::LeakResult, adapter: &str) {
             }
         }
     });
+}
+
+#[derive(Clone, Copy)]
+enum Transport {
+    Start,
+    Pause,
+    Stop,
+}
+
+/// A media-style button with a drawn icon. The button for the torrent's
+/// current state is lit and does nothing when clicked.
+fn transport_button(ui: &mut egui::Ui, kind: Transport, current: bool, tip: &str) -> egui::Response {
+    let label = match kind {
+        Transport::Start => "Start",
+        Transport::Pause => "Pause",
+        Transport::Stop => "Stop",
+    };
+    let sense = if current { egui::Sense::hover() } else { egui::Sense::click() };
+    let (rect, resp) = ui.allocate_exact_size(egui::vec2(96.0, 30.0), sense);
+    let resp = resp.on_hover_text(tip);
+    if !ui.is_rect_visible(rect) {
+        return resp;
+    }
+    let vis = ui.style().interact(&resp);
+    let (fill, edge, fg) = if current {
+        (ff::pal().accent, ff::pal().accent, ff::pal().on_accent)
+    } else {
+        (vis.weak_bg_fill, vis.bg_stroke.color, vis.text_color())
+    };
+    let p = ui.painter();
+    p.rect(rect, vis.corner_radius, fill, egui::Stroke::new(1.0, edge), egui::StrokeKind::Inside);
+    let c = egui::pos2(rect.left() + 20.0, rect.center().y);
+    match kind {
+        Transport::Start => {
+            let pts = vec![c + egui::vec2(-5.0, -7.0), c + egui::vec2(7.0, 0.0), c + egui::vec2(-5.0, 7.0)];
+            p.add(egui::Shape::convex_polygon(pts, fg, egui::Stroke::NONE));
+        }
+        Transport::Pause => {
+            for dx in [-5.0, 1.5] {
+                p.rect_filled(egui::Rect::from_min_size(c + egui::vec2(dx, -7.0), egui::vec2(4.0, 14.0)), 1.0, fg);
+            }
+        }
+        Transport::Stop => {
+            p.rect_filled(egui::Rect::from_center_size(c, egui::vec2(12.0, 12.0)), 1.5, fg);
+        }
+    }
+    p.text(egui::pos2(rect.left() + 36.0, rect.center().y), egui::Align2::LEFT_CENTER, label, egui::FontId::proportional(15.0), fg);
+    if resp.hovered() && !current {
+        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+    }
+    resp
 }

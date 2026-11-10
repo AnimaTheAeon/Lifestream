@@ -140,6 +140,8 @@ pub mod ffi {
         fn set_file_priority(self: Pin<&mut Engine>, hash: &str, index: i32, prio: i32);
         fn pause_torrent(self: Pin<&mut Engine>, hash: &str);
         fn resume_torrent(self: Pin<&mut Engine>, hash: &str);
+        fn stop_torrent(self: Pin<&mut Engine>, hash: &str);
+        fn force_start(self: Pin<&mut Engine>, hash: &str);
         fn remove_torrent(self: Pin<&mut Engine>, hash: &str, delete_files: bool);
         fn recheck(self: Pin<&mut Engine>, hash: &str);
         fn set_sequential(self: Pin<&mut Engine>, hash: &str, on: bool);
