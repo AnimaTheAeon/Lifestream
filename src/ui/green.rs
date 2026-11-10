@@ -6,7 +6,7 @@
 use std::f32::consts::TAU;
 
 use eframe::egui::{
-    self, epaint::CubicBezierShape, pos2, Color32, Key, LayerId, Pos2, Rect, Sense, Shape, Stroke,
+    self, pos2, Color32, Key, LayerId, Pos2, Rect, Sense, Shape, Stroke,
     Vec2,
 };
 
@@ -76,29 +76,45 @@ fn paint_big_orb(painter: &egui::Painter, c: Pos2, r: f32, t: f32) {
         painter.add(Shape::ellipse_filled(center, Vec2::new(sx * r, sy * r), rgba(140, 240, 60, 45)));
         painter.add(Shape::ellipse_stroke(center, Vec2::new(sx * r, sy * r), Stroke::new(1.5, rgba(200, 255, 120, 70))));
     }
-    // Emblem: a lens with an eye, drawn in pale light.
-    let s = r * 0.42;
-    let ink = Stroke::new((r * 0.035).max(2.0), rgba(255, 255, 230, 215));
-    let top = c + Vec2::new(0.0, -s);
-    let bottom = c + Vec2::new(0.0, s);
-    for side in [-1.0, 1.0] {
-        painter.add(CubicBezierShape::from_points_stroke(
-            [top, c + Vec2::new(side * s * 0.95, -s * 0.45), c + Vec2::new(side * s * 0.95, s * 0.45), bottom],
-            false,
-            Color32::TRANSPARENT,
-            ink,
-        ));
+    // Emblem: a slowly twisting double helix (the Lifestream), in pale light.
+    // Strands dim and thin as they turn away; motes of light ride along them.
+    let h = r * 0.44; // half height
+    let amp = r * 0.24;
+    let turn = std::f32::consts::TAU / (h * 1.3);
+    let phase = t * 0.7;
+    let at = |y: f32, strand: f32| {
+        let a = (y + h) * turn + phase + strand * std::f32::consts::PI;
+        (c.x + amp * a.sin(), a.cos())
+    };
+    let ink = |depth: f32, alpha: f32| rgba(255, 255, 230, (alpha * (0.45 + 0.55 * (depth + 1.0) / 2.0) * 255.0) as u8);
+    // Rungs between the strands.
+    let mut y = -h + h * 0.08;
+    while y < h * 0.96 {
+        let (x0, _) = at(y, 0.0);
+        let (x1, _) = at(y, 1.0);
+        painter.line_segment([pos2(x0, c.y + y), pos2(x1, c.y + y)], Stroke::new((r * 0.025).max(1.5), rgba(255, 255, 230, 85)));
+        y += h * 0.16;
     }
-    let thin = Stroke::new((r * 0.022).max(1.5), rgba(255, 255, 230, 150));
-    for side in [-1.0, 1.0] {
-        painter.add(CubicBezierShape::from_points_stroke(
-            [c + Vec2::new(-s * 1.15, 0.0), c + Vec2::new(-s * 0.3, side * s * 0.32), c + Vec2::new(s * 0.3, side * s * 0.32), c + Vec2::new(s * 1.15, 0.0)],
-            false,
-            Color32::TRANSPARENT,
-            thin,
-        ));
+    // Strands, in short pieces so each can take its own depth.
+    let step = h / 28.0;
+    for strand in [0.0, 1.0] {
+        let mut y = -h;
+        while y < h {
+            let (x0, d0) = at(y, strand);
+            let (x1, d1) = at(y + step, strand);
+            let d = (d0 + d1) / 2.0;
+            let w = r * (0.03 + 0.028 * (d + 1.0) / 2.0);
+            painter.line_segment([pos2(x0, c.y + y), pos2(x1, c.y + y + step)], Stroke::new(w.max(1.5), ink(d, 0.95)));
+            y += step;
+        }
     }
-    painter.circle_filled(c, s * 0.2, rgba(255, 255, 230, 220));
+    // Motes drifting down the strands.
+    for i in 0..5 {
+        let f = ((t * 0.12 + i as f32 * 0.2) % 1.0) * 2.0 - 1.0;
+        let y = f * h;
+        let (x, d) = at(y, (i % 2) as f32);
+        painter.circle_filled(pos2(x, c.y + y), (r * 0.03).max(1.5) * (0.8 + 0.4 * (d + 1.0) / 2.0), ink(d, 1.0));
+    }
 }
 
 /// Ring node beside each tab.
