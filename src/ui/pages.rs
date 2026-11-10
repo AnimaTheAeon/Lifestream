@@ -745,21 +745,16 @@ impl App {
                         }
                     });
                 });
-                ui.add_space(10.0);
-                ff::window(ui, |ui| {
-                    ui.set_width(ui.available_width());
-                    ui.vertical_centered(|ui| {
-                        ff::title(ui, "Drop .torrent files here", 18.0, TEXT());
-                        ui.label(dim("or"));
-                        if ui.button("Choose .torrent file").clicked() {
-                            if let Some(p) = rfd::FileDialog::new().add_filter("Torrent", &["torrent"]).pick_file() {
-                                match std::fs::read(&p) {
-                                    Ok(d) => self.preview_bytes(d),
-                                    Err(e) => self.add.error = Some(e.to_string()),
-                                }
+                ui.add_space(8.0);
+                field(ui, ".TORRENT FILE", "Or drop one anywhere on this window", |ui| {
+                    if ui.button("Choose .torrent file…").clicked() {
+                        if let Some(p) = rfd::FileDialog::new().add_filter("Torrent", &["torrent"]).pick_file() {
+                            match std::fs::read(&p) {
+                                Ok(d) => self.preview_bytes(d),
+                                Err(e) => self.add.error = Some(e.to_string()),
                             }
                         }
-                    });
+                    }
                 });
             } else if let Some((_, pv, wanted)) = self.add.preview.as_mut() {
                 ui.horizontal(|ui| {
@@ -823,13 +818,18 @@ impl App {
             if let Some(e) = &self.add.error {
                 ui.colored_label(BAD(), e);
             }
-            ui.add_space(10.0);
+            ui.add_space(12.0);
+            let has_preview = self.add.preview.is_some();
+            let can_add = has_preview || self.add.magnet.trim().starts_with("magnet:");
+            let big = egui::Button::new(RichText::new("Add to party…").size(24.0).color(if can_add { GOOD() } else { TEXT_DIM() }).strong())
+                .min_size(egui::vec2(0.0, 64.0));
+            let add_clicked = ui
+                .with_layout(Layout::top_down_justified(Align::Center), |ui| {
+                    ui.add_enabled(can_add, big).on_disabled_hover_text("Paste a magnet link or choose a .torrent file first.").clicked()
+                })
+                .inner;
+            ui.add_space(6.0);
             ui.horizontal(|ui| {
-                let has_preview = self.add.preview.is_some();
-                let can_add = has_preview || self.add.magnet.trim().starts_with("magnet:");
-                let add_clicked = ui
-                    .add_enabled(can_add, egui::Button::new(RichText::new("Add to party…").color(GOOD()).strong()))
-                    .clicked();
                 let picked = if add_clicked { self.ask_save_folder(&self.add.category.clone()) } else { None };
                 if let Some(save_path) = picked {
                     let save_path = Some(save_path);
