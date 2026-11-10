@@ -33,6 +33,10 @@ qBittorrent and Deluge) with a Rust + egui interface.
   (`S02E05-`), regex, skip duplicates, per-rule category
 - Turtle mode (alternate limits) on demand or on a schedule
 - Stop seeding at a ratio or time, then pause / remove / remove + delete
+- Remote control that speaks Transmission's RPC (port 9091, this PC only
+  by default), so [Turks](https://github.com/AnimaTheAeon/Turks) and
+  Radarr/Sonarr/Prowlarr can use Lifestream as their download client
+  (Config → Remote control)
 
 **App**
 - Simple / Advanced mode: Simple shows what most people need

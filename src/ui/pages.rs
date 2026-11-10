@@ -1232,6 +1232,27 @@ impl App {
                 row(ui, "Prevent sleep while downloading", "Keeps the PC awake until downloads finish.", |ui| changed |= toggle(ui, &mut s.prevent_sleep));
             }
 
+            section(ui, "Remote control");
+            row(ui, "Let Turks send downloads here", "Turns on a Transmission-compatible remote control, so Turks (or Radarr, Sonarr, Prowlarr) can add torrents and watch their progress. In Turks, add a 'Transmission / Lifestream' download client. Changes apply after a restart.", |ui| {
+                changed |= toggle(ui, &mut s.rpc_enabled)
+            });
+            if s.rpc_enabled {
+                row(ui, "Port", "9091 is Transmission's usual port.", |ui| {
+                    changed |= ui.add(egui::DragValue::new(&mut s.rpc_port).range(1024..=65535)).changed()
+                });
+                if adv {
+                    row(ui, "Allow other computers", "Off: only apps on this PC can connect. Turn on if Turks runs on another machine, and set a username and password.", |ui| {
+                        changed |= toggle(ui, &mut s.rpc_allow_lan)
+                    });
+                    row(ui, "Username", "Optional. Must match the download client settings in Turks.", |ui| {
+                        changed |= ui.add(egui::TextEdit::singleline(&mut s.rpc_username).desired_width(180.0)).changed()
+                    });
+                    row(ui, "Password", "", |ui| {
+                        changed |= ui.add(egui::TextEdit::singleline(&mut s.rpc_password).password(true).desired_width(180.0)).changed()
+                    });
+                }
+            }
+
             section(ui, "Backup");
             row(ui, "Back up settings, RSS rules and torrent list", "One file. Includes download progress so nothing starts over after a restore.", |ui| {
                 if ui.button("Restore").clicked() {

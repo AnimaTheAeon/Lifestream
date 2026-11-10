@@ -25,6 +25,9 @@ pub enum Cmd {
     AddMagnet { uri: String, category: String, choice: AddChoice, save_path: Option<String> },
     AddTorrent { data: Vec<u8>, category: String, choice: AddChoice, priorities: Option<Vec<u8>>, save_path: Option<String> },
     AddFromUrl { url: String, category: String },
+    /// From the remote-control API: replies with the new torrent's hash.
+    RemoteAdd { magnet: Option<String>, data: Option<Vec<u8>>, category: String, save_path: Option<String>, paused: bool, reply: Sender<Result<String, String>> },
+    SetCategory { hash: String, category: String },
     Pause(String),
     Resume(String),
     Remove { hash: String, delete_files: bool },
@@ -707,6 +710,29 @@ impl Core {
                 } else {
                     self.download_torrent_url(url, category);
                 }
+            }
+            Cmd::RemoteAdd { magnet, data, category, save_path, paused, reply } => {
+                let mut c = self.default_choice();
+                c.paused = paused;
+                let r = match (magnet, data) {
+                    (Some(m), _) => self.add_magnet(&m, &category, c, save_path),
+                    (None, Some(d)) => self.add_bytes(&d, &category, c, None, save_path),
+                    _ => Err("Nothing to add".into()),
+                };
+                if let Ok(h) = &r {
+                    let name = self.engine().map(|e| e.torrents()).unwrap_or_default().into_iter().find(|t| &t.hash == h).map(|t| t.name).unwrap_or_default();
+                    applog::info(format!("Added from remote control: {}", if name.is_empty() { h.clone() } else { name.clone() }));
+                    self.toast(format!("Added from Turks: {}", if name.is_empty() { "a torrent".into() } else { name }));
+                }
+                let _ = reply.send(r);
+            }
+            Cmd::SetCategory { hash, category } => {
+                if let Some(m) = self.meta.get_mut(&hash) {
+                    m.category = category;
+                } else {
+                    self.meta.insert(hash, Meta { category, ..Default::default() });
+                }
+                self.save_meta();
             }
             Cmd::Pause(h) => {
                 if let Some(e) = self.engine() {

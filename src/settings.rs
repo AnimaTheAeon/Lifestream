@@ -173,6 +173,13 @@ pub struct Settings {
     pub backup_dir: String,
     pub backup_keep: u32,
     pub last_backup: i64,
+
+    // Remote control (Transmission-compatible RPC, used by Turks)
+    pub rpc_enabled: bool,
+    pub rpc_port: u16,
+    pub rpc_allow_lan: bool,
+    pub rpc_username: String,
+    pub rpc_password: String,
 }
 
 impl Default for Settings {
@@ -245,6 +252,11 @@ impl Default for Settings {
             backup_dir: data_dir().join("backups").display().to_string(),
             backup_keep: 4,
             last_backup: 0,
+            rpc_enabled: true,
+            rpc_port: 9091,
+            rpc_allow_lan: false,
+            rpc_username: String::new(),
+            rpc_password: String::new(),
         }
     }
 }
