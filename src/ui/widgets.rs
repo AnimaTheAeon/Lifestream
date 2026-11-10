@@ -5,24 +5,31 @@ use eframe::egui::{self, Align, Color32, Layout, RichText, Ui};
 use super::theme::{self as ff, BAD, GOOD, LABEL, TEXT, TEXT_DIM, WARN};
 
 static SHINRA: std::sync::OnceLock<egui::TextureHandle> = std::sync::OnceLock::new();
+/// Help icon for the green dashboard theme.
+static GREEN_HELP: std::sync::OnceLock<egui::TextureHandle> = std::sync::OnceLock::new();
 
 /// Loads the help icon once at startup.
 pub fn init_icons(ctx: &egui::Context) {
-    if SHINRA.get().is_some() {
-        return;
-    }
-    if let Ok(img) = image::load_from_memory(include_bytes!("../../resources/shinra.png")) {
-        let img = img.to_rgba8();
-        let (w, h) = img.dimensions();
-        let color = egui::ColorImage::from_rgba_unmultiplied([w as usize, h as usize], img.as_raw());
-        let _ = SHINRA.set(ctx.load_texture("shinra", color, egui::TextureOptions::LINEAR));
-    }
+    let load = |cell: &std::sync::OnceLock<egui::TextureHandle>, name: &str, bytes: &[u8]| {
+        if cell.get().is_some() {
+            return;
+        }
+        if let Ok(img) = image::load_from_memory(bytes) {
+            let img = img.to_rgba8();
+            let (w, h) = img.dimensions();
+            let color = egui::ColorImage::from_rgba_unmultiplied([w as usize, h as usize], img.as_raw());
+            let _ = cell.set(ctx.load_texture(name, color, egui::TextureOptions::LINEAR));
+        }
+    };
+    load(&SHINRA, "shinra", include_bytes!("../../resources/shinra.png"));
+    load(&GREEN_HELP, "help_green", include_bytes!("../../resources/help_green.png"));
 }
 
 /// The help icon: hover it to read what a setting does.
 pub fn help_icon(ui: &mut Ui, help: &str) -> egui::Response {
     let size = egui::vec2(17.0, 17.0);
-    let r = match SHINRA.get() {
+    let icon = if ff::is_green() { GREEN_HELP.get() } else { SHINRA.get() };
+    let r = match icon {
         Some(tex) => ui.add(egui::Image::new((tex.id(), size)).sense(egui::Sense::hover())),
         None => ui.label(RichText::new("?").color(LABEL()).strong()),
     };
