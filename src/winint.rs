@@ -115,7 +115,7 @@ const AUMID: &str = "AnimaTheAeon.Lifestream";
 
 /// Registers Lifestream's name and icon for Windows notifications (per user).
 pub fn register_notifications() {
-    let icon = crate::settings::data_dir().join("notify_icon_v2.png");
+    let icon = crate::settings::data_dir().join("notify_icon_v3.png");
     if !icon.exists() {
         let _ = std::fs::create_dir_all(crate::settings::data_dir());
         let _ = std::fs::write(&icon, include_bytes!("../resources/icon_64.png"));
