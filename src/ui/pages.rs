@@ -65,7 +65,11 @@ impl App {
                 }
             });
         });
-        ui.label(dim("Your party of downloads. Click a torrent's icon to see its files."));
+        ui.label(dim(if self.sort == Sort::Queue {
+            "Your party of downloads. Click a torrent's icon to see its files. Click and hold a download to drag it up or down the queue."
+        } else {
+            "Your party of downloads. Click a torrent's icon to see its files. Sort by queue order to drag downloads into a new order."
+        }));
 
         if self.snap.kill_hold {
             ui.add_space(4.0);
@@ -133,9 +137,15 @@ impl App {
             Sort::Added => list.sort_by_key(|t| -t.info.added_time),
         }
 
+        // Only unfinished torrents have a queue spot; reorder them in queue view.
+        let can_reorder = self.sort == Sort::Queue;
+        if !can_reorder {
+            self.drag_row = None;
+        }
         egui::ScrollArea::vertical()
             .id_salt("torrents")
             .auto_shrink([false, false])
+            .scroll_source(egui::scroll_area::ScrollSource::SCROLL_BAR | egui::scroll_area::ScrollSource::MOUSE_WHEEL)
             .show(ui, |ui| {
                 if list.is_empty() {
                     ui.add_space(30.0);
@@ -144,13 +154,110 @@ impl App {
                         ui.label(dim("Add a magnet link or a .torrent file, or drop one onto this window."));
                     });
                 }
+                // (hash, queue position, row rect) for each draggable row.
+                let mut slots: Vec<(String, i32, egui::Rect)> = Vec::new();
+                let mut dropped = false;
                 for t in &list {
-                    self.torrent_row(ui, t);
+                    if can_reorder && t.info.queue_position >= 0 {
+                        let h = &t.info.hash;
+                        // The drag area sits under the row's contents, so its
+                        // buttons still take clicks and the rest of the row drags.
+                        let resp = ui
+                            .scope_builder(egui::UiBuilder::new().id_salt(("queue_drag", h)).sense(egui::Sense::drag()), |ui| {
+                                self.torrent_row(ui, t);
+                            })
+                            .response;
+                        let rect = resp.rect;
+                        if resp.drag_started() {
+                            self.drag_row = Some(h.clone());
+                        }
+                        if resp.drag_stopped() && self.drag_row.as_deref() == Some(h.as_str()) {
+                            dropped = true;
+                        }
+                        slots.push((h.clone(), t.info.queue_position, rect));
+                    } else {
+                        self.torrent_row(ui, t);
+                    }
                 }
+                self.queue_drag(ui, &slots, dropped);
             });
     }
 
-    fn torrent_row(&mut self, ui: &mut egui::Ui, t: &TorrentView) {
+    /// Paints the drop marker while a row is dragged and moves it on release.
+    fn queue_drag(&mut self, ui: &mut egui::Ui, slots: &[(String, i32, egui::Rect)], dropped: bool) {
+        let Some(hash) = self.drag_row.clone() else { return };
+        let Some(from) = slots.iter().find(|s| s.0 == hash).map(|s| (s.1, s.2)) else {
+            self.drag_row = None;
+            return;
+        };
+        let Some(pointer) = ui.ctx().pointer_latest_pos() else { return };
+
+        // Drop before the first row whose middle is below the pointer.
+        let before = slots.iter().position(|s| pointer.y < s.2.center().y);
+        let (target, line_y) = match before {
+            Some(i) => {
+                let (_, pos, rect) = &slots[i];
+                let pos = if from.0 < *pos { pos - 1 } else { *pos };
+                (pos, rect.top() - 6.0)
+            }
+            None => {
+                let (_, pos, rect) = slots.last().unwrap();
+                (*pos, rect.bottom() + 6.0)
+            }
+        };
+
+        if dropped {
+            self.drag_row = None;
+            if target != from.0 {
+                self.core.send(Cmd::QueueSet(hash.clone(), target));
+                // Show the new order right away; the next update confirms it.
+                let torrents = &mut self.snap.torrents;
+                if let Some(src) = torrents.iter().position(|t| t.info.hash == hash) {
+                    let moved = torrents.remove(src);
+                    let dest = match before {
+                        Some(i) => torrents.iter().position(|t| t.info.hash == slots[i].0).unwrap_or(torrents.len()),
+                        None => torrents.iter().position(|t| t.info.hash == slots.last().unwrap().0).map(|p| p + 1).unwrap_or(torrents.len()),
+                    };
+                    torrents.insert(dest, moved);
+                }
+            }
+            return;
+        }
+
+        ui.ctx().set_cursor_icon(egui::CursorIcon::Grabbing);
+        let accent = ff::pal().accent;
+        let p = ui.painter();
+        // Lift the dragged row and mark where it will land.
+        p.rect_filled(from.1.expand(2.0), 4.0, accent.gamma_multiply(0.12));
+        p.rect_stroke(from.1.expand(2.0), 4.0, egui::Stroke::new(1.5, accent), egui::StrokeKind::Outside);
+        if target != from.0 {
+            let clip = ui.clip_rect();
+            let line_y = line_y.clamp(clip.top() + 3.0, clip.bottom() - 3.0);
+            let x0 = from.1.left();
+            let x1 = from.1.right();
+            p.line_segment([egui::pos2(x0, line_y), egui::pos2(x1, line_y)], egui::Stroke::new(3.0, accent));
+            p.circle_filled(egui::pos2(x0, line_y), 5.0, accent);
+            p.circle_filled(egui::pos2(x1, line_y), 5.0, accent);
+        }
+
+        // Scroll when dragging near the top or bottom edge.
+        let clip = ui.clip_rect();
+        let edge = 50.0;
+        let dy = if pointer.y < clip.top() + edge {
+            (clip.top() + edge - pointer.y).min(edge) * 0.3
+        } else if pointer.y > clip.bottom() - edge {
+            -((pointer.y - (clip.bottom() - edge)).min(edge) * 0.3)
+        } else {
+            0.0
+        };
+        if dy != 0.0 {
+            ui.scroll_with_delta(egui::vec2(0.0, dy));
+        }
+        ui.ctx().request_repaint();
+    }
+
+    /// Draws one torrent and returns its rect.
+    fn torrent_row(&mut self, ui: &mut egui::Ui, t: &TorrentView) -> egui::Rect {
         let i = &t.info;
         let held = self.snap.kill_hold || self.snap.user_paused;
         let (status, color) = status_of(t, held);
@@ -244,6 +351,7 @@ impl App {
         row.response.context_menu(|ui| self.torrent_menu(ui, t));
         ui.add_space(4.0);
         ff::divider(ui);
+        row.response.rect
     }
 
     fn torrent_menu(&mut self, ui: &mut egui::Ui, t: &TorrentView) {

@@ -44,6 +44,7 @@ public:
   void set_torrent_limits(rust::Str hash, int32_t max_conn, int32_t max_uploads);
   void move_storage(rust::Str hash, rust::Str path);
   void queue_top(rust::Str hash);
+  void queue_set(rust::Str hash, int32_t pos);
   rust::String magnet_link(rust::Str hash) const;
 
   void pause_session();
@@ -63,6 +64,7 @@ private:
   void register_handle(const lt::torrent_handle &h);
   void write_resume(const lt::add_torrent_params &p);
   void save_session_state();
+  void save_queue_order();
   void apply_first_last(const lt::torrent_handle &h);
   std::string resume_path(const std::string &hash) const;
 
