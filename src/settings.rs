@@ -170,6 +170,8 @@ pub struct Settings {
     // App
     pub start_with_windows: bool,
     pub close_to_tray: bool,
+    /// Windows pop-up notifications for finished downloads and VPN changes.
+    pub system_notifications: bool,
     pub prevent_sleep: bool,
     pub auto_backup: bool,
     pub backup_dir: String,
@@ -250,6 +252,7 @@ impl Default for Settings {
             rules: Vec::new(),
             start_with_windows: false,
             close_to_tray: true,
+            system_notifications: true,
             prevent_sleep: true,
             auto_backup: true,
             backup_dir: data_dir().join("backups").display().to_string(),

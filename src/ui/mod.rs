@@ -63,7 +63,6 @@ pub enum Sort {
 pub struct AddState {
     pub magnet: String,
     pub preview: Option<(Vec<u8>, TorrentPreview, Vec<bool>)>,
-    pub category: String,
     pub choice: AddChoice,
     pub error: Option<String>,
 }
@@ -84,6 +83,10 @@ pub struct App {
     pub drag_grab: egui::Vec2,
     /// The mouse has moved far enough for this to be a drag, not a click.
     pub drag_live: bool,
+    /// The last alert already shown as a Windows notification.
+    pub alert_seen: Option<Instant>,
+    /// Last check of who opens magnet links / .torrent files (Windows).
+    pub handler_check: Option<(Result<(), String>, Instant)>,
     /// A magnet link opened from outside (browser), waiting for the window
     /// to come up before asking where to save it.
     pub pending_magnet: Option<(String, Instant)>,
@@ -160,6 +163,8 @@ impl App {
             drag_row: None,
             drag_grab: egui::Vec2::ZERO,
             drag_live: false,
+            alert_seen: None,
+            handler_check: None,
             pending_magnet: None,
             row_order: Vec::new(),
             row_y: Default::default(),
@@ -168,7 +173,7 @@ impl App {
             popup: None,
             popup_tab: 0,
             confirm_remove: None,
-            add: AddState { magnet: String::new(), preview: None, category: String::new(), choice, error: None },
+            add: AddState { magnet: String::new(), preview: None, choice, error: None },
             incoming,
             rss_rule: 0,
             new_feed: (String::new(), String::new()),
@@ -252,6 +257,22 @@ impl App {
                 Ok(data) => self.preview_bytes(data),
                 Err(e) => self.notify(format!("Couldn't open {arg}: {e}")),
             }
+        }
+    }
+
+    /// Windows notification for new alerts, when Lifestream isn't in front.
+    fn system_notify(&mut self, ctx: &egui::Context) {
+        let Some((title, body, at)) = self.snap.alert.clone() else { return };
+        if self.alert_seen == Some(at) {
+            return;
+        }
+        self.alert_seen = Some(at);
+        let in_front = ctx.input(|i| i.viewport().focused).unwrap_or(false);
+        if self.settings.system_notifications && !in_front {
+            #[cfg(windows)]
+            crate::winint::notify(&title, &body);
+            #[cfg(not(windows))]
+            let _ = (title, body);
         }
     }
 
@@ -658,6 +679,7 @@ impl eframe::App for App {
                 }
             }
         }
+        self.system_notify(ctx);
         self.watch_updater(ctx);
         self.flush_settings(false);
         ctx.request_repaint_after(Duration::from_millis(500));

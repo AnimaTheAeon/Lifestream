@@ -54,6 +54,43 @@ pub fn register_handlers() -> Result<(), String> {
     Ok(())
 }
 
+/// Who opens a link type: Ok(()) = Lifestream, Err(name) = another app
+/// (or "nothing" when no app is set).
+fn owner(user_choice_key: &str, fallback_progid: Option<String>) -> Result<(), String> {
+    use winreg::enums::HKEY_CLASSES_ROOT;
+    let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+    let hkcr = RegKey::predef(HKEY_CLASSES_ROOT);
+    // A choice made in Windows Settings wins over plain registration.
+    let chosen: Option<String> = hkcu.open_subkey(user_choice_key).ok().and_then(|k| k.get_value("ProgId").ok());
+    let Some(progid) = chosen.or(fallback_progid) else { return Err("nothing".into()) };
+    let cmd: String = hkcr
+        .open_subkey(format!(r"{progid}\shell\open\command"))
+        .and_then(|k| k.get_value(""))
+        .unwrap_or_default();
+    if !cmd.is_empty() && cmd.to_lowercase().contains(&exe().to_lowercase()) {
+        return Ok(());
+    }
+    // A readable name for the other app, if it has one.
+    let name: String = hkcr
+        .open_subkey(format!(r"{progid}\Application"))
+        .and_then(|k| k.get_value("ApplicationName"))
+        .or_else(|_| hkcr.open_subkey(&progid).and_then(|k| k.get_value("")))
+        .unwrap_or_default();
+    let name = if name.trim().is_empty() || name.starts_with("URL:") { progid } else { name };
+    Err(name)
+}
+
+/// Whether Lifestream opens magnet links and .torrent files.
+/// Ok(()) = it does; Err(other app's name) = something else does.
+pub fn handler_status() -> Result<(), String> {
+    use winreg::enums::HKEY_CLASSES_ROOT;
+    let hkcr = RegKey::predef(HKEY_CLASSES_ROOT);
+    let magnet = owner(r"Software\Microsoft\Windows\Shell\Associations\UrlAssociations\magnet\UserChoice", Some("magnet".into()));
+    let torrent_progid: Option<String> = hkcr.open_subkey(".torrent").and_then(|k| k.get_value("")).ok();
+    let torrent = owner(r"Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.torrent\UserChoice", torrent_progid);
+    magnet.and(torrent)
+}
+
 pub fn keep_awake(on: bool) {
     use windows::Win32::System::Power::{SetThreadExecutionState, ES_CONTINUOUS, ES_SYSTEM_REQUIRED};
     unsafe {
@@ -72,4 +109,34 @@ pub fn hold_install_mutex() {
         // Leaked on purpose: it must live until the process exits.
         let _ = CreateMutexW(None, false, windows::core::w!("LifestreamSingleInstance"));
     }
+}
+
+const AUMID: &str = "AnimaTheAeon.Lifestream";
+
+/// Registers Lifestream's name and icon for Windows notifications (per user).
+pub fn register_notifications() {
+    let icon = crate::settings::data_dir().join("notify_icon.png");
+    if !icon.exists() {
+        let _ = std::fs::create_dir_all(crate::settings::data_dir());
+        let _ = std::fs::write(&icon, include_bytes!("../resources/icon_64.png"));
+    }
+    let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+    if let Ok((k, _)) = hkcu.create_subkey(format!(r"Software\Classes\AppUserModelId\{AUMID}")) {
+        let _ = k.set_value("DisplayName", &"Lifestream");
+        let _ = k.set_value("IconUri", &icon.display().to_string());
+    }
+}
+
+/// Shows a Windows notification (off the UI thread).
+pub fn notify(title: &str, body: &str) {
+    let (title, body) = (title.to_string(), body.to_string());
+    std::thread::spawn(move || {
+        let mut t = tauri_winrt_notification::Toast::new(AUMID).title(&title);
+        if !body.is_empty() {
+            t = t.text1(&body);
+        }
+        if let Err(e) = t.show() {
+            crate::applog::warn(format!("Notification failed: {e:?}"));
+        }
+    });
 }

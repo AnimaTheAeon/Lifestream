@@ -622,7 +622,7 @@ rust::Vec<rust::String> Engine::pop_alerts() {
       std::string hash = hex_of(f->handle);
       f->handle.save_resume_data(lt::torrent_handle::save_info_dict);
       pending_saves_++;
-      out.push_back(rs("FINISHED|" + hash + "|" + f->message()));
+      out.push_back(rs("FINISHED|" + hash + "|" + std::string(f->torrent_name())));
       continue;
     }
     if (auto *ls = lt::alert_cast<lt::listen_succeeded_alert>(a)) {
