@@ -84,6 +84,9 @@ pub struct App {
     pub drag_grab: egui::Vec2,
     /// The mouse has moved far enough for this to be a drag, not a click.
     pub drag_live: bool,
+    /// A magnet link opened from outside (browser), waiting for the window
+    /// to come up before asking where to save it.
+    pub pending_magnet: Option<(String, Instant)>,
     /// Row order and on-screen spots last frame, for slide animations.
     pub row_order: Vec<String>,
     pub row_y: std::collections::HashMap<String, f32>,
@@ -157,6 +160,7 @@ impl App {
             drag_row: None,
             drag_grab: egui::Vec2::ZERO,
             drag_live: false,
+            pending_magnet: None,
             row_order: Vec::new(),
             row_y: Default::default(),
             row_anim: Default::default(),
@@ -241,15 +245,41 @@ impl App {
     pub fn open_argument(&mut self, arg: &str) {
         let arg = arg.trim();
         if arg.starts_with("magnet:") {
-            self.add.magnet = arg.to_string();
-            self.add.preview = None;
-            self.page = Page::Add;
-            self.menu_touched = true;
+            // Straight in: ask where to save, then add it with the default options.
+            self.pending_magnet = Some((arg.to_string(), Instant::now()));
         } else if arg.to_lowercase().ends_with(".torrent") {
             match std::fs::read(arg) {
                 Ok(data) => self.preview_bytes(data),
                 Err(e) => self.notify(format!("Couldn't open {arg}: {e}")),
             }
+        }
+    }
+
+    /// Handles a magnet link from the browser once the window is showing.
+    fn quick_add_magnet(&mut self, ctx: &egui::Context) {
+        let Some((uri, at)) = self.pending_magnet.as_ref() else { return };
+        // Give the window a moment to come up so the folder dialog opens in front.
+        if at.elapsed() < Duration::from_millis(250) {
+            ctx.request_repaint_after(Duration::from_millis(50));
+            return;
+        }
+        let uri = uri.clone();
+        self.pending_magnet = None;
+        let Some(save_path) = self.ask_save_folder("") else {
+            self.notify("Magnet link not added (no folder picked).");
+            return;
+        };
+        let choice = AddChoice {
+            paused: self.settings.start_paused,
+            sequential: self.settings.default_sequential,
+            first_last: self.settings.default_first_last,
+            skip_check: false,
+        };
+        self.core.send(Cmd::AddMagnet { uri, category: String::new(), choice, save_path: Some(save_path) });
+        self.page = Page::Torrents;
+        self.menu_touched = true;
+        if ff::is_green() {
+            self.green_in_page = true;
         }
     }
 
@@ -636,6 +666,7 @@ impl eframe::App for App {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         let ctx = ui.ctx().clone();
         self.handle_drops(&ctx);
+        self.quick_add_magnet(&ctx);
         egui::CentralPanel::default()
             .frame(egui::Frame::new().fill(ff::BACKDROP()).inner_margin(egui::Margin::same(14)))
             .show(ui, |ui| self.layout(ui));
