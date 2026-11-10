@@ -1,0 +1,429 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#121e78">
+<title>Lifestream</title>
+<link rel="icon" href="/icon.png">
+<style>
+@font-face { font-family: Nunito; font-weight: 400 700; src: url('/fonts/nunito-700.ttf') format('truetype'); }
+@font-face { font-family: Nunito; font-weight: 800 900; src: url('/fonts/nunito-800.ttf') format('truetype'); }
+:root {
+  --win: linear-gradient(160deg, #2e56be 0%, #1a2c96 40%, #121e78 62%, #06083a 100%);
+  --light: #d6d8e4; --mid: #8c90a8; --dark: #2c2e46;
+  --text: #f4f4f8; --dim: #aab2d6; --label: #70ccff;
+  --good: #78e68c; --warn: #ffe260; --bad: #ff6e6e; --well: #080c34;
+  --shadow: 2px 2px 0 rgba(0, 0, 0, .85);
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; height: 100%; }
+body { background: #04040c; color: var(--text); font: 700 15px/1.4 Nunito, system-ui, sans-serif; text-shadow: var(--shadow); }
+button, input, select { font: inherit; }
+.app { display: flex; flex-direction: column; gap: 12px; height: 100%; padding: 12px; }
+.main { display: flex; gap: 12px; flex: 1; min-height: 0; }
+.win { background: var(--win); border: 2px solid var(--light); border-radius: 8px; box-shadow: 0 0 0 1px var(--dark), inset 0 0 0 1px var(--mid), 0 6px 14px rgba(0,0,0,.6); }
+.content { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; }
+.content > .scroll { flex: 1; overflow: auto; padding: 16px 20px; }
+.side { width: 240px; flex: none; display: flex; flex-direction: column; justify-content: space-between; gap: 12px; }
+nav.win { padding: 10px 8px; display: flex; flex-direction: column; gap: 2px; }
+.mi { position: relative; display: flex; align-items: center; min-height: 40px; padding: 0 10px 0 44px; border: 0; border-radius: 4px; background: none; color: var(--text); font-weight: 800; font-size: 20px; text-shadow: var(--shadow); text-align: left; cursor: pointer; }
+.mi:hover, .mi:focus-visible { background: rgba(255,255,255,.08); outline: none; }
+.mi[aria-current="page"] { background: rgba(112,204,255,.14); }
+.hand { position: absolute; left: 8px; top: 50%; margin-top: -10px; width: 30px; height: 20px; display: none; }
+.mi[aria-current="page"] .hand { display: block; }
+.info { padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; }
+.row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.lbl { color: var(--label); font-weight: 800; font-size: 13px; letter-spacing: .06em; }
+.val { font-weight: 800; font-size: 16px; font-variant-numeric: tabular-nums; }
+.good { color: var(--good); } .warn { color: var(--warn); } .bad { color: var(--bad); } .dimc { color: var(--dim); }
+.status { min-height: 44px; display: flex; align-items: center; gap: 10px; padding: 0 16px; font-size: 16px; white-space: nowrap; overflow: hidden; }
+.status > span { overflow: hidden; text-overflow: ellipsis; }
+.badge { flex: none; }
+h1 { margin: 0 0 12px; font-size: 28px; font-weight: 800; }
+h2 { margin: 22px 0 8px; font-size: 18px; color: var(--label); letter-spacing: .04em; }
+.toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 12px 20px; border-bottom: 1px solid rgba(214,216,228,.3); }
+.btn { min-height: 36px; padding: 0 14px; border: 1px solid var(--mid); border-radius: 4px; background: #101a5c; color: var(--text); font-weight: 800; text-shadow: 1px 1px 0 #000; cursor: pointer; }
+.btn:hover, .btn:focus-visible { background: #2c48aa; border-color: var(--light); outline: none; }
+.btn.primary { background: #3c64c8; border-color: var(--light); }
+.btn.danger { color: var(--bad); border-color: var(--bad); }
+.btn:disabled { opacity: .5; cursor: default; }
+.icon-btn { width: 36px; padding: 0; }
+input[type=text], input[type=password], input[type=number], select { min-height: 36px; padding: 0 10px; border: 1px solid #5a64a0; border-radius: 4px; background: var(--well); color: var(--text); text-shadow: none; }
+input:focus, select:focus { outline: none; border-color: var(--light); box-shadow: 0 0 0 2px rgba(112,204,255,.4); }
+.t { display: grid; grid-template-columns: 48px minmax(0,1fr) 220px 120px auto; gap: 14px; align-items: center; padding: 10px; border-radius: 6px; }
+.t:hover { background: rgba(255,255,255,.05); }
+.sq { width: 48px; height: 48px; border: 2px solid var(--light); border-radius: 4px; background: var(--well); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 13px; }
+.name { font-size: 18px; font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sub { font-size: 13px; color: var(--dim); display: flex; gap: 12px; flex-wrap: wrap; }
+.bar { height: 8px; border-radius: 4px; background: var(--well); border: 1px solid var(--dark); overflow: hidden; }
+.fill { height: 100%; }
+.f-dl { background: linear-gradient(90deg, #1e6ee6, #8ce6ff); }
+.f-done { background: linear-gradient(90deg, #1e9a46, #a0f0b0); }
+.f-wait { background: linear-gradient(90deg, #c89614, #ffec8c); }
+.f-off { background: #5a5e78; }
+.tag { display: inline-block; padding: 3px 8px; border: 1px solid currentColor; border-radius: 3px; font-size: 12px; letter-spacing: .06em; text-align: center; min-width: 110px; }
+.acts { display: flex; gap: 6px; }
+.field input[type=checkbox] { justify-self: start; width: 20px; height: 20px; accent-color: #70ccff; }
+.field { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 12px; align-items: center; margin: 8px 0; }
+.field .help { grid-column: 2; font-size: 13px; color: var(--dim); text-shadow: none; margin-top: -4px; }
+.cat { display: flex; gap: 8px; margin: 6px 0; }
+.empty { padding: 40px 10px; text-align: center; color: var(--dim); }
+.notice { margin: 0 0 12px; padding: 10px 14px; border: 1px solid var(--warn); border-radius: 6px; background: rgba(255,226,96,.08); }
+.notice.bad { border-color: var(--bad); background: rgba(255,110,110,.08); color: var(--text); }
+.drop { margin-top: 8px; padding: 20px; border: 2px dashed var(--mid); border-radius: 6px; text-align: center; color: var(--dim); }
+.drop.over { border-color: var(--light); background: rgba(255,255,255,.05); }
+.log { font: 13px/1.5 ui-monospace, Consolas, monospace; text-shadow: none; white-space: pre-wrap; }
+.setup { max-width: 380px; margin: 10vh auto; padding: 24px 26px; }
+.toast { position: fixed; right: 20px; bottom: 76px; padding: 10px 16px; display: none; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+@media (max-width: 820px) {
+  .main { flex-direction: column-reverse; }
+  .side { width: auto; }
+  nav.win { flex-direction: row; flex-wrap: wrap; }
+  .mi { font-size: 16px; padding-left: 10px; min-height: 44px; }
+  .mi .hand { display: none !important; }
+  .info { display: none; }
+  .t { grid-template-columns: 40px minmax(0,1fr); }
+  .t > .gauge, .t > .tagcell { grid-column: 2; }
+  .t > .acts { grid-column: 2; }
+  .field { grid-template-columns: 1fr; }
+  .field .help { grid-column: 1; }
+}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="glove" viewBox="0 0 30 20"><rect x="2" y="8" width="22" height="11" rx="4" fill="#000" fill-opacity=".35"/><rect x="1" y="5" width="6" height="11" rx="2" fill="#c4c8d6" stroke="#1e1e28" stroke-width="1.2"/><rect x="6" y="4" width="12" height="13" rx="4" fill="#fafafc" stroke="#1e1e28" stroke-width="1.2"/><rect x="14" y="4" width="15" height="5" rx="2.5" fill="#fafafc" stroke="#1e1e28" stroke-width="1.2"/><path d="M9 10h7M9 13h7" stroke="#c4c8d6"/></symbol>
+</svg>
+
+<div id="setup" class="win setup" hidden>
+  <h1>Lifestream</h1>
+  <p>Choose a username and password. You'll use them to open this page, and in Midgar, Turks or Sonarr when you add Lifestream as a Transmission download client.</p>
+  <form id="setup-form">
+    <div class="field" style="grid-template-columns:1fr"><label class="lbl" for="su">USERNAME</label><input id="su" type="text" autocomplete="username" required></div>
+    <div class="field" style="grid-template-columns:1fr"><label class="lbl" for="sp">PASSWORD (6+ CHARACTERS)</label><input id="sp" type="password" autocomplete="new-password" minlength="6" required></div>
+    <button class="btn primary" type="submit" style="width:100%;margin-top:10px">Save</button>
+    <p id="setup-error" class="bad" role="alert"></p>
+  </form>
+</div>
+
+<div id="app" class="app" hidden>
+  <div class="main">
+    <section class="win content" aria-live="polite">
+      <div id="page"></div>
+    </section>
+    <aside class="side">
+      <nav class="win" aria-label="Menu">
+        <button class="mi" data-page="torrents"><svg class="hand"><use href="#glove"/></svg>Torrents</button>
+        <button class="mi" data-page="add"><svg class="hand"><use href="#glove"/></svg>Add</button>
+        <button class="mi" data-page="settings"><svg class="hand"><use href="#glove"/></svg>Settings</button>
+        <button class="mi" data-page="log"><svg class="hand"><use href="#glove"/></svg>Log</button>
+      </nav>
+      <section class="win info" aria-label="Status">
+        <div class="row" style="justify-content:flex-start;gap:8px"><span id="badge"></span><span id="headline" class="val" style="font-size:14px"></span></div>
+        <div class="row"><span class="lbl">Time</span><span id="i-time" class="val"></span></div>
+        <div class="row"><span class="lbl">Down</span><span id="i-dl" class="val"></span></div>
+        <div class="row"><span class="lbl">Up</span><span id="i-ul" class="val"></span></div>
+        <div class="row"><span class="lbl">Torrents</span><span id="i-count" class="val"></span></div>
+        <button id="pause-all" class="btn" style="margin-top:4px;color:var(--label)"></button>
+      </section>
+    </aside>
+  </div>
+  <footer class="win status"><span id="s-badge" class="badge"></span><span id="s-text"></span><a id="s-update" class="tag warn" style="margin-left:auto;min-width:0;text-decoration:none" target="_blank" rel="noreferrer" hidden></a></footer>
+</div>
+<div id="toast" class="win toast" role="status"></div>
+
+<script>
+'use strict';
+const $ = (s) => document.querySelector(s);
+function el(tag, attrs, ...kids) {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (v === undefined || v === null || v === false) continue;
+    if (k === 'class') e.className = v;
+    else if (k.startsWith('on')) e.addEventListener(k.slice(2), v);
+    else if (k === 'style') e.style.cssText = v;
+    else e.setAttribute(k, v === true ? '' : v);
+  }
+  for (const k of kids.flat()) if (k !== null && k !== undefined && k !== false) e.append(k instanceof Node ? k : String(k));
+  return e;
+}
+const bytes = (n) => { if (!n || n < 0) return '0 B'; const u = ['B','KB','MB','GB','TB']; let i = 0; while (n >= 1024 && i < u.length - 1) { n /= 1024; i++; } return (i ? n.toFixed(1) : n) + ' ' + u[i]; };
+const rate = (n) => bytes(n) + '/s';
+const eta = (s) => { if (s < 0) return '—'; const h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60; return h ? `${h}h ${m}m` : `${m}m ${s % 60}s`; };
+const clock = (s) => [Math.floor(s / 3600), Math.floor(s / 60) % 60, s % 60].map((n) => String(n).padStart(2, '0')).join(':');
+function badge(kind) {
+  const fill = { good: '#1e9a46', warn: '#c89614', bad: '#b43c3c' }[kind];
+  const mark = { good: '<path d="M5.5 10.5l3 3 6-7" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>', warn: '<path d="M10 5v6M10 14v.5" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/>', bad: '<path d="M6.5 6.5l7 7M13.5 6.5l-7 7" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/>' }[kind];
+  const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  s.setAttribute('viewBox', '0 0 20 20'); s.setAttribute('width', 20); s.setAttribute('height', 20); s.setAttribute('aria-hidden', 'true');
+  s.innerHTML = `<circle cx="10" cy="10" r="9" fill="${fill}" stroke="#d6d8e4" stroke-width="1.5"/>${mark}`;
+  return s;
+}
+function toast(text) { const t = $('#toast'); t.textContent = text; t.style.display = 'block'; clearTimeout(toast.t); toast.t = setTimeout(() => t.style.display = 'none', 3500); }
+
+// ---- Transmission RPC (same API Midgar uses)
+let sessionId = '';
+async function rpc(method, args = {}) {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const r = await fetch('/transmission/rpc', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Transmission-Session-Id': sessionId }, body: JSON.stringify({ method, arguments: args }) });
+    if (r.status === 409) { sessionId = r.headers.get('X-Transmission-Session-Id') || ''; continue; }
+    const j = await r.json();
+    if (j.result !== 'success') throw new Error(j.result);
+    return j.arguments;
+  }
+  throw new Error('No session');
+}
+async function api(path, method = 'GET', body) {
+  const r = await fetch('/lifestream/api/' + path, { method, headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+  return j;
+}
+
+// ---- state
+let state = null, torrents = [], page = location.hash.slice(1) || 'torrents';
+const FIELDS = ['id','hashString','name','status','percentDone','totalSize','leftUntilDone','rateDownload','rateUpload','eta','uploadRatio','labels','errorString','downloadDir','peersConnected','isPrivate'];
+
+async function refresh() {
+  try {
+    state = await api('state');
+    if (state.setup) { $('#setup').hidden = false; $('#app').hidden = true; return; }
+    $('#setup').hidden = true; $('#app').hidden = false;
+    torrents = (await rpc('torrent-get', { fields: FIELDS })).torrents;
+    drawInfo();
+    if (page === 'torrents') drawTorrents();
+  } catch (e) {
+    $('#s-text').textContent = 'Lost contact with Lifestream (' + e.message + ')';
+  }
+}
+
+function overall() {
+  if (!state) return ['bad', 'CONNECTING', ''];
+  if (state.engineError) return ['bad', 'ENGINE ERROR', state.engineError];
+  if (state.killHold) return ['bad', 'KILL SWITCH ON', (state.killReason || '').replace('on the Network page', 'in Settings')];
+  if (state.listenError) return ['warn', 'PORT PROBLEM', state.listenError];
+  if (state.userPaused) return ['warn', 'ALL PAUSED', 'Everything is paused. Press Resume all to continue.'];
+  return ['good', state.adapter ? 'VPN PROTECTED' : 'RUNNING', state.adapterIp ? `Bound to ${state.adapter} (${state.adapterIp})` : 'Downloads are running.'];
+}
+function drawInfo() {
+  const [kind, title, detail] = overall();
+  $('#badge').replaceChildren(badge(kind));
+  $('#headline').textContent = title; $('#headline').className = 'val ' + kind;
+  $('#i-time').textContent = clock(state.uptimeSecs);
+  $('#i-dl').textContent = rate(state.dlRate);
+  $('#i-ul').textContent = rate(state.ulRate);
+  $('#i-count').textContent = state.torrentCount;
+  $('#pause-all').textContent = state.userPaused ? 'RESUME ALL' : 'PAUSE ALL';
+  $('#s-badge').replaceChildren(badge(kind));
+  const bits = [detail, `↓ ${rate(state.dlRate)}  ↑ ${rate(state.ulRate)}`];
+  if (state.listenPort) bits.push(`Port ${state.externalPort || state.listenPort}${state.incomingSeen ? ' (open)' : ''}`);
+  $('#s-text').textContent = bits.filter(Boolean).join(' · ');
+  $('#s-text').className = kind === 'good' ? '' : kind;
+  const u = state.update, link = $('#s-update');
+  if (u && u.version) {
+    link.hidden = false;
+    link.textContent = `UPDATE ${u.version} READY`;
+    link.href = (state.headless ? u.spk : u.installer) || u.page;
+    link.title = state.headless ? 'Download the new package, then in Package Center choose Manual Install. Your torrents and settings are kept.' : 'Lifestream offers this update in its own window too.';
+  } else link.hidden = true;
+  if (state.toast && state.toast !== drawInfo.lastToast) { drawInfo.lastToast = state.toast; toast(state.toast); }
+}
+
+const STATUS = { 0: ['PAUSED', 'dimc', 'f-off'], 1: ['CHECK WAIT', 'warn', 'f-wait'], 2: ['CHECKING', 'warn', 'f-wait'], 3: ['QUEUED', 'dimc', 'f-wait'], 4: ['DOWNLOADING', '', 'f-dl'], 5: ['QUEUED', 'dimc', 'f-done'], 6: ['SEEDING', 'good', 'f-done'] };
+
+function torrentRow(t) {
+  let [word, cls, fill] = STATUS[t.status] || ['?', '', 'f-off'];
+  const pct = Math.round((t.percentDone || 0) * 1000) / 10;
+  const noInfo = !t.totalSize;
+  const done = !noInfo && t.leftUntilDone === 0;
+  if (noInfo && t.status !== 0) [word, cls] = ['GETTING INFO', 'warn'];
+  // The kill switch or Pause all holds everything at the session level.
+  if (state && (state.killHold || state.userPaused) && t.status !== 0) [word, cls, fill] = ['HELD', 'warn', 'f-wait'];
+  const paused = t.status === 0;
+  const act = (method) => async () => { try { await rpc(method, { ids: [t.hashString] }); refresh(); } catch (e) { toast(e.message); } };
+  return el('div', { class: 't' },
+    el('div', { class: 'sq', title: t.isPrivate ? 'Private tracker' : '' }, pct >= 100 ? '✓' : Math.floor(pct) + '%'),
+    el('div', { style: 'min-width:0' },
+      el('div', { class: 'name', title: t.name }, t.name || t.hashString),
+      el('div', { class: 'sub' },
+        el('span', {}, el('span', { class: 'lbl' }, 'SIZE '), bytes(t.totalSize)),
+        el('span', {}, el('span', { class: 'lbl' }, 'RATIO '), (t.uploadRatio || 0).toFixed(2)),
+        t.labels && t.labels.length ? el('span', {}, el('span', { class: 'lbl' }, 'CAT '), t.labels[0]) : null,
+        el('span', {}, el('span', { class: 'lbl' }, 'PEERS '), t.peersConnected),
+        t.errorString ? el('span', { class: 'bad' }, t.errorString) : null)),
+    el('div', { class: 'gauge' },
+      el('div', { class: 'row' }, el('span', { class: 'lbl' }, done ? 'DONE' : 'ETA ' + eta(t.eta)), el('span', { class: 'val', style: 'font-size:14px' }, `↓ ${rate(t.rateDownload)}  ↑ ${rate(t.rateUpload)}`)),
+      el('div', { class: 'bar', role: 'progressbar', 'aria-valuenow': pct, 'aria-valuemin': 0, 'aria-valuemax': 100, 'aria-label': (t.name || '') + ' progress' }, el('div', { class: 'fill ' + fill, style: `width:${pct}%` }))),
+    el('div', { class: 'tagcell' }, el('span', { class: 'tag ' + cls }, word)),
+    el('div', { class: 'acts' },
+      el('button', { class: 'btn icon-btn', title: paused ? 'Resume' : 'Pause', 'aria-label': (paused ? 'Resume ' : 'Pause ') + t.name, onclick: act(paused ? 'torrent-start' : 'torrent-stop') }, paused ? '▶' : '❚❚'),
+      el('button', { class: 'btn icon-btn danger', title: 'Remove', 'aria-label': 'Remove ' + t.name, onclick: () => removeDialog(t) }, '✕')));
+}
+
+async function removeDialog(t) {
+  if (!confirm(`Remove "${t.name}" from Lifestream?`)) return;
+  const del = confirm('Also delete its downloaded files?\n\nOK = delete files, Cancel = keep files');
+  try { await rpc('torrent-remove', { ids: [t.hashString], 'delete-local-data': del }); toast('Removed'); refresh(); } catch (e) { toast(e.message); }
+}
+
+let filter = '';
+function drawTorrents() {
+  const root = $('#page');
+  let list = root.querySelector('#tlist');
+  if (!list) {
+    root.replaceChildren(
+      el('div', { class: 'toolbar' },
+        el('h1', { style: 'margin:0;flex:1' }, 'Torrents'),
+        el('label', { class: 'sr', for: 'flt' }, 'Filter torrents'),
+        el('input', { id: 'flt', type: 'text', placeholder: 'Filter…', value: filter, oninput: (e) => { filter = e.target.value.toLowerCase(); drawTorrents(); } }),
+        el('button', { class: 'btn', onclick: () => go('add') }, 'Add torrent')),
+      el('div', { class: 'scroll', id: 'tlist' }));
+    list = root.querySelector('#tlist');
+  }
+  const shown = torrents.filter((t) => !filter || (t.name || '').toLowerCase().includes(filter));
+  list.replaceChildren(...(shown.length ? shown.map(torrentRow) : [el('div', { class: 'empty' }, torrents.length ? 'Nothing matches that filter.' : 'No torrents yet. Add one, or let Midgar send some.')]));
+}
+
+function drawAdd() {
+  const cats = (state && state.categories) || [];
+  const catSel = el('select', { id: 'acat' }, el('option', { value: '' }, 'No category'), ...cats.map((c) => el('option', { value: c }, c)));
+  const paused = el('input', { type: 'checkbox', id: 'apause' });
+  const magnet = el('input', { type: 'text', id: 'amag', placeholder: 'magnet:?xt=… or https://…/file.torrent', style: 'width:100%' });
+  const fileIn = el('input', { type: 'file', accept: '.torrent', multiple: true, id: 'afile', class: 'sr' });
+  const opts = () => ({ labels: catSel.value ? [catSel.value] : [], paused: paused.checked });
+  async function addFiles(files) {
+    for (const f of files) {
+      const buf = new Uint8Array(await f.arrayBuffer());
+      let bin = ''; for (let i = 0; i < buf.length; i += 0x8000) bin += String.fromCharCode(...buf.subarray(i, i + 0x8000));
+      try {
+        const r = await rpc('torrent-add', { metainfo: btoa(bin), ...opts() });
+        toast(r['torrent-duplicate'] ? 'Already in the list' : 'Added ' + f.name);
+      } catch (e) { toast(f.name + ': ' + e.message); }
+    }
+    go('torrents');
+  }
+  const drop = el('label', { class: 'drop', for: 'afile', ondragover: (e) => { e.preventDefault(); drop.classList.add('over'); }, ondragleave: () => drop.classList.remove('over'), ondrop: (e) => { e.preventDefault(); drop.classList.remove('over'); addFiles(e.dataTransfer.files); } }, 'Drop .torrent files here, or click to pick them');
+  fileIn.addEventListener('change', () => addFiles(fileIn.files));
+  $('#page').replaceChildren(el('div', { class: 'scroll' },
+    el('h1', {}, 'Add'),
+    el('div', { class: 'field' }, el('label', { class: 'lbl', for: 'amag' }, 'MAGNET LINK OR URL'), magnet),
+    el('div', { class: 'field' }, el('label', { class: 'lbl', for: 'acat' }, 'CATEGORY'), catSel, el('div', { class: 'help' }, 'Categories and their folders are set in Settings.')),
+    el('div', { class: 'field' }, el('label', { class: 'lbl', for: 'apause' }, 'ADD PAUSED'), el('div', {}, paused)),
+    el('div', { style: 'display:flex;gap:8px;margin:10px 0' }, el('button', { class: 'btn primary', onclick: async () => {
+      const v = magnet.value.trim(); if (!v) return magnet.focus();
+      try { const r = await rpc('torrent-add', { filename: v, ...opts() }); toast(r['torrent-duplicate'] ? 'Already in the list' : 'Added'); go('torrents'); } catch (e) { toast(e.message); }
+    } }, 'Add link')),
+    el('h2', {}, '.TORRENT FILES'), fileIn, drop));
+}
+
+let settings = null;
+async function drawSettings() {
+  settings = await api('settings');
+  const s = settings, adapters = (state && state.adapters) || [];
+  const v = {};
+  const text = (k, attrs = {}) => (v[k] = el('input', { type: 'text', id: 'f-' + k, value: s[k] ?? '', ...attrs }));
+  const num = (k, attrs = {}) => (v[k] = el('input', { type: 'number', id: 'f-' + k, value: s[k] ?? 0, style: 'width:140px', ...attrs }));
+  const check = (k) => (v[k] = el('input', { type: 'checkbox', id: 'f-' + k, checked: !!s[k] }));
+  const field = (k, label, control, help) => el('div', { class: 'field' }, el('label', { class: 'lbl', for: 'f-' + k }, label), control, help ? el('div', { class: 'help' }, help) : null);
+  const adapterSel = (v.adapter = el('select', { id: 'f-adapter' }, el('option', { value: '' }, 'Any (not bound)'), ...adapters.map((a) => el('option', { value: a.name, selected: a.name === s.adapter }, a.label + (a.vpn ? '  (VPN)' : '')))));
+  const seedSel = (v.seed_action = el('select', { id: 'f-seed_action' }, ...[['pause', 'Pause it'], ['remove', 'Remove it (keep files)'], ['remove-delete', 'Remove it and delete files']].map(([val, t]) => el('option', { value: val, selected: s.seed_action === val }, t))));
+  const encSel = (v.encryption = el('select', { id: 'f-encryption' }, ...[[0, 'Allow'], [1, 'Prefer'], [2, 'Require']].map(([val, t]) => el('option', { value: val, selected: s.encryption === val }, t))));
+  const catBox = el('div', { id: 'cats' });
+  const catRow = (c = { name: '', path: '' }) => {
+    const row = el('div', { class: 'cat' },
+      el('input', { type: 'text', value: c.name, placeholder: 'Name (e.g. tv)', 'aria-label': 'Category name', style: 'width:140px' }),
+      el('input', { type: 'text', value: c.path, placeholder: '/volume1/video/TV', 'aria-label': 'Category folder', style: 'flex:1' }),
+      el('button', { class: 'btn danger', onclick: () => row.remove() }, 'Remove'));
+    catBox.append(row);
+  };
+  (s.categories || []).forEach(catRow);
+  const pass = el('input', { type: 'password', id: 'f-rpc_password', placeholder: s.rpc_password_set ? '(unchanged)' : '', autocomplete: 'new-password' });
+  const err = el('p', { class: 'bad', role: 'alert' });
+
+  async function save() {
+    const body = {};
+    for (const [k, c] of Object.entries(v)) {
+      if (c.type === 'checkbox') body[k] = c.checked;
+      else if (c.type === 'number') body[k] = Number(c.value);
+      else if (k === 'encryption') body[k] = Number(c.value);
+      else body[k] = c.value;
+    }
+    body.categories = [...catBox.children].map((r) => { const [n, p] = r.querySelectorAll('input'); return { name: n.value, path: p.value }; }).filter((c) => c.name.trim());
+    if (pass.value) body.rpc_password = pass.value;
+    try { await api('settings', 'PUT', body); err.textContent = ''; toast('Settings saved'); pass.value = ''; refresh(); }
+    catch (e) { err.textContent = e.message; }
+  }
+
+  $('#page').replaceChildren(
+    el('div', { class: 'toolbar' }, el('h1', { style: 'margin:0;flex:1' }, 'Settings'), el('button', { class: 'btn primary', onclick: save }, 'Save')),
+    el('div', { class: 'scroll' }, err,
+      el('h2', {}, 'FOLDERS'),
+      field('download_dir', 'DOWNLOAD FOLDER', text('download_dir', { style: 'width:100%' }), 'On a Synology use a shared folder, e.g. /volume1/downloads. The Lifestream user needs Read/Write on it.'),
+      el('div', { class: 'field' }, el('span', { class: 'lbl' }, 'CATEGORIES'), el('div', {}, catBox, el('button', { class: 'btn', onclick: () => catRow() }, 'Add category')), el('div', { class: 'help' }, 'Midgar and Turks send their category (like "tv"). Give it a folder here; point TV/Movies at folders Jenova watches for subtitles.')),
+      field('incomplete_enabled', 'KEEP UNFINISHED SEPARATE', check('incomplete_enabled')),
+      field('incomplete_dir', 'UNFINISHED FOLDER', text('incomplete_dir', { style: 'width:100%' })),
+      el('h2', {}, 'VPN AND NETWORK'),
+      field('adapter', 'VPN ADAPTER', adapterSel, 'Torrent traffic only uses this connection.'),
+      field('kill_switch', 'KILL SWITCH', check('kill_switch'), 'If the adapter drops (or none is picked), everything pauses until it is back.'),
+      field('listen_port', 'LISTENING PORT', num('listen_port')),
+      field('follow_vpn_port', 'USE VPN PORT FORWARDING', check('follow_vpn_port')),
+      field('natpmp', 'NAT-PMP', check('natpmp')),
+      field('upnp', 'UPNP', check('upnp')),
+      el('h2', {}, 'SPEED (KB/S, 0 = NO LIMIT)'),
+      field('dl_limit_kb', 'DOWNLOAD', num('dl_limit_kb')),
+      field('ul_limit_kb', 'UPLOAD', num('ul_limit_kb')),
+      field('turtle_dl_kb', 'TURTLE DOWNLOAD', num('turtle_dl_kb')),
+      field('turtle_ul_kb', 'TURTLE UPLOAD', num('turtle_ul_kb')),
+      field('active_downloads', 'ACTIVE DOWNLOADS', num('active_downloads')),
+      field('active_seeds', 'ACTIVE SEEDS', num('active_seeds')),
+      el('h2', {}, 'SEEDING'),
+      field('ratio_limit', 'STOP AT RATIO', num('ratio_limit', { step: '0.1' }), '0 = no limit'),
+      field('seed_hours', 'OR AFTER HOURS', num('seed_hours', { step: '0.5' }), '0 = no limit'),
+      field('seed_action', 'THEN', seedSel),
+      el('h2', {}, 'PRIVACY'),
+      field('encryption', 'ENCRYPTION', encSel),
+      field('anonymous_mode', 'ANONYMOUS MODE', check('anonymous_mode')),
+      field('dht', 'DHT', check('dht')),
+      field('pex', 'PEER EXCHANGE', check('pex'), 'Takes effect after a restart.'),
+      field('lsd', 'LOCAL PEER DISCOVERY', check('lsd')),
+      field('blocklist_url', 'BLOCKLIST URL', text('blocklist_url', { style: 'width:100%' })),
+      el('h2', {}, 'SIGN-IN AND REMOTE CONTROL'),
+      field('rpc_username', 'USERNAME', text('rpc_username')),
+      el('div', { class: 'field' }, el('label', { class: 'lbl', for: 'f-rpc_password' }, 'NEW PASSWORD'), pass, el('div', { class: 'help' }, 'In Midgar/Turks/Sonarr add a Transmission client: this NAS or PC, port 9091, URL base /transmission/, and these details.')),
+      el('h2', {}, 'TOOLS'),
+      el('div', { style: 'display:flex;gap:8px;flex-wrap:wrap' },
+        el('button', { class: 'btn', onclick: () => api('action', 'POST', { action: 'leak-check' }).then(() => toast('Checking…')) }, 'Leak check'),
+        el('button', { class: 'btn', onclick: () => api('action', 'POST', { action: 'update-blocklist' }).then(() => toast('Updating blocklist…')) }, 'Update blocklist'),
+        el('button', { class: 'btn', onclick: () => api('action', 'POST', { action: 'rss-check' }).then(() => toast('Checking feeds…')) }, 'Check RSS now')),
+      el('p', { class: 'dimc' }, `Lifestream ${state ? state.version : ''}${state && state.headless ? ' for Synology' : ''}`)));
+}
+
+async function drawLog() {
+  const { lines } = await api('log');
+  $('#page').replaceChildren(
+    el('div', { class: 'toolbar' }, el('h1', { style: 'margin:0;flex:1' }, 'Log'), el('button', { class: 'btn', onclick: drawLog }, 'Refresh')),
+    el('div', { class: 'scroll log' }, ...lines.map((l) => el('div', { class: l.level === 'error' ? 'bad' : l.level === 'warn' ? 'warn' : '' }, `${l.time}  ${l.text}`))));
+}
+
+function go(p) {
+  page = p; history.replaceState(null, '', '#' + p);
+  document.querySelectorAll('.mi').forEach((b) => b.setAttribute('aria-current', b.dataset.page === p ? 'page' : 'false'));
+  ({ torrents: drawTorrents, add: drawAdd, settings: drawSettings, log: drawLog })[p]();
+}
+
+document.querySelectorAll('.mi').forEach((b) => b.addEventListener('click', () => go(b.dataset.page)));
+$('#pause-all').addEventListener('click', async () => { await api('action', 'POST', { action: state.userPaused ? 'resume-all' : 'pause-all' }); refresh(); });
+$('#setup-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  try { await api('setup', 'POST', { user: $('#su').value, pass: $('#sp').value }); location.reload(); }
+  catch (err) { $('#setup-error').textContent = err.message; }
+});
+
+refresh().then(() => { if (state && !state.setup) go(['torrents', 'add', 'settings', 'log'].includes(page) ? page : 'torrents'); });
+setInterval(refresh, 2000);
+</script>
+</body>
+</html>

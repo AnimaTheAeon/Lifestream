@@ -1,4 +1,4 @@
-name: Build Windows
+name: Build Windows and Synology
 
 on:
   push:
@@ -18,6 +18,9 @@ env:
 jobs:
   build:
     runs-on: windows-latest
+    outputs:
+      version: ${{ steps.ver.outputs.version }}
+      exists: ${{ steps.ver.outputs.exists }}
     steps:
       - uses: actions/checkout@v4
 
@@ -84,20 +87,6 @@ jobs:
             target/release/lifestream.exe
             target/installer/*.exe
 
-      # A push to main with a new version number publishes a release.
-      - name: Publish release for new version
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.ver.outputs.exists == 'false'
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v${{ steps.ver.outputs.version }}
-          target_commitish: ${{ github.sha }}
-          name: Lifestream v${{ steps.ver.outputs.version }}
-          files: |
-            target/release/lifestream.exe
-            target/installer/*.exe
-          make_latest: true
-          generate_release_notes: true
-
       - name: Attach exe to release
         if: github.event_name == 'release' || startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
@@ -108,3 +97,63 @@ jobs:
             target/installer/*.exe
           make_latest: true
           overwrite_files: true
+
+  # Headless Lifestream for Synology DSM 7 (x86_64, e.g. DS923+), controlled
+  # from its web page. Built on Ubuntu 22.04 so it runs on DSM 7.2's glibc;
+  # libtorrent and the C++ runtime are bundled next to the binary.
+  synology:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install libtorrent
+        run: sudo apt-get update -q && sudo apt-get install -y -q libtorrent-rasterbar-dev pkg-config
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: headless
+      - name: Test
+        run: cargo test --release --no-default-features
+      - name: Build
+        env:
+          # DT_RPATH (not RUNPATH) so bundled libraries also find each other.
+          RUSTFLAGS: "-C link-arg=-Wl,--disable-new-dtags,-rpath,$ORIGIN/lib"
+        run: cargo build --release --no-default-features
+      - name: Package
+        run: |
+          v=$(grep -m1 '^version = ' Cargo.toml | cut -d'"' -f2)
+          rm -rf stage dist && mkdir -p stage/lib
+          cp target/release/lifestream stage/
+          # Everything it links except the C library itself, which DSM provides.
+          ldd stage/lifestream | awk '/=> \//{print $3}' \
+            | grep -vE '/(libc|libm|libpthread|libdl|librt|ld-linux[^/]*)\.so' \
+            | xargs -r -I{} cp -L {} stage/lib/
+          ls -la stage/lib
+          ldd stage/lifestream | grep -c "$PWD/stage/lib" || true
+          sh synology/build-spk.sh stage "$v" dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lifestream-synology-x86_64
+          path: dist/*.spk
+
+  # A push to main with a new version number publishes a release.
+  release:
+    needs: [build, synology]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.build.outputs.exists == 'false'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Publish release for new version
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ needs.build.outputs.version }}
+          target_commitish: ${{ github.sha }}
+          name: Lifestream v${{ needs.build.outputs.version }}
+          files: |
+            dist/release/lifestream.exe
+            dist/installer/*.exe
+            dist/*.spk
+          make_latest: true
+          generate_release_notes: true

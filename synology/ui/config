@@ -1,0 +1,14 @@
+{
+	".url": {
+		"Lifestream.Web": {
+			"type": "url",
+			"allUsers": true,
+			"title": "Lifestream",
+			"desc": "Torrents, FFVII style",
+			"icon": "images/lifestream_{0}.png",
+			"protocol": "http",
+			"port": "9091",
+			"url": "/"
+		}
+	}
+}

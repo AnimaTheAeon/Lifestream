@@ -545,6 +545,7 @@ impl Core {
             || new.upload_slots_torrent != self.settings.upload_slots_torrent;
         self.settings = new;
         self.settings.save();
+        crate::rpc::set_credentials(&self.settings.rpc_username, &self.settings.rpc_password);
         self.evaluate_adapter();
         self.turtle_active = self.settings.turtle_manual || self.in_turtle_window();
         self.sync_engine();
@@ -830,9 +831,12 @@ impl Core {
             Cmd::CopyMagnet(h) => {
                 if let Some(e) = self.engine.as_ref() {
                     let link = e.magnet_link(&h);
+                    #[cfg(feature = "gui")]
                     if let Ok(mut c) = arboard::Clipboard::new() {
                         let _ = c.set_text(link);
                     }
+                    #[cfg(not(feature = "gui"))]
+                    let _ = link;
                 }
                 self.toast("Magnet link copied");
             }

@@ -18,6 +18,20 @@ use crate::settings::Settings;
 
 const SESSION_HEADER: &str = "X-Transmission-Session-Id";
 
+/// Username and password, updated live when settings change.
+static CREDENTIALS: once_cell::sync::Lazy<std::sync::Mutex<(String, String)>> =
+    once_cell::sync::Lazy::new(|| std::sync::Mutex::new((String::new(), String::new())));
+
+pub fn set_credentials(user: &str, pass: &str) {
+    if let Ok(mut c) = CREDENTIALS.lock() {
+        *c = (user.to_string(), pass.to_string());
+    }
+}
+
+fn credentials() -> (String, String) {
+    CREDENTIALS.lock().map(|c| c.clone()).unwrap_or_default()
+}
+
 pub fn start(core: CoreHandle, settings: &Settings) {
     if !settings.rpc_enabled {
         return;
@@ -33,14 +47,17 @@ pub fn start(core: CoreHandle, settings: &Settings) {
     };
     applog::info(format!("Remote control listening on http://{addr}/transmission/rpc"));
     let session = format!("{:032x}", rand::random::<u128>());
-    let (user, pass) = (settings.rpc_username.clone(), settings.rpc_password.clone());
+    set_credentials(&settings.rpc_username, &settings.rpc_password);
     std::thread::Builder::new()
         .name("rpc".into())
         .spawn(move || {
             for req in server.incoming_requests() {
                 let core = core.clone();
-                let (session, user, pass) = (session.clone(), user.clone(), pass.clone());
-                std::thread::spawn(move || handle(core, req, &session, &user, &pass));
+                let session = session.clone();
+                std::thread::spawn(move || {
+                    let (user, pass) = credentials();
+                    handle(core, req, &session, &user, &pass)
+                });
             }
         })
         .ok();
@@ -73,18 +90,25 @@ fn handle(core: CoreHandle, mut req: Request, session: &str, user: &str, pass: &
     // Without a username and password, only apps on this PC may connect, even
     // when "allow other computers" is on.
     let local = req.remote_addr().map(|a| a.ip().is_loopback()).unwrap_or(false);
-    if !local && user.is_empty() && pass.is_empty() {
-        let _ = req.respond(Response::from_string("Set a username and password in Lifestream (Config → Remote control) to allow other devices.").with_status_code(403));
-        return;
-    }
     let path = req.url().split('?').next().unwrap_or("").trim_end_matches('/').to_string();
-    if !path.ends_with("/rpc") {
-        let _ = req.respond(Response::from_string("Lifestream remote control: POST to /transmission/rpc").with_status_code(404));
+    let is_rpc = path.ends_with("/rpc");
+    if !local && user.is_empty() && pass.is_empty() {
+        // The web page can still offer first-time setup (choose a password).
+        if !is_rpc {
+            crate::web::handle(&core, req, true);
+            return;
+        }
+        let _ = req.respond(Response::from_string("Set a username and password in Lifestream (Config → Remote control) to allow other devices.").with_status_code(403));
         return;
     }
     if !authorized(&req, user, pass) {
         let resp = Response::from_string("Unauthorized").with_status_code(401).with_header(header("WWW-Authenticate", "Basic realm=\"Lifestream\""));
         let _ = req.respond(resp);
+        return;
+    }
+    if !is_rpc {
+        // Everything else is the web page (and its small API).
+        crate::web::handle(&core, req, false);
         return;
     }
     let sent = req.headers().iter().find(|h| h.field.equiv(SESSION_HEADER)).map(|h| h.value.to_string()).unwrap_or_default();

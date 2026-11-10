@@ -64,6 +64,21 @@ Each [release](https://github.com/AnimaTheAeon/Lifestream/releases) has two file
 - **lifestream.exe**: portable. Run it from anywhere; nothing is installed.
 
 Both keep settings in the same place, so you can switch between them.
+Lifestream updates itself: it checks for a new release each time it opens.
+
+- **Lifestream-x.y.z-x86_64.spk**: Synology version (DSM 7, x86_64 models
+  such as the DS923+). In Package Center choose **Manual Install**. It has no
+  window; open **Lifestream** from the DSM main menu (or port 9091) for the
+  same FFVII-style controls in your browser, phone included. The first visit
+  asks you to choose a username and password. Give the **Lifestream** system
+  user Read/Write on your downloads folder (Control Panel → Shared Folder →
+  Edit → Permissions → System internal user). When a new version is out, the
+  page shows **UPDATE … READY**: download the new `.spk` and install it the
+  same way; torrents and settings are kept. (DSM doesn't let packages replace
+  themselves.)
+
+The desktop app serves the same web page on its remote-control port, so you
+can check on downloads from your phone too.
 
 ## Building
 
@@ -81,3 +96,7 @@ cargo build --release
 ```
 
 On Linux: `sudo apt install libtorrent-rasterbar-dev libgtk-3-dev` then `cargo build`.
+
+Headless (Synology) build: `cargo build --release --no-default-features`
+(no GUI libraries needed); `synology/build-spk.sh` packages it. CI builds it on
+Ubuntu 22.04 with libtorrent bundled.

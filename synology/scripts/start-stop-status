@@ -1,0 +1,52 @@
+#!/bin/sh
+# DSM service control for Lifestream (headless).
+APP="$SYNOPKG_PKGDEST/app"
+DATA="$SYNOPKG_PKGVAR"
+PID_FILE="$DATA/lifestream.pid"
+STOP_FILE="$DATA/Lifestream/stop-request"
+
+is_running() {
+	[ -f "$PID_FILE" ] && kill -0 "$(cat "$PID_FILE")" 2>/dev/null
+}
+
+case "$1" in
+	start)
+		is_running && exit 0
+		export HOME="$DATA"
+		export XDG_CONFIG_HOME="$DATA"
+		mkdir -p "$DATA/Lifestream"
+		rm -f "$STOP_FILE"
+		cd "$APP" || exit 1
+		nohup "$APP/lifestream" >> "$DATA/service.out" 2>&1 < /dev/null &
+		echo $! > "$PID_FILE"
+		sleep 1
+		is_running && exit 0
+		exit 1
+		;;
+	stop)
+		if is_running; then
+			PID="$(cat "$PID_FILE")"
+			# Ask nicely so download progress is saved, then insist.
+			touch "$STOP_FILE"
+			i=0
+			while [ $i -lt 40 ] && kill -0 "$PID" 2>/dev/null; do
+				sleep 0.5
+				i=$((i + 1))
+			done
+			kill -TERM "$PID" 2>/dev/null
+			sleep 1
+			kill -KILL "$PID" 2>/dev/null
+		fi
+		rm -f "$PID_FILE" "$STOP_FILE"
+		exit 0
+		;;
+	status)
+		is_running && exit 0
+		exit 3
+		;;
+	log)
+		echo "$DATA/Lifestream/lifestream.log"
+		exit 0
+		;;
+esac
+exit 0

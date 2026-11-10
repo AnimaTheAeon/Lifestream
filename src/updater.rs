@@ -3,12 +3,18 @@
 //! Installed copies (next to Inno Setup's unins000.exe) update by running the
 //! new installer; the portable exe replaces itself, like Jenova.
 
+#[cfg(feature = "gui")]
 use std::io::Read;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::atomic::AtomicU64;
+#[cfg(feature = "gui")]
+use std::sync::atomic::Ordering;
+#[cfg(feature = "gui")]
+use std::sync::Arc;
+use std::sync::Mutex;
 use std::time::Duration;
 
+#[cfg(feature = "gui")]
 use sha2::{Digest, Sha256};
 
 const RELEASES_API: &str = "https://api.github.com/repos/AnimaTheAeon/Lifestream/releases/latest";
@@ -30,6 +36,8 @@ pub struct Release {
     pub page_url: String,
     pub installer: Option<Asset>,
     pub portable: Option<Asset>,
+    /// The Synology package.
+    pub nas: Option<Asset>,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -76,6 +84,7 @@ pub fn is_installed() -> bool {
 }
 
 /// Quiet check: only an available update changes anything the user sees.
+#[cfg(feature = "gui")]
 pub fn check_in_background(updater: Arc<Updater>, ctx: eframe::egui::Context) {
     updater.set(State::Checking);
     std::thread::spawn(move || {
@@ -107,7 +116,7 @@ fn client() -> Result<reqwest::blocking::Client, String> {
         .map_err(|e| e.to_string())
 }
 
-fn fetch_latest() -> Result<Option<Release>, String> {
+pub fn fetch_latest() -> Result<Option<Release>, String> {
     let url = std::env::var("LIFESTREAM_UPDATE_URL").unwrap_or_else(|_| RELEASES_API.into());
     let resp = client()?
         .get(url)
@@ -154,6 +163,7 @@ pub fn parse_release(json: &serde_json::Value) -> Option<Release> {
             n.starts_with("lifestream-setup") && n.ends_with(".exe")
         }).cloned(),
         portable: assets.iter().find(|a| lower(a) == "lifestream.exe").cloned(),
+        nas: assets.iter().find(|a| lower(a).ends_with(".spk")).cloned(),
     })
 }
 
@@ -192,6 +202,7 @@ pub fn is_newer(candidate: &str, current: &str) -> bool {
     false
 }
 
+#[cfg(feature = "gui")]
 pub fn install_in_background(updater: Arc<Updater>, release: Release, ctx: eframe::egui::Context) {
     updater.set(State::Downloading(release.clone()));
     updater.downloaded.store(0, Ordering::SeqCst);
@@ -230,6 +241,7 @@ pub fn install_in_background(updater: Arc<Updater>, release: Release, ctx: efram
     });
 }
 
+#[cfg(feature = "gui")]
 fn download(asset: &Asset, updater: &Updater, ctx: &eframe::egui::Context) -> Result<Vec<u8>, String> {
     let mut resp = client()?.get(&asset.url).send().map_err(|e| format!("Download failed: {e}"))?;
     if !resp.status().is_success() {
