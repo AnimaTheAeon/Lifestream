@@ -76,7 +76,7 @@ fn main() -> eframe::Result<()> {
             for a in open_args {
                 let _ = tx.send(instance::Incoming::Open(a));
             }
-            Ok(Box::new(ui::App::new(cc, core, join, settings, rx, start_hidden, restored)))
+            Ok(Box::new(ui::App::new(cc, core, join, settings, rx, tx, start_hidden, restored)))
         }),
     )
 }

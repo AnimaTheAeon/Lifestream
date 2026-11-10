@@ -97,6 +97,7 @@ pub struct App {
     pub updater: Arc<crate::updater::Updater>,
     pub manual_update_check: bool,
     quitting_for_update: bool,
+    pub leak_open: bool,
 }
 
 impl App {
@@ -106,15 +107,17 @@ impl App {
         core_join: std::thread::JoinHandle<()>,
         settings: Settings,
         incoming: Receiver<Incoming>,
+        #[allow(unused_variables)] incoming_tx: std::sync::mpsc::Sender<Incoming>,
         start_hidden: bool,
         startup_notice: Option<String>,
     ) -> Self {
         configure_fonts(&cc.egui_ctx);
+        widgets::init_icons(&cc.egui_ctx);
         ff::apply_style(&cc.egui_ctx);
         let download_dir = Arc::new(Mutex::new(settings.download_dir.clone()));
 
         #[cfg(windows)]
-        let tray = crate::tray::Tray::new(core.clone(), cc.egui_ctx.clone(), Arc::clone(&download_dir));
+        let tray = crate::tray::Tray::new(core.clone(), cc.egui_ctx.clone(), Arc::clone(&download_dir), incoming_tx);
 
         let choice = AddChoice {
             paused: settings.start_paused,
@@ -156,6 +159,7 @@ impl App {
             },
             manual_update_check: false,
             quitting_for_update: false,
+            leak_open: false,
         }
     }
 
@@ -221,6 +225,33 @@ impl App {
         }
     }
 
+    /// Asks where to save, starting in the category's folder or the last folder
+    /// picked. Remembers the answer. None = cancelled.
+    pub fn ask_save_folder(&mut self, category: &str) -> Option<String> {
+        let s = &self.settings;
+        let cat_dir = s.categories.iter().find(|c| c.name == category && !c.path.trim().is_empty()).map(|c| c.path.clone());
+        let start = cat_dir
+            .or_else(|| (!s.last_save_dir.trim().is_empty()).then(|| s.last_save_dir.clone()))
+            .unwrap_or_else(|| s.download_dir.clone());
+        let _ = std::fs::create_dir_all(&start);
+        // Debug builds only: lets automated tests stand in for the dialog.
+        #[cfg(debug_assertions)]
+        if let Ok(dir) = std::env::var("LIFESTREAM_TEST_PICK_DIR") {
+            crate::applog::info(format!("Test pick (dialog would start in {start})"));
+            self.settings.last_save_dir = dir.clone();
+            self.changed();
+            return Some(dir);
+        }
+        let picked = rfd::FileDialog::new()
+            .set_title("Where should this download go?")
+            .set_directory(&start)
+            .pick_folder()?;
+        let picked = picked.display().to_string();
+        self.settings.last_save_dir = picked.clone();
+        self.changed();
+        Some(picked)
+    }
+
     pub fn preview_bytes(&mut self, data: Vec<u8>) {
         match crate::engine::ffi::parse_torrent(&data) {
             Ok(p) => {
@@ -252,10 +283,18 @@ impl App {
                 }
             }
             n => {
+                // One question for the whole batch.
+                let Some(folder) = self.ask_save_folder("") else { return };
                 let choice = self.add.choice;
                 for p in paths {
                     if let Ok(data) = std::fs::read(&p) {
-                        self.core.send(Cmd::AddTorrent { data, category: String::new(), choice, priorities: None });
+                        self.core.send(Cmd::AddTorrent {
+                            data,
+                            category: String::new(),
+                            choice,
+                            priorities: None,
+                            save_path: Some(folder.clone()),
+                        });
                     }
                 }
                 self.notify(format!("Adding {n} torrents…"));

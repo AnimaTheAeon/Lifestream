@@ -536,7 +536,7 @@ impl App {
 
             section(ui, "Where it goes");
             let cats: Vec<String> = self.settings.categories.iter().map(|c| c.name.clone()).collect();
-            row(ui, "Category", "Each category can have its own folder (set them up in Config).", |ui| {
+            row(ui, "Category", "Each category can have its own folder (set them up in Config). When you click Add, Lifestream asks where to save it, starting in the category's folder or the last folder you picked.", |ui| {
                 egui::ComboBox::from_id_salt("add_cat")
                     .selected_text(if self.add.category.is_empty() { "None".to_string() } else { self.add.category.clone() })
                     .show_ui(ui, |ui| {
@@ -546,8 +546,6 @@ impl App {
                         }
                     });
             });
-            let dest = self.settings.path_for_category(&self.add.category);
-            ui.label(dim(&format!("Saves to {dest}")));
 
             section(ui, "Options");
             row(ui, "Start right away", "Off = add it paused so you can start it later.", |ui| {
@@ -575,7 +573,12 @@ impl App {
             ui.horizontal(|ui| {
                 let has_preview = self.add.preview.is_some();
                 let can_add = has_preview || self.add.magnet.trim().starts_with("magnet:");
-                if ui.add_enabled(can_add, egui::Button::new(RichText::new("Add to party").color(GOOD).strong())).clicked() {
+                let add_clicked = ui
+                    .add_enabled(can_add, egui::Button::new(RichText::new("Add to party…").color(GOOD).strong()))
+                    .clicked();
+                let picked = if add_clicked { self.ask_save_folder(&self.add.category.clone()) } else { None };
+                if let Some(save_path) = picked {
+                    let save_path = Some(save_path);
                     let category = self.add.category.clone();
                     let choice = self.add.choice;
                     if let Some((data, pv, wanted)) = self.add.preview.take() {
@@ -592,9 +595,9 @@ impl App {
                             }
                             Some(p)
                         };
-                        self.core.send(Cmd::AddTorrent { data, category, choice, priorities });
+                        self.core.send(Cmd::AddTorrent { data, category, choice, priorities, save_path });
                     } else {
-                        self.core.send(Cmd::AddMagnet { uri: self.add.magnet.trim().to_string(), category, choice });
+                        self.core.send(Cmd::AddMagnet { uri: self.add.magnet.trim().to_string(), category, choice, save_path });
                         self.add.magnet.clear();
                     }
                     self.add.error = None;
@@ -680,7 +683,7 @@ impl App {
                 changed |= ui.add(egui::DragValue::new(&mut self.settings.rss_interval_min).range(5..=1440).suffix(" min")).changed();
             });
 
-            section(ui, "Rules");
+            w::section_help(ui, "Rules", "A rule says which feed items to download, like \"Show Name 1080p\" from season 2 on. Anything it matches is added automatically and saved to the rule's category.");
             ui.horizontal_wrapped(|ui| {
                 for (i, r) in self.settings.rules.iter().enumerate() {
                     if w::pill(ui, &r.name, self.rss_rule == i).clicked() {
@@ -693,9 +696,6 @@ impl App {
                     changed = true;
                 }
             });
-            if self.settings.rules.is_empty() {
-                ui.label(dim("A rule says which feed items to download, like \"Show Name 1080p\" from season 2 on."));
-            }
             let cats: Vec<String> = self.settings.categories.iter().map(|c| c.name.clone()).collect();
             let feed_names: Vec<String> = self.settings.feeds.iter().map(|f| f.name.clone()).collect();
             let mut delete_rule = false;
@@ -971,16 +971,37 @@ impl App {
                 ui.colored_label(BAD, &sn.listen_error);
             }
 
-            section(ui, "Leak check");
-            ui.label(dim("Asks a lookup site where your traffic comes out, once over your normal connection and once from the adapter torrents use."));
-            ui.add_space(4.0);
+            w::section_help(ui, "Leak check", "Asks a lookup site where your traffic comes out: once over your normal connection, and once from the adapter torrents use, exactly the way the torrent engine connects. Runs on its own when Lifestream opens, when the VPN reconnects, and every 30 minutes.");
             let adapter_name = self.settings.adapter.clone();
-            if ui.add_enabled(!sn.leak_checking, egui::Button::new(if sn.leak_checking { "Checking…" } else { "Run leak check" })).clicked() {
-                self.core.send(Cmd::LeakCheck);
+            let (prot, prot_title, _) = self.protection();
+            let summary = match sn.leak.as_ref().and_then(|l| l.torrent.as_ref()) {
+                Some(Ok(t)) if !t.org.is_empty() => format!("Torrents exit at {} ({})", t.ip, t.org),
+                Some(Ok(t)) => format!("Torrents exit at {}", t.ip),
+                Some(Err(_)) => "No internet through this adapter".to_string(),
+                None if sn.leak_checking => "Checking…".to_string(),
+                None => "Not checked yet".to_string(),
+            };
+            if w::disclosure(ui, self.leak_open, |ui| {
+                ff::badge(ui, prot, 18.0);
+                let color = match prot {
+                    ff::Badge::Good => GOOD,
+                    ff::Badge::Warn => WARN,
+                    ff::Badge::Bad => BAD,
+                };
+                ff::title(ui, &prot_title, 15.0, color);
+                ui.label(dim(&summary));
+            }) {
+                self.leak_open = !self.leak_open;
             }
-            ui.add_space(4.0);
-            if let Some(r) = &sn.leak {
-                leak_report(ui, r, &adapter_name);
+            if self.leak_open {
+                ui.add_space(4.0);
+                if ui.add_enabled(!sn.leak_checking, egui::Button::new(if sn.leak_checking { "Checking…" } else { "Run leak check" })).clicked() {
+                    self.core.send(Cmd::LeakCheck);
+                }
+                ui.add_space(4.0);
+                if let Some(r) = &sn.leak {
+                    leak_report(ui, r, &adapter_name);
+                }
             }
             let lower = adapter_name.to_lowercase();
             if ["tailscale", "zerotier", "hamachi", "radmin"].iter().any(|n| lower.contains(n)) {
@@ -1024,8 +1045,7 @@ impl App {
                 ui.label(dim("Paused right now because a private torrent is active (see Private trackers)."));
             }
 
-            section(ui, "Private trackers");
-            ui.label(dim("Torrents marked private automatically skip DHT, peer exchange and local discovery, and only talk to their own tracker. They get a PRIVATE tag in your list."));
+            w::section_help(ui, "Private trackers", "Torrents marked private automatically skip DHT, peer exchange and local discovery, and only talk to their own tracker. They get a PRIVATE tag in your list.");
             row(ui, "Honor tracker seeding rules", "Private torrents ignore your stop-seeding goal until they've seeded for the minimum time below.", |ui| {
                 changed |= toggle(ui, &mut s.private_honor_seed)
             });
@@ -1098,7 +1118,7 @@ impl App {
 
     pub(super) fn page_seeding(&mut self, ui: &mut egui::Ui) {
         page_title(ui, "Seeding", "When to stop sharing, and how seeders and leechers are shown.");
-        let adv = self.settings.advanced_mode;
+        let _adv = self.settings.advanced_mode;
         let s = &mut self.settings;
         let mut changed = false;
         egui::ScrollArea::vertical().id_salt("seed").auto_shrink([false, false]).show(ui, |ui| {
@@ -1108,7 +1128,7 @@ impl App {
             row(ui, "Or after seeding for", "Whichever comes first. 0 = no time limit.", |ui| {
                 changed |= ui.add(egui::DragValue::new(&mut s.seed_hours).range(0.0..=10000.0).suffix(" h")).changed()
             });
-            row(ui, "Then", "", |ui| {
+            row(ui, "Then", "What happens when a torrent reaches its goal. If you resume it afterwards, it keeps seeding until you stop it.", |ui| {
                 let label = |a: SeedAction| match a {
                     SeedAction::Pause => "Pause the torrent",
                     SeedAction::Remove => "Remove it (keep files)",
@@ -1120,10 +1140,9 @@ impl App {
                     }
                 });
             });
-            ui.label(dim("If you resume a torrent after it reaches its goal, it keeps seeding until you stop it."));
 
             section(ui, "Seeders vs. leechers");
-            row(ui, "Show as", "S 42 (180) means connected to 42 of 180 seeders in the swarm.", |ui| {
+            row(ui, "Show as", "S 42 (180) means connected to 42 of 180 seeders in the swarm. Tip: sort the Torrents list by \"Seeders vs. leechers\" to spot torrents that are hard to find.", |ui| {
                 let label = |d: SeederDisplay| match d {
                     SeederDisplay::Both => "Connected (swarm)",
                     SeederDisplay::Connected => "Connected only",
@@ -1138,9 +1157,6 @@ impl App {
             row(ui, "Swarm health bar", "Gold bar under each torrent: how many full copies exist among your peers.", |ui| {
                 changed |= toggle(ui, &mut s.health_bar)
             });
-            if adv {
-                ui.label(dim("Tip: sort the Torrents list by \"Seeders vs. leechers\" to spot torrents that are hard to find."));
-            }
         });
         if changed {
             self.changed();
@@ -1162,12 +1178,11 @@ impl App {
                 changed |= w::toggle_labeled(ui, &mut s.advanced_mode, "ADVANCED", "SIMPLE");
             });
             section(ui, "Folders");
-            ui.label(RichText::new("Download folder").color(TEXT).strong());
+            w::label_help(ui, "Default download folder", "Where RSS downloads go when their rule has no category, and the first folder offered when you add a torrent. After that, Lifestream offers the last folder you picked.");
             ui.horizontal(|ui| changed |= w::folder_field(ui, &mut s.download_dir, (ui.available_width() - 90.0).max(200.0)));
             ui.add_space(6.0);
 
-            ui.label(RichText::new("Categories").color(TEXT).strong()).on_hover_text("Pick a category when adding a torrent and it saves to that folder.");
-            ui.label(dim("Point Movies or TV at a folder Jenova watches and subtitles arrive on their own."));
+            w::label_help(ui, "Categories", "Pick a category when adding a torrent and its folder is offered as the save location. RSS rules save straight into their category's folder. Point Movies or TV at a folder Jenova watches and subtitles arrive on their own.");
             let mut remove = None;
             for (i, c) in s.categories.iter_mut().enumerate() {
                 ui.horizontal(|ui| {
@@ -1188,13 +1203,8 @@ impl App {
             }
 
             ui.add_space(6.0);
-            row(ui, "Watch a folder for .torrent files", "Anything saved there is added automatically.", |ui| changed |= toggle(ui, &mut s.watch_enabled));
-            if s.watch_enabled {
-                ui.horizontal(|ui| changed |= w::folder_field(ui, &mut s.watch_dir, (ui.available_width() - 90.0).max(200.0)));
-                row(ui, "Delete the .torrent after adding", "Off = rename it to .torrent.added instead.", |ui| changed |= toggle(ui, &mut s.watch_delete));
-            }
             if adv {
-                row(ui, "Keep unfinished files in a separate folder", "Finished downloads move to their real folder, so watch folders only see complete files.", |ui| {
+                row(ui, "Keep unfinished files in a separate folder", "Finished downloads move to their real folder, so apps watching that folder (like Jenova) only see complete files.", |ui| {
                     changed |= toggle(ui, &mut s.incomplete_enabled)
                 });
                 if s.incomplete_enabled {
