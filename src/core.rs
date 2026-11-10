@@ -221,6 +221,8 @@ pub struct Snapshot {
     pub engine_error: Option<String>,
     pub anonymous_effective: bool,
     pub toast: Option<(String, Instant)>,
+    /// Worth a Windows notification: (title, body, when).
+    pub alert: Option<(String, String, Instant)>,
 }
 
 impl Default for Snapshot {
@@ -253,6 +255,7 @@ impl Default for Snapshot {
             engine_error: None,
             anonymous_effective: true,
             toast: None,
+            alert: None,
         }
     }
 }
@@ -345,6 +348,7 @@ struct Core {
     leak: Option<LeakResult>,
     leak_checking: bool,
     toast: Option<(String, Instant)>,
+    alert: Option<(String, String, Instant)>,
     started: Instant,
 }
 
@@ -380,12 +384,20 @@ impl Core {
             leak: None,
             leak_checking: false,
             toast: None,
+            alert: None,
             started: Instant::now(),
         }
     }
 
     fn toast(&mut self, text: impl Into<String>) {
         self.toast = Some((text.into(), Instant::now()));
+    }
+
+    /// An in-app toast plus a Windows notification (if turned on).
+    fn alert(&mut self, title: impl Into<String>, body: impl Into<String>) {
+        let (title, body) = (title.into(), body.into());
+        self.toast(if body.is_empty() { title.clone() } else { format!("{title}: {body}") });
+        self.alert = Some((title, body, Instant::now()));
     }
 
     fn engine(&mut self) -> Option<std::pin::Pin<&mut Engine>> {
@@ -428,12 +440,12 @@ impl Core {
         if hold != self.kill_hold {
             if hold {
                 applog::warn(format!("Kill switch: {reason}"));
-                self.toast("Kill switch tripped: downloads paused");
+                self.alert("Kill switch tripped", "Downloads are paused until the VPN is back.");
             } else if self.kill_hold {
                 applog::info("Kill switch: adapter is back, resuming.");
                 // The VPN may have reconnected to a different server.
                 self.leak = None;
-                self.toast("VPN is back: resuming");
+                self.alert("VPN is back", "Downloads are resuming.");
             }
         }
         self.kill_hold = hold;
@@ -976,7 +988,7 @@ impl Core {
                     }
                 }
                 applog::info(format!("RSS rule \"{}\" grabbed {}", rule.name, item.title));
-                let _ = self.tx.send(Cmd::AddFromUrl { url: item.link.clone(), category: rule.category.clone() });
+                let _ = self.tx.send(Cmd::AddFromUrl { url: item.link.clone(), category: String::new() });
                 break;
             }
             self.rss_history.seen.insert(item.guid.clone());
@@ -1049,7 +1061,7 @@ impl Core {
                 // Already-complete torrents report "finished" again when they load.
                 if self.started.elapsed() > Duration::from_secs(20) {
                     applog::info(format!("Finished: {msg}"));
-                    self.toast("Download finished");
+                    self.alert("Download finished", msg.clone());
                 }
                 let dest = self.meta.get(&hash).and_then(|m| m.final_path.clone());
                 if let Some(dest) = dest {
@@ -1183,6 +1195,7 @@ impl Core {
             s.blocklist_status = self.blocklist_status.clone();
             s.restart_needed = self.settings.pex != self.pex_at_start;
             s.toast = self.toast.clone();
+            s.alert = self.alert.clone();
         }
     }
 

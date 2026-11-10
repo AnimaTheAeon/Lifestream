@@ -6,7 +6,7 @@ use super::theme::{self as ff, BAD, GOOD, LABEL, TEXT, TEXT_DIM, WARN};
 use super::widgets::{self as w, field, page_title, rate, row, section, toggle};
 use super::{dim, open_path, App, Filter, Page, Sort};
 use crate::core::{human_bytes, human_eta, human_rate, Cmd, TorrentView};
-use crate::settings::{Category, Feed, RssRule, SeedAction, SeederDisplay};
+use crate::settings::{Feed, RssRule, SeedAction, SeederDisplay};
 
 const BLUE: (Color32, Color32) = (Color32::from_rgb(30, 110, 230), Color32::from_rgb(140, 230, 255));
 const GREEN: (Color32, Color32) = (Color32::from_rgb(30, 154, 70), Color32::from_rgb(160, 240, 176));
@@ -68,11 +68,18 @@ impl App {
                 }
             });
         });
-        ui.label(dim(if self.sort == Sort::Queue {
-            "Your party of downloads. Click a torrent's icon to see its files. Click and hold a download to drag it up or down the queue."
+        let opener = if ff::is_green() {
+            // Box of X easter egg.
+            "Downloading now. No Gold membership required, and no red rings."
         } else {
-            "Your party of downloads. Click a torrent's icon to see its files. Sort by queue order to drag downloads into a new order."
-        }));
+            "Your party of downloads."
+        };
+        let how = if self.sort == Sort::Queue {
+            "Click a torrent's icon to see its files. Click and hold a download to drag it up or down the queue."
+        } else {
+            "Click a torrent's icon to see its files. Sort by queue order to drag downloads into a new order."
+        };
+        ui.label(dim(&format!("{opener} {how}")));
 
         if self.snap.kill_hold {
             ui.add_space(4.0);
@@ -388,9 +395,6 @@ impl App {
                         ff::tag(ui, "PRIVATE", WARN()).on_hover_text(
                             "From a private tracker: DHT, peer exchange and local discovery are off for it, and it only talks to its own tracker.",
                         );
-                    }
-                    if !t.category.is_empty() {
-                        ff::tag(ui, &t.category.to_uppercase(), LABEL());
                     }
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                         let size = egui::vec2(76.0, 24.0);
@@ -783,19 +787,6 @@ impl App {
                 });
             }
 
-            section(ui, "Where it goes");
-            let cats: Vec<String> = self.settings.categories.iter().map(|c| c.name.clone()).collect();
-            row(ui, "Category", "Each category can have its own folder (set them up in Config). When you click Add, Lifestream asks where to save it, starting in the category's folder or the last folder you picked.", |ui| {
-                egui::ComboBox::from_id_salt("add_cat")
-                    .selected_text(if self.add.category.is_empty() { "None".to_string() } else { self.add.category.clone() })
-                    .show_ui(ui, |ui| {
-                        ui.selectable_value(&mut self.add.category, String::new(), "None");
-                        for c in &cats {
-                            ui.selectable_value(&mut self.add.category, c.clone(), c);
-                        }
-                    });
-            });
-
             section(ui, "Options");
             row(ui, "Start right away", "Off = add it paused so you can start it later.", |ui| {
                 let mut on = !self.add.choice.paused;
@@ -825,15 +816,15 @@ impl App {
                 .min_size(egui::vec2(0.0, 64.0));
             let add_clicked = ui
                 .with_layout(Layout::top_down_justified(Align::Center), |ui| {
-                    ui.add_enabled(can_add, big).on_disabled_hover_text("Paste a magnet link or choose a .torrent file first.").clicked()
+                    ui.add_enabled(can_add, big).on_hover_text("Asks where to save it, starting in the last folder you picked.").on_disabled_hover_text("Paste a magnet link or choose a .torrent file first.").clicked()
                 })
                 .inner;
             ui.add_space(6.0);
             ui.horizontal(|ui| {
-                let picked = if add_clicked { self.ask_save_folder(&self.add.category.clone()) } else { None };
+                let picked = if add_clicked { self.ask_save_folder("") } else { None };
                 if let Some(save_path) = picked {
                     let save_path = Some(save_path);
-                    let category = self.add.category.clone();
+                    let category = String::new();
                     let choice = self.add.choice;
                     if let Some((data, pv, wanted)) = self.add.preview.take() {
                         let priorities = if wanted.iter().all(|w| *w) {
@@ -937,7 +928,7 @@ impl App {
                 changed |= ui.add(egui::DragValue::new(&mut self.settings.rss_interval_min).range(5..=1440).suffix(" min")).changed();
             });
 
-            w::section_help(ui, "Rules", "A rule says which feed items to download, like \"Show Name 1080p\" from season 2 on. Anything it matches is added automatically and saved to the rule's category.");
+            w::section_help(ui, "Rules", "A rule says which feed items to download, like \"Show Name 1080p\" from season 2 on. Anything it matches is added automatically and saved to your default download folder.");
             ui.horizontal_wrapped(|ui| {
                 for (i, r) in self.settings.rules.iter().enumerate() {
                     if w::pill(ui, &r.name, self.rss_rule == i).clicked() {
@@ -950,25 +941,12 @@ impl App {
                     changed = true;
                 }
             });
-            let cats: Vec<String> = self.settings.categories.iter().map(|c| c.name.clone()).collect();
             let feed_names: Vec<String> = self.settings.feeds.iter().map(|f| f.name.clone()).collect();
             let mut delete_rule = false;
             if let Some(rule) = self.settings.rules.get_mut(self.rss_rule) {
                 ui.add_space(6.0);
                 ui.columns(2, |cols| {
                     changed |= field(&mut cols[0], "NAME", "", |ui| ui.text_edit_singleline(&mut rule.name)).changed();
-                    changed |= field(&mut cols[1], "SAVE AS", "Category for anything this rule grabs.", |ui| {
-                        let mut c = false;
-                        egui::ComboBox::from_id_salt("rule_cat")
-                            .selected_text(if rule.category.is_empty() { "None".to_string() } else { rule.category.clone() })
-                            .show_ui(ui, |ui| {
-                                c |= ui.selectable_value(&mut rule.category, String::new(), "None").changed();
-                                for n in &cats {
-                                    c |= ui.selectable_value(&mut rule.category, n.clone(), n).changed();
-                                }
-                            });
-                        c
-                    });
                     changed |= field(
                         &mut cols[0],
                         "MUST CONTAIN",
@@ -1455,29 +1433,9 @@ impl App {
                 }
             });
             section(ui, "Folders");
-            w::label_help(ui, "Default download folder", "Where RSS downloads go when their rule has no category, and the first folder offered when you add a torrent. After that, Lifestream offers the last folder you picked.");
+            w::label_help(ui, "Default download folder", "Where RSS downloads go, and the first folder offered when you add a torrent. After that, Lifestream offers the last folder you picked.");
             ui.horizontal(|ui| changed |= w::folder_field(ui, &mut s.download_dir, (ui.available_width() - 90.0).max(200.0)));
             ui.add_space(6.0);
-
-            w::label_help(ui, "Categories", "Pick a category when adding a torrent and its folder is offered as the save location. RSS rules save straight into their category's folder. Point Movies or TV at a folder Jenova watches and subtitles arrive on their own.");
-            let mut remove = None;
-            for (i, c) in s.categories.iter_mut().enumerate() {
-                ui.horizontal(|ui| {
-                    changed |= ui.add(egui::TextEdit::singleline(&mut c.name).desired_width(110.0)).changed();
-                    if ui.small_button("Remove").clicked() {
-                        remove = Some(i);
-                    }
-                    changed |= w::folder_field(ui, &mut c.path, (ui.available_width() - 90.0).max(150.0));
-                });
-            }
-            if let Some(i) = remove {
-                s.categories.remove(i);
-                changed = true;
-            }
-            if ui.button("Add category").clicked() {
-                s.categories.push(Category { name: format!("Category {}", s.categories.len() + 1), path: s.download_dir.clone() });
-                changed = true;
-            }
 
             ui.add_space(6.0);
             if adv {
@@ -1495,12 +1453,48 @@ impl App {
 
             section(ui, "App");
             if cfg!(windows) {
-                row(ui, "Open magnet links and .torrent files with Lifestream", "Your browser sends magnet links straight here.", |ui| {
-                    if ui.button("Make default").clicked() {
-                        make_default = true;
+                // Re-check every few seconds while this page is open.
+                let stale = self.handler_check.as_ref().map(|c| c.1.elapsed() > std::time::Duration::from_secs(3)).unwrap_or(true);
+                if stale {
+                    #[cfg(windows)]
+                    {
+                        self.handler_check = Some((crate::winint::handler_status(), std::time::Instant::now()));
                     }
-                });
+                }
+                let status = self.handler_check.as_ref().map(|c| c.0.clone());
+                let is_default = matches!(status, Some(Ok(())));
+                row(
+                    ui,
+                    "Open magnet links and .torrent files with Lifestream",
+                    "When on, clicking a magnet link in your browser or opening a .torrent file sends it straight here.",
+                    |ui| {
+                        if is_default {
+                            ui.label(RichText::new("DEFAULT").color(GOOD()).strong());
+                            ff::badge(ui, ff::Badge::Good, 20.0).on_hover_text("Lifestream opens magnet links and .torrent files.");
+                        } else if ui.button("Make default").clicked() {
+                            make_default = true;
+                        }
+                    },
+                );
+                if let Some(Err(other)) = &status {
+                    ui.horizontal_wrapped(|ui| {
+                        ui.colored_label(
+                            WARN(),
+                            format!("Right now Windows opens them with {other}. If Make default doesn't change that, pick Lifestream for MAGNET and .torrent in Default apps."),
+                        );
+                        if ui.small_button("Open Default apps").clicked() {
+                            #[cfg(windows)]
+                            let _ = std::process::Command::new("explorer").arg("ms-settings:defaultapps").spawn();
+                        }
+                    });
+                }
                 row(ui, "Start with Windows", "Starts quietly in the tray.", |ui| changed |= toggle(ui, &mut s.start_with_windows));
+                row(
+                    ui,
+                    "Windows notifications",
+                    "Pops up a Windows notification when a download finishes, the kill switch trips, or the VPN comes back, while Lifestream is in the background or in the tray. (In-app messages always show.)",
+                    |ui| changed |= toggle(ui, &mut s.system_notifications),
+                );
                 row(
                     ui,
                     "When I close the window",
@@ -1586,7 +1580,10 @@ impl App {
         if make_default {
             #[cfg(windows)]
             match crate::winint::register_handlers() {
-                Ok(()) => self.notify("Magnet links and .torrent files now open in Lifestream."),
+                Ok(()) => {
+                    self.handler_check = None; // re-check right away
+                    self.notify("Magnet links and .torrent files now open in Lifestream.");
+                }
                 Err(e) => self.notify(format!("Couldn't set that up: {e}")),
             }
         }
