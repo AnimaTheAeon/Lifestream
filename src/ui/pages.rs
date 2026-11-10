@@ -1177,7 +1177,7 @@ impl App {
             row(ui, "Mode", "Simple shows the settings most people need. Advanced shows everything, plus the Log.", |ui| {
                 changed |= w::toggle_labeled(ui, &mut s.advanced_mode, "ADVANCED", "SIMPLE");
             });
-            row(ui, "Theme", "Switches the whole app's look right away. FFVII menu: blue windows and the pointing hand. Green dashboard: glowing grid, jelly orb and slanted tabs.", |ui| {
+            row(ui, "Theme", "Switches the whole app's look right away. FFVII menu: blue windows and the pointing hand. Box of X: glowing grid, jelly orb and slanted tabs.", |ui| {
                 // Right-to-left row: list in reverse so they read FFVII, Green.
                 for theme in [ff::Theme::GreenDash, ff::Theme::FfMenu] {
                     let selected = ff::theme() == theme;
