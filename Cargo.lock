@@ -2233,7 +2233,7 @@ dependencies = [
 
 [[package]]
 name = "lifestream"
-version = "0.1.6"
+version = "0.1.7"
 dependencies = [
  "arboard",
  "base64 0.22.1",
@@ -2256,6 +2256,7 @@ dependencies = [
  "rss",
  "serde",
  "serde_json",
+ "sha1_smol",
  "sha2",
  "tiny_http",
  "tray-icon",
@@ -3632,6 +3633,12 @@ checksum = "9c187e0a369471c550af028cba56d4f4fa2a489ad28151ae95a4d340a2a8b782"
 dependencies = [
  "serde_core",
 ]
+
+[[package]]
+name = "sha1_smol"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bbfa15b3dddfee50a0fff136974b3e1bde555604ba463834a7eb7deb6417705d"
 
 [[package]]
 name = "sha2"

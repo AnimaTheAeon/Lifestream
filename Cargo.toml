@@ -1,6 +1,6 @@
 [package]
 name = "lifestream"
-version = "0.1.6"
+version = "0.1.7"
 edition = "2021"
 build = "build.rs"
 description = "A torrent client with a classic JRPG menu look."
@@ -48,3 +48,6 @@ opt-level = 3
 [[bin]]
 name = "lifestream"
 path = "src/main.rs"
+
+[dev-dependencies]
+sha1_smol = "1"
