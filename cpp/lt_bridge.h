@@ -75,6 +75,7 @@ private:
   std::set<std::string> first_last_pending_;
   std::string state_dir_;
   int pending_saves_ = 0;
+  bool shut_down_ = false;
   int listen_port_ = 0;
   int external_port_ = 0;
   std::string listen_error_;

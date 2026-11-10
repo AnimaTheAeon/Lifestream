@@ -117,6 +117,8 @@ pub struct App {
     pub updater: Arc<crate::updater::Updater>,
     pub manual_update_check: bool,
     quitting_for_update: bool,
+    /// Quit was chosen: window hidden, progress saving in the background.
+    shutting_down: Option<Instant>,
     pub leak_open: bool,
     /// Green dashboard: a page is open (false = the home screen with the orb).
     pub green_in_page: bool,
@@ -194,6 +196,7 @@ impl App {
             },
             manual_update_check: false,
             quitting_for_update: false,
+            shutting_down: None,
             leak_open: false,
             green_in_page: false,
             green_cursor: 0,
@@ -669,15 +672,39 @@ impl eframe::App for App {
         }
 
         // Close button: hide to tray unless quitting.
-        if ctx.input(|i| i.viewport().close_requested()) {
+        if ctx.input(|i| i.viewport().close_requested()) && self.shutting_down.is_none() {
+            #[allow(unused_mut)]
+            let mut to_tray = false;
             #[cfg(windows)]
             {
                 let quitting = crate::tray::QUIT.load(std::sync::atomic::Ordering::SeqCst);
-                if !quitting && self.settings.close_to_tray && self.tray.is_some() {
-                    ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
-                    crate::tray::hide_window(ctx);
-                }
+                to_tray = !quitting && self.settings.close_to_tray && self.tray.is_some();
             }
+            ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
+            if to_tray {
+                #[cfg(windows)]
+                crate::tray::hide_window(ctx);
+            } else {
+                // Really quitting: vanish right away (window and tray icon) and
+                // let progress save in the background, then close for real.
+                ctx.send_viewport_cmd(egui::ViewportCommand::Visible(false));
+                #[cfg(windows)]
+                {
+                    self.tray = None;
+                }
+                self.flush_settings(true);
+                self.core.send(Cmd::Shutdown);
+                self.shutting_down = Some(Instant::now());
+            }
+        }
+        if let Some(since) = self.shutting_down {
+            let saved = self.core_join.as_ref().map(|j| j.is_finished()).unwrap_or(true);
+            if saved || since.elapsed() > Duration::from_secs(15) {
+                ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+            } else {
+                ctx.request_repaint_after(Duration::from_millis(100));
+            }
+            return;
         }
         self.system_notify(ctx);
         self.watch_updater(ctx);
@@ -697,7 +724,9 @@ impl eframe::App for App {
 
     fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
         self.flush_settings(true);
-        self.core.send(Cmd::Shutdown);
+        if self.shutting_down.is_none() {
+            self.core.send(Cmd::Shutdown);
+        }
         if let Some(j) = self.core_join.take() {
             let _ = j.join();
         }
