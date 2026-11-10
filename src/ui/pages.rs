@@ -1171,6 +1171,7 @@ impl App {
         let mut changed = false;
         let mut export = false;
         let mut restore = false;
+        let mut theme_switched = false;
         let mut make_default = false;
         egui::ScrollArea::vertical().id_salt("config").auto_shrink([false, false]).show(ui, |ui| {
             let s = &mut self.settings;
@@ -1194,6 +1195,8 @@ impl App {
                         ff::apply_style(ui.ctx());
                         s.theme = theme.key().to_string();
                         changed = true;
+                        // Land on Config in the new layout (once; BACK still works).
+                        theme_switched = true;
                     }
                 }
             });
@@ -1300,6 +1303,9 @@ impl App {
                 }
             });
         });
+        if theme_switched && ff::is_green() {
+            self.green_in_page = true;
+        }
         if changed {
             self.changed();
         }

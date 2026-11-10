@@ -12,6 +12,7 @@ use eframe::egui::{
 
 use super::theme::{self as ff, pal};
 use super::{App, Page, MENU};
+use crate::core::Cmd;
 
 fn rgba(r: u8, g: u8, b: u8, a: u8) -> Color32 {
     Color32::from_rgba_unmultiplied(r, g, b, a)
@@ -195,6 +196,14 @@ impl App {
         MENU.iter().filter(|m| self.settings.advanced_mode || !m.2).map(|m| (m.0, m.1)).collect()
     }
 
+    /// Back to the dashboard, with the cursor on the page just left.
+    fn green_back(&mut self) {
+        self.green_in_page = false;
+        if let Some(i) = self.green_menu().iter().position(|m| m.0 == self.page) {
+            self.green_cursor = i;
+        }
+    }
+
     fn green_open(&mut self, page: Page) {
         self.menu_touched = true;
         self.page = page;
@@ -298,10 +307,21 @@ impl App {
 
     /// Returns the content panel's rect (pop-ups anchor to it).
     fn green_page(&mut self, ui: &mut egui::Ui, full: Rect) -> Rect {
+        // Esc (or the mouse's side "back" button) backs out one level:
+        // a confirm dialog, then the files pop-up, then the page itself.
+        // While typing, Esc just leaves the text box (egui handles that).
         let typing = ui.ctx().egui_wants_keyboard_input();
-        let overlay = self.popup.is_some() || self.confirm_remove.is_some();
-        if !typing && !overlay && ui.input(|i| i.key_pressed(Key::Escape)) {
-            self.green_in_page = false;
+        let esc = !typing && ui.input(|i| i.key_pressed(Key::Escape));
+        let mouse_back = ui.input(|i| i.pointer.button_pressed(egui::PointerButton::Extra1));
+        if esc || mouse_back {
+            if self.confirm_remove.is_some() {
+                self.confirm_remove = None;
+            } else if self.popup.is_some() {
+                self.popup = None;
+                self.core.send(Cmd::WatchFiles(None));
+            } else {
+                self.green_back();
+            }
         }
         if !self.settings.advanced_mode && self.page == Page::Log {
             self.page = Page::Torrents;
@@ -335,7 +355,7 @@ impl App {
         ff::set_hide_headings(false);
 
         if hint(ui, pos2(full.right() - 190.0, full.bottom() - 30.0), "ESC", "BACK").clicked() {
-            self.green_in_page = false;
+            self.green_back();
         }
         frame
     }
