@@ -1,4 +1,6 @@
 #![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
+// The headless (Synology) build leaves the desktop-only helpers unused.
+#![cfg_attr(not(feature = "gui"), allow(dead_code))]
 
 mod applog;
 mod backup;
@@ -10,15 +12,62 @@ mod netif;
 mod rpc;
 mod rss;
 mod settings;
-#[cfg(windows)]
+#[cfg(all(windows, feature = "gui"))]
 mod tray;
+#[cfg(feature = "gui")]
 mod ui;
 mod updater;
+mod web;
 #[cfg(windows)]
 mod winint;
 
+#[cfg(feature = "gui")]
 use eframe::egui;
 
+/// The Synology (headless) version: no window, controlled from the web page.
+#[cfg(not(feature = "gui"))]
+fn main() {
+    use std::time::Duration;
+
+    applog::info(format!("Lifestream {} (headless) starting.", updater::APP_VERSION));
+    let restored = backup::apply_pending_restore();
+    if let Some(msg) = &restored {
+        applog::info(msg.clone());
+    }
+    let fresh = !settings::Settings::path().exists();
+    let mut settings = settings::Settings::load();
+    // First run on a Synology: start out in the usual shared downloads folder.
+    if fresh && std::path::Path::new("/volume1/downloads").is_dir() {
+        settings.download_dir = "/volume1/downloads/Lifestream".into();
+        settings.incomplete_dir = "/volume1/downloads/Lifestream/Incomplete".into();
+        settings.save();
+    }
+    // The web page is the only way in, so it must answer on the network.
+    if !settings.rpc_enabled || !settings.rpc_allow_lan {
+        settings.rpc_enabled = true;
+        settings.rpc_allow_lan = true;
+        settings.save();
+    }
+    let (core, join) = core::start(settings.clone());
+    rpc::start(core.clone(), &settings);
+
+    // DSM stops the package by creating this file (see the package's
+    // start-stop-status script), so progress is saved before exiting.
+    let stop_file = settings::data_dir().join("stop-request");
+    let _ = std::fs::remove_file(&stop_file);
+    while !join.is_finished() {
+        if stop_file.exists() {
+            let _ = std::fs::remove_file(&stop_file);
+            core.send(core::Cmd::Shutdown);
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(500));
+    }
+    let _ = join.join();
+    applog::info("Lifestream stopped.");
+}
+
+#[cfg(feature = "gui")]
 fn main() -> eframe::Result<()> {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let start_hidden = args.iter().any(|a| a == "--tray");
