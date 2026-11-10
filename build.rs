@@ -36,6 +36,8 @@ fn main() {
 
     if target_os == "windows" {
         println!("cargo:rerun-if-changed=resources/lifestream.rc");
+        // The .rc pulls in the icon; rebuild when the icon itself changes too.
+        println!("cargo:rerun-if-changed=resources/lifestream.ico");
         embed_resource::compile("resources/lifestream.rc", embed_resource::NONE)
             .manifest_optional()
             .ok();

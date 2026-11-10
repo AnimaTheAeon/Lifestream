@@ -88,6 +88,8 @@ fn main() -> eframe::Result<()> {
     winint::hold_install_mutex();
     #[cfg(windows)]
     winint::register_notifications();
+    #[cfg(windows)]
+    winint::refresh_icons_once();
     let mut settings = settings::Settings::load();
     // The installer leaves a note when "Start with Windows" was ticked there.
     let marker = settings::data_dir().join("installer-autostart");
