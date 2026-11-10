@@ -494,8 +494,9 @@ impl eframe::App for App {
         self.handle_incoming(ctx);
 
         #[cfg(windows)]
+        let (_, title, _) = self.protection();
+        #[cfg(windows)]
         if let Some(t) = self.tray.as_mut() {
-            let (_, title, _) = self.protection();
             t.update(&self.snap, self.settings.rss_enabled, self.settings.kill_switch, &title);
         }
 
