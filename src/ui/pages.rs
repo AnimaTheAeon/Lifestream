@@ -173,7 +173,41 @@ impl App {
                 // (hash, queue position, row rect) for each draggable row.
                 let mut slots: Vec<(String, i32, egui::Rect)> = Vec::new();
                 let mut dropped = false;
+
+                // Slide animation: when the order changes, each row starts where
+                // it was drawn last frame and eases into its new spot.
+                const SLIDE_SECS: f64 = 0.3;
+                let now = ui.input(|i| i.time);
+                let top0 = ui.cursor().top();
+                let order: Vec<String> = list.iter().map(|t| t.info.hash.clone()).collect();
+                let reordered = order != self.row_order;
+                let mut new_y = std::collections::HashMap::new();
+                let mut animating = false;
+
                 for t in &list {
+                    let h = t.info.hash.clone();
+                    let y = ui.cursor().top() - top0;
+                    if reordered {
+                        if let Some(prev) = self.row_y.get(&h) {
+                            let off = prev - y;
+                            if off.abs() > 1.0 {
+                                self.row_anim.insert(h.clone(), (off, now));
+                            }
+                        }
+                    }
+                    let mut off = 0.0;
+                    if let Some(&(off0, t0)) = self.row_anim.get(&h) {
+                        let k = ((now - t0) / SLIDE_SECS).clamp(0.0, 1.0) as f32;
+                        if k >= 1.0 {
+                            self.row_anim.remove(&h);
+                        } else {
+                            off = off0 * (1.0 - k).powi(3); // ease out
+                            animating = true;
+                        }
+                    }
+                    new_y.insert(h, y + off);
+                    let shift = egui::emath::TSTransform::from_translation(egui::vec2(0.0, off));
+                    ui.with_visual_transform(shift, |ui| {
                     if can_reorder && t.info.queue_position >= 0 {
                         let h = &t.info.hash;
                         // The drag area sits under the row's contents, so its
@@ -197,13 +231,19 @@ impl App {
                     } else {
                         self.torrent_row(ui, t);
                     }
+                    });
                 }
-                self.queue_drag(ui, &slots, dropped);
+                self.row_order = order;
+                self.row_y = new_y;
+                if animating {
+                    ui.ctx().request_repaint();
+                }
+                self.queue_drag(ui, &slots, dropped, top0);
             });
     }
 
     /// Paints the drop marker while a row is dragged and moves it on release.
-    fn queue_drag(&mut self, ui: &mut egui::Ui, slots: &[(String, i32, egui::Rect)], dropped: bool) {
+    fn queue_drag(&mut self, ui: &mut egui::Ui, slots: &[(String, i32, egui::Rect)], dropped: bool, top0: f32) {
         let Some(hash) = self.drag_row.clone() else { return };
         let Some(from) = slots.iter().find(|s| s.0 == hash).map(|s| (s.1, s.2)) else {
             self.drag_row = None;
@@ -243,6 +283,8 @@ impl App {
             self.drag_live = false;
             if target != from.0 {
                 self.core.send(Cmd::QueueSet(hash.clone(), target));
+                // The dropped row glides in from where the ghost was.
+                self.row_y.insert(hash.clone(), pointer.y - self.drag_grab.y - top0);
                 // Show the new order right away; the next update confirms it.
                 let torrents = &mut self.snap.torrents;
                 if let Some(src) = torrents.iter().position(|t| t.info.hash == hash) {
@@ -1459,9 +1501,29 @@ impl App {
                     }
                 });
                 row(ui, "Start with Windows", "Starts quietly in the tray.", |ui| changed |= toggle(ui, &mut s.start_with_windows));
-                row(ui, "Close to tray", "The X button hides the window; downloads keep going. Quit from the tray menu.", |ui| {
-                    changed |= toggle(ui, &mut s.close_to_tray)
-                });
+                row(
+                    ui,
+                    "When I close the window",
+                    "Keep running: the X button hides Lifestream in the taskbar tray and downloads keep going (quit from the tray icon's menu). Quit: the X button fully closes Lifestream and stops all transfers.",
+                    |ui| {
+                        // Right-to-left row, so list the options in reverse.
+                        for (tray, label) in [(false, "Quit"), (true, "Keep running in tray")] {
+                            let selected = s.close_to_tray == tray;
+                            let mut text = RichText::new(label);
+                            if selected {
+                                text = text.color(ff::pal().on_accent);
+                            }
+                            let mut button = egui::Button::new(text);
+                            if selected {
+                                button = button.fill(ff::pal().accent);
+                            }
+                            if ui.add(button).clicked() && !selected {
+                                s.close_to_tray = tray;
+                                changed = true;
+                            }
+                        }
+                    },
+                );
             }
             if adv {
                 row(ui, "Prevent sleep while downloading", "Keeps the PC awake until downloads finish.", |ui| changed |= toggle(ui, &mut s.prevent_sleep));
