@@ -257,6 +257,48 @@ impl App {
         }
     }
 
+    /// Are torrents doing what we want: bound to the VPN, kill switch armed,
+    /// and the last check shows them exiting through a VPN?
+    pub fn protection(&self) -> (ff::Badge, String, String) {
+        use crate::core::{org_kind, OrgKind};
+        use ff::Badge::*;
+        let s = &self.settings;
+        let sn = &self.snap;
+        if sn.engine_error.is_some() {
+            return (Bad, "ENGINE ERROR".into(), "The torrent engine isn't running.".into());
+        }
+        if s.adapter.is_empty() || !s.bind_only {
+            return (Bad, "NOT LOCKED TO VPN".into(), "Pick your VPN adapter on the Network page and turn on \"Only use this adapter\".".into());
+        }
+        if sn.kill_hold {
+            return (Warn, "HELD: VPN DOWN".into(), "The kill switch is doing its job: nothing runs until your VPN adapter is back.".into());
+        }
+        if !s.kill_switch {
+            return (Warn, "KILL SWITCH OFF".into(), "Torrents are bound to your VPN, but nothing pauses them if it drops.".into());
+        }
+        let Some(r) = &sn.leak else {
+            return (Warn, "CHECKING…".into(), "Checking where torrent traffic comes out.".into());
+        };
+        let Some(t) = &r.torrent else {
+            return (Warn, "CHECKING…".into(), "Checking where torrent traffic comes out.".into());
+        };
+        let t = match t {
+            Ok(t) => t,
+            Err(_) => {
+                return (Bad, "NO INTERNET ON VPN".into(), format!("Nothing gets out through {}. Torrents can't connect (your real IP isn't used).", s.adapter));
+            }
+        };
+        let via = if t.org.is_empty() { t.ip.clone() } else { format!("{} ({})", t.ip, t.org) };
+        match org_kind(&t.org) {
+            OrgKind::HomeIsp => (Bad, "NOT ON VPN".into(), format!("Torrents exit at {via}, which looks like a home internet provider.")),
+            OrgKind::Vpn => (Good, "PROTECTED".into(), format!("Torrents exit at {via}. Kill switch armed.")),
+            OrgKind::Unknown => match &r.normal {
+                Ok(n) if n.ip != t.ip => (Good, "PROTECTED".into(), format!("Torrents exit at {via}, not your normal address ({}). Kill switch armed.", n.ip)),
+                _ => (Warn, "UNVERIFIED".into(), format!("Torrents exit at {via}. If that's your VPN provider, you're fine.")),
+            },
+        }
+    }
+
     fn status_line(&self) -> String {
         let s = &self.snap;
         if let Some(e) = &s.engine_error {
@@ -299,7 +341,7 @@ impl App {
         let main = Rect::from_min_max(full.min, pos2(full.right() - side_w - gap, full.bottom() - bar_h - gap));
         let menu_h = items.len() as f32 * (ff::MENU_ITEM_HEIGHT + 6.0) + ff::WINDOW_PADDING as f32 * 2.0;
         let menu = Rect::from_min_size(pos2(main.right() + gap, full.top()), Vec2::new(side_w, menu_h));
-        let info_h = 160.0;
+        let info_h = 192.0;
         let info = Rect::from_min_max(pos2(menu.left(), main.bottom() - info_h), pos2(full.right(), main.bottom()));
         let bar = Rect::from_min_max(pos2(full.left(), full.bottom() - bar_h), full.max);
 
@@ -321,7 +363,26 @@ impl App {
         let held = self.snap.kill_hold || self.snap.user_paused;
         let (dl, ul) = if held { (human_rate(0), human_rate(0)) } else { (human_rate(self.snap.dl_rate), human_rate(self.snap.ul_rate)) };
         let mut mode_clicked = false;
+        let (prot, prot_title, prot_detail) = self.protection();
+        let mut go_network = false;
         ff::window_at(ui, info, "info", |ui| {
+            let r = ui
+                .horizontal(|ui| {
+                    ff::badge(ui, prot, 20.0);
+                    let color = match prot {
+                        ff::Badge::Good => ff::GOOD,
+                        ff::Badge::Warn => ff::WARN,
+                        ff::Badge::Bad => ff::BAD,
+                    };
+                    ff::title(ui, &prot_title, 14.0, color);
+                })
+                .response
+                .interact(egui::Sense::click())
+                .on_hover_text(format!("{prot_detail}\n\nClick for the Network page."));
+            if r.clicked() {
+                go_network = true;
+            }
+            ui.add_space(2.0);
             info_row(ui, "Time", &time);
             info_row(ui, "DL", &dl);
             info_row(ui, "UL", &ul);
@@ -332,6 +393,10 @@ impl App {
                 .on_hover_text("Simple shows the settings most people need. Advanced shows everything, plus the Log.")
                 .clicked();
         });
+        if go_network {
+            self.page = Page::Network;
+            self.menu_touched = true;
+        }
         if mode_clicked {
             self.settings.advanced_mode = !advanced;
             self.changed();
@@ -342,6 +407,8 @@ impl App {
         ff::window_at(ui, bar, "status", |ui| {
             ui.add_space(-4.0);
             ui.horizontal_centered(|ui| {
+                ff::badge(ui, prot, 18.0).on_hover_text(&prot_detail);
+                ui.add_space(4.0);
                 ff::title(ui, &status, 16.0, if warn { ff::WARN } else { TEXT });
             });
         });
@@ -428,7 +495,8 @@ impl eframe::App for App {
 
         #[cfg(windows)]
         if let Some(t) = self.tray.as_mut() {
-            t.update(&self.snap, self.settings.rss_enabled, self.settings.kill_switch);
+            let (_, title, _) = self.protection();
+            t.update(&self.snap, self.settings.rss_enabled, self.settings.kill_switch, &title);
         }
 
         // Close button: hide to tray unless quitting.

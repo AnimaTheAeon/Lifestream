@@ -91,7 +91,7 @@ fn lookup_ip(local: Option<std::net::IpAddr>) -> Result<IpInfo, String> {
         .build()
         .map_err(|e| e.to_string())?;
     match client
-        .get("https://ipinfo.io/json")
+        .get(std::env::var("LIFESTREAM_IPINFO_URL").unwrap_or_else(|_| "https://ipinfo.io/json".into()))
         .send()
         .and_then(|r| r.error_for_status())
         .and_then(|r| r.json::<serde_json::Value>())
@@ -118,6 +118,58 @@ fn lookup_ip(local: Option<std::net::IpAddr>) -> Result<IpInfo, String> {
             .and_then(|r| r.text())
             .map(|ip| IpInfo { ip: ip.trim().to_string(), org: String::new(), place: String::new() })
             .map_err(|_| format!("no response ({first})")),
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum OrgKind {
+    Vpn,
+    HomeIsp,
+    Unknown,
+}
+
+/// Rough guess from the provider name whether an exit address is a VPN or
+/// datacenter (good) or a home internet provider (bad).
+pub fn org_kind(org: &str) -> OrgKind {
+    let o = org.to_lowercase();
+    const ISP: &[&str] = &[
+        "charter", "spectrum", "comcast", "xfinity", "at&t", "att services", "verizon", "cox comm",
+        "frontier", "centurylink", "lumen", "windstream", "optimum", "altice", "cablevision", "mediacom",
+        "t-mobile", "tmobile", "rcn", "wideopenwest", "google fiber", "sparklight", "cable one",
+        "breezeline", "ziply", "brightspeed", "consolidated comm", "metronet", "astound", "suddenlink",
+        "rogers", "bell canada", "shaw comm", "telus", "videotron", "virgin media", "british telecom",
+        "sky uk", "deutsche telekom", "vodafone", "orange", "starlink", "spacex", "viasat", "hughes",
+    ];
+    const VPN: &[&str] = &[
+        "m247", "datacamp", "cdn77", "proton", "mullvad", "31173", "tefincom", "nord", "packethub",
+        "clouvider", "leaseweb", "ovh", "digitalocean", "hetzner", "choopa", "vultr", "linode", "akamai",
+        "amazon", "google cloud", "microsoft", "zenlayer", "hostroyale", "xtom", "performive",
+        "gsl networks", "tzulo", "quadranet", "psychz", "hivelocity", "colocrossing", "private internet",
+        "kape", "expressvpn", "surfshark", "windscribe", "ivpn", "airvpn", "i3d", "worldstream", "estnoc",
+        "host universal", "creanova", "fdcservers", "100tb", "ipxo", "contabo", "datapacket", "hydra",
+        "cloudflare", "oracle", "g-core", "gcore", "stark industries", "aeza", "servers.com", "redstation",
+        "vpn", "hosting", "datacenter", "data center", "cloud", "server",
+    ];
+    if ISP.iter().any(|k| o.contains(k)) {
+        OrgKind::HomeIsp
+    } else if VPN.iter().any(|k| o.contains(k)) {
+        OrgKind::Vpn
+    } else {
+        OrgKind::Unknown
+    }
+}
+
+#[cfg(test)]
+mod org_tests {
+    use super::{org_kind, OrgKind};
+    #[test]
+    fn orgs() {
+        assert_eq!(org_kind("M247 Europe SRL"), OrgKind::Vpn);
+        assert_eq!(org_kind("Proton AG"), OrgKind::Vpn);
+        assert_eq!(org_kind("Datacamp Limited"), OrgKind::Vpn);
+        assert_eq!(org_kind("Charter Communications Inc"), OrgKind::HomeIsp);
+        assert_eq!(org_kind("Comcast Cable Communications, LLC"), OrgKind::HomeIsp);
+        assert_eq!(org_kind("Some Small Telco"), OrgKind::Unknown);
     }
 }
 
@@ -364,6 +416,8 @@ impl Core {
                 self.toast("Kill switch tripped: downloads paused");
             } else if self.kill_hold {
                 applog::info("Kill switch: adapter is back, resuming.");
+                // The VPN may have reconnected to a different server.
+                self.leak = None;
                 self.toast("VPN is back: resuming");
             }
         }
@@ -1118,6 +1172,7 @@ impl Core {
         let mut last_slow = Instant::now() - Duration::from_secs(60);
         let mut last_resume_save = Instant::now();
         let mut last_incoming = Instant::now() - Duration::from_secs(60);
+        let mut last_leak = Instant::now();
         loop {
             // Commands from the UI, briefly blocking so the loop isn't hot.
             match self.rx.recv_timeout(Duration::from_millis(250)) {
@@ -1176,6 +1231,17 @@ impl Core {
                 }
                 if self.toast.as_ref().map(|t| t.1.elapsed() > Duration::from_secs(5)).unwrap_or(false) {
                     self.toast = None;
+                }
+            }
+            // Keep the protection badge honest: re-check whenever the bound
+            // address changes, and every 30 minutes otherwise.
+            if self.settings.bind_only && !self.kill_hold && !self.leak_checking {
+                let stale_ip = self.leak.as_ref().map(|l| l.bound_ip != self.adapter_ip).unwrap_or(true);
+                if (stale_ip && last_leak.elapsed() >= Duration::from_secs(3))
+                    || last_leak.elapsed() >= Duration::from_secs(30 * 60)
+                {
+                    last_leak = Instant::now();
+                    self.leak_check();
                 }
             }
             if last_incoming.elapsed() >= Duration::from_secs(15) {
