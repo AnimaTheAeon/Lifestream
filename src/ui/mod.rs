@@ -84,6 +84,13 @@ pub struct App {
     pub drag_grab: egui::Vec2,
     /// The mouse has moved far enough for this to be a drag, not a click.
     pub drag_live: bool,
+    /// Row order and on-screen spots last frame, for slide animations.
+    pub row_order: Vec<String>,
+    pub row_y: std::collections::HashMap<String, f32>,
+    /// Rows sliding into place: (starting offset, start time).
+    pub row_anim: std::collections::HashMap<String, (f32, f64)>,
+    /// Widgets flashing after a click: (widget id, start time).
+    pub click_flashes: Vec<(egui::Id, f64)>,
     pub popup: Option<String>,
     pub popup_tab: u8,
     pub confirm_remove: Option<(String, String)>,
@@ -150,6 +157,10 @@ impl App {
             drag_row: None,
             drag_grab: egui::Vec2::ZERO,
             drag_live: false,
+            row_order: Vec::new(),
+            row_y: Default::default(),
+            row_anim: Default::default(),
+            click_flashes: Vec::new(),
             popup: None,
             popup_tab: 0,
             confirm_remove: None,
@@ -407,6 +418,42 @@ impl App {
         }
     }
 
+    /// A quick glow on whatever was just clicked, so every press shows.
+    fn click_flash(&mut self, ctx: &egui::Context) {
+        const SECS: f64 = 0.35;
+        let now = ctx.input(|i| i.time);
+        if let Some(id) = ctx.interaction_snapshot(|s| s.clicked) {
+            self.click_flashes.push((id, now));
+        }
+        self.click_flashes.retain(|f| now - f.1 < SECS);
+        if self.click_flashes.is_empty() {
+            return;
+        }
+        // Lighter than the accent so it shows on accent-colored buttons too.
+        let ring = ff::pal().accent.lerp_to_gamma(egui::Color32::WHITE, 0.55);
+        for &(id, t0) in &self.click_flashes {
+            // Only while the widget is still on screen (a click that opens
+            // another page shouldn't leave a glow over the new one).
+            let Some(w) = ctx.viewport(|v| v.this_pass.widgets.get(id).copied()) else { continue };
+            let rect = w.interact_rect;
+            if !rect.is_positive() {
+                continue;
+            }
+            let k = ((now - t0) / SECS) as f32;
+            let fade = 1.0 - k;
+            let p = ctx.layer_painter(w.layer_id);
+            // A bright fill that fades, plus a ring that grows outward.
+            p.rect_filled(rect, 4.0, egui::Color32::from_white_alpha((110.0 * fade) as u8));
+            p.rect_stroke(
+                rect.expand(1.0 + 8.0 * k),
+                6.0,
+                egui::Stroke::new(3.0 * fade + 0.5, ring.gamma_multiply(fade)),
+                egui::StrokeKind::Outside,
+            );
+        }
+        ctx.request_repaint();
+    }
+
     fn layout(&mut self, ui: &mut egui::Ui) {
         if ff::is_green() {
             return self.green_layout(ui);
@@ -592,6 +639,7 @@ impl eframe::App for App {
         egui::CentralPanel::default()
             .frame(egui::Frame::new().fill(ff::BACKDROP()).inner_margin(egui::Margin::same(14)))
             .show(ui, |ui| self.layout(ui));
+        self.click_flash(&ctx);
     }
 
     fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
