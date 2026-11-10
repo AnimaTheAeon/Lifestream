@@ -64,3 +64,12 @@ pub fn keep_awake(on: bool) {
         }
     }
 }
+
+/// Named mutex the installer checks so it can close Lifestream before updating.
+pub fn hold_install_mutex() {
+    use windows::Win32::System::Threading::CreateMutexW;
+    unsafe {
+        // Leaked on purpose: it must live until the process exits.
+        let _ = CreateMutexW(None, false, windows::core::w!("LifestreamSingleInstance"));
+    }
+}

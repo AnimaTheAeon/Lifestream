@@ -31,7 +31,16 @@ fn main() -> eframe::Result<()> {
     if let Some(msg) = &restored {
         applog::info(msg.clone());
     }
-    let settings = settings::Settings::load();
+    #[cfg(windows)]
+    winint::hold_install_mutex();
+    let mut settings = settings::Settings::load();
+    // The installer leaves a note when "Start with Windows" was ticked there.
+    let marker = settings::data_dir().join("installer-autostart");
+    if marker.exists() {
+        settings.start_with_windows = true;
+        settings.save();
+        let _ = std::fs::remove_file(&marker);
+    }
     #[cfg(windows)]
     winint::set_autostart(settings.start_with_windows);
 
