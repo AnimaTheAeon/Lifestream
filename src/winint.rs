@@ -140,3 +140,23 @@ pub fn notify(title: &str, body: &str) {
         }
     });
 }
+
+/// Once per new version: ask Explorer to redraw icons, so shortcuts and the
+/// taskbar pick up a changed app icon without a sign-out.
+pub fn refresh_icons_once() {
+    let marker = crate::settings::data_dir().join("icons-refreshed");
+    let version = env!("CARGO_PKG_VERSION");
+    if std::fs::read_to_string(&marker).map(|v| v.trim() == version).unwrap_or(false) {
+        return;
+    }
+    use windows::Win32::UI::Shell::{SHChangeNotify, SHCNE_ASSOCCHANGED, SHCNF_IDLIST};
+    unsafe { SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, None, None) };
+    // ie4uinit -show rebuilds the icon cache on Windows 10/11.
+    let sys = std::env::var("SystemRoot").unwrap_or_else(|_| r"C:\Windows".into());
+    let tool = std::path::Path::new(&sys).join("System32").join("ie4uinit.exe");
+    if tool.exists() {
+        use std::os::windows::process::CommandExt;
+        let _ = std::process::Command::new(tool).arg("-show").creation_flags(0x0800_0000).spawn(); // CREATE_NO_WINDOW
+    }
+    let _ = std::fs::write(&marker, version);
+}

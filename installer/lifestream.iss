@@ -26,6 +26,8 @@ DisableProgramGroupPage=yes
 UninstallDisplayIcon={app}\{#MyAppExe}
 UninstallDisplayName={#MyAppName}
 SetupIconFile=..\resources\lifestream.ico
+; Tell Explorer the icons changed (shortcuts, file types, magnet links).
+ChangesAssociations=yes
 WizardStyle=modern
 WizardSmallImageFile=wizard-small.bmp
 WizardImageFile=wizard-large.bmp
@@ -75,6 +77,8 @@ Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: 
 Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: none; ValueName: "Lifestream"; Flags: uninsdeletevalue
 
 [Run]
+; Refresh Windows' icon cache so shortcuts and pinned taskbar icons show the new icon.
+Filename: "{sys}\ie4uinit.exe"; Parameters: "-show"; Flags: runhidden waituntilterminated skipifdoesntexist
 Filename: "{app}\{#MyAppExe}"; Description: "Launch Lifestream"; Flags: nowait postinstall skipifsilent
 ; In-app updates run the installer silently; reopen Lifestream afterwards.
 Filename: "{app}\{#MyAppExe}"; Parameters: "--after-update"; Flags: nowait; Check: WizardSilent
