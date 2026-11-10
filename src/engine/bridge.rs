@@ -48,6 +48,8 @@ pub mod ffi {
     #[derive(Clone, Debug, Default)]
     pub struct TorrentInfo {
         pub hash: String,
+        /// SHA-1 info hash (what Midgar/Sonarr use); empty for pure v2 torrents.
+        pub hash_v1: String,
         pub name: String,
         pub save_path: String,
         /// 0 checking, 1 metadata, 2 downloading, 3 finished, 4 seeding
@@ -95,6 +97,7 @@ pub mod ffi {
         pub total_size: i64,
         pub is_private: bool,
         pub hash: String,
+        pub hash_v1: String,
         pub comment: String,
         pub has_metadata: bool,
         pub files: Vec<FileEntry>,

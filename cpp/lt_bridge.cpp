@@ -64,6 +64,15 @@ std::string hex_of(const lt::info_hash_t &ih) {
   return ss.str();
 }
 
+// The SHA-1 (v1) info hash, which is what Sonarr-style apps use as the ID.
+// Empty for pure v2 torrents.
+std::string v1_hex_of(const lt::info_hash_t &ih) {
+  if (!ih.has_v1()) return std::string();
+  std::ostringstream ss;
+  ss << ih.v1;
+  return ss.str();
+}
+
 lt::settings_pack make_pack(const LtSettings &s) {
   lt::settings_pack p;
   p.set_int(lt::settings_pack::alert_mask,
@@ -162,6 +171,7 @@ TorrentPreview preview_from(const lt::torrent_info &ti) {
   pv.total_size = ti.total_size();
   pv.is_private = ti.priv();
   pv.hash = rs(hex_of(ti.info_hashes()));
+  pv.hash_v1 = rs(v1_hex_of(ti.info_hashes()));
   pv.comment = rs(std::string());
   pv.has_metadata = true;
   const auto &fst = layout_of(ti);
@@ -283,6 +293,7 @@ rust::Vec<TorrentInfo> Engine::torrents() const {
     lt::torrent_status s = h.status();
     TorrentInfo t;
     t.hash = rs(kv.first);
+    t.hash_v1 = rs(v1_hex_of(s.info_hashes));
     t.name = rs(s.name.empty() ? kv.first : s.name);
     t.save_path = rs(s.save_path);
     switch (s.state) {

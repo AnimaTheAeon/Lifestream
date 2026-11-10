@@ -25,8 +25,9 @@ pub enum Cmd {
     AddMagnet { uri: String, category: String, choice: AddChoice, save_path: Option<String> },
     AddTorrent { data: Vec<u8>, category: String, choice: AddChoice, priorities: Option<Vec<u8>>, save_path: Option<String> },
     AddFromUrl { url: String, category: String },
-    /// From the remote-control API: replies with the new torrent's hash.
-    RemoteAdd { magnet: Option<String>, data: Option<Vec<u8>>, category: String, save_path: Option<String>, paused: bool, reply: Sender<Result<String, String>> },
+    /// From the remote-control API: replies with the torrent's v1 hash (what
+    /// Sonarr-style apps use as its ID) and whether it was already in the list.
+    RemoteAdd { magnet: Option<String>, data: Option<Vec<u8>>, category: String, save_path: Option<String>, paused: bool, reply: Sender<Result<(String, bool), String>> },
     SetCategory { hash: String, category: String },
     Pause(String),
     Resume(String),
@@ -712,6 +713,20 @@ impl Core {
                 }
             }
             Cmd::RemoteAdd { magnet, data, category, save_path, paused, reply } => {
+                // Already in the list? Transmission calls that a duplicate, not an error,
+                // and apps like Midgar treat an error as a failed download.
+                let wanted = match (&magnet, &data) {
+                    (Some(m), _) => crate::rpc::magnet_hash(m),
+                    (None, Some(d)) => ffi::parse_torrent(d).ok().map(|p| if p.hash_v1.is_empty() { p.hash } else { p.hash_v1 }),
+                    _ => None,
+                };
+                if let Some(w) = &wanted {
+                    let existing = self.engine.as_ref().map(|e| e.torrents()).unwrap_or_default();
+                    if existing.iter().any(|t| t.hash_v1.eq_ignore_ascii_case(w) || t.hash.eq_ignore_ascii_case(w)) {
+                        let _ = reply.send(Ok((w.clone(), true)));
+                        return true;
+                    }
+                }
                 let mut c = self.default_choice();
                 c.paused = paused;
                 let r = match (magnet, data) {
@@ -719,11 +734,14 @@ impl Core {
                     (None, Some(d)) => self.add_bytes(&d, &category, c, None, save_path),
                     _ => Err("Nothing to add".into()),
                 };
-                if let Ok(h) = &r {
-                    let name = self.engine().map(|e| e.torrents()).unwrap_or_default().into_iter().find(|t| &t.hash == h).map(|t| t.name).unwrap_or_default();
+                let r = r.map(|h| {
+                    let info = self.engine().map(|e| e.torrents()).unwrap_or_default().into_iter().find(|t| t.hash == h);
+                    let name = info.as_ref().map(|t| t.name.clone()).unwrap_or_default();
                     applog::info(format!("Added from remote control: {}", if name.is_empty() { h.clone() } else { name.clone() }));
-                    self.toast(format!("Added from Turks: {}", if name.is_empty() { "a torrent".into() } else { name }));
-                }
+                    self.toast(format!("Added by remote control: {}", if name.is_empty() { "a torrent".into() } else { name }));
+                    let v1 = info.map(|t| t.hash_v1).filter(|v| !v.is_empty());
+                    (wanted.or(v1).unwrap_or(h), false)
+                });
                 let _ = reply.send(r);
             }
             Cmd::SetCategory { hash, category } => {
