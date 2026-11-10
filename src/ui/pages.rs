@@ -957,30 +957,24 @@ impl App {
             }
 
             section(ui, "Leak check");
-            ui.horizontal(|ui| {
-                ui.vertical(|ui| {
-                    match &sn.public_ip {
-                        Some(Ok(ip)) => {
-                            ui.label(RichText::new(format!("Public address: {ip}")).color(TEXT).strong());
-                            ui.label(dim("If this isn't your home internet's address, your VPN is covering you."));
-                        }
-                        Some(Err(e)) => {
-                            ui.colored_label(BAD, format!("Check failed: {e}"));
-                        }
-                        None => {
-                            ui.label(dim("Shows the address websites see for this computer."));
-                        }
-                    }
-                    if let Some(ip) = &sn.adapter_ip {
-                        ui.label(dim(&format!("Torrents are bound to {ip}.")));
-                    }
-                });
-                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                    if ui.add_enabled(!sn.leak_checking, egui::Button::new(if sn.leak_checking { "Checking…" } else { "Check now" })).clicked() {
-                        self.core.send(Cmd::LeakCheck);
-                    }
-                });
-            });
+            ui.label(dim("Asks a lookup site where your traffic comes out, once over your normal connection and once from the adapter torrents use."));
+            ui.add_space(4.0);
+            let adapter_name = self.settings.adapter.clone();
+            if ui.add_enabled(!sn.leak_checking, egui::Button::new(if sn.leak_checking { "Checking…" } else { "Run leak check" })).clicked() {
+                self.core.send(Cmd::LeakCheck);
+            }
+            ui.add_space(4.0);
+            if let Some(r) = &sn.leak {
+                leak_report(ui, r, &adapter_name);
+            }
+            let lower = adapter_name.to_lowercase();
+            if ["tailscale", "zerotier", "hamachi", "radmin"].iter().any(|n| lower.contains(n)) {
+                ui.add_space(4.0);
+                ui.colored_label(
+                    WARN,
+                    "This adapter is a private-network tool, not an internet VPN. Unless it's set to use an exit node, torrents bound to it can't reach peers at all.",
+                );
+            }
         });
         if refresh {
             self.refresh_adapters(true);
@@ -1232,7 +1226,13 @@ impl App {
                     open_path(&crate::settings::data_dir().display().to_string());
                 }
             });
-            ui.label(dim(&format!("Lifestream {}", env!("CARGO_PKG_VERSION"))));
+            row(ui, &format!("Lifestream v{}", crate::updater::APP_VERSION), "Lifestream checks for updates each time it opens and only says something when there's a new version.", |ui| {
+                if ui.button("Check for updates").clicked() {
+                    self.manual_update_check = true;
+                    self.updater.dismissed.store(false, std::sync::atomic::Ordering::SeqCst);
+                    crate::updater::check_in_background(std::sync::Arc::clone(&self.updater), ui.ctx().clone());
+                }
+            });
         });
         if changed {
             self.changed();
@@ -1336,4 +1336,75 @@ fn sort_name(s: Sort) -> &'static str {
         Sort::Ratio => "Ratio",
         Sort::Added => "Newest first",
     }
+}
+
+fn ip_line(ui: &mut egui::Ui, label: &str, r: &Result<crate::core::IpInfo, String>) {
+    ui.horizontal_wrapped(|ui| {
+        ff::stat_label(ui, label);
+        match r {
+            Ok(i) => {
+                ff::title(ui, &i.ip, 15.0, TEXT);
+                let mut bits = Vec::new();
+                if !i.org.is_empty() {
+                    bits.push(i.org.clone());
+                }
+                if !i.place.is_empty() {
+                    bits.push(i.place.clone());
+                }
+                if !bits.is_empty() {
+                    ui.label(RichText::new(bits.join(" · ")).color(TEXT_DIM));
+                }
+            }
+            Err(e) => {
+                ff::title(ui, "NO CONNECTION", 15.0, BAD).on_hover_text(e);
+            }
+        }
+    });
+}
+
+/// Plain-language verdict for the two lookups.
+fn leak_report(ui: &mut egui::Ui, r: &crate::core::LeakResult, adapter: &str) {
+    ff::window(ui, |ui| {
+        ui.set_width(ui.available_width());
+        ip_line(ui, "EVERYTHING ELSE", &r.normal);
+        match &r.torrent {
+            None => {
+                ui.add_space(4.0);
+                ff::title(ui, "Torrents aren't bound to an adapter", 15.0, WARN);
+                ui.add(egui::Label::new(dim(
+                    "They use whatever route Windows picks, which is the address above. Pick your VPN adapter and turn on \"Only use this adapter\" so torrents can only go through it.",
+                )).wrap());
+            }
+            Some(t) => {
+                let via = r.bound_ip.clone().unwrap_or_default();
+                ip_line(ui, &format!("TORRENTS (via {via})"), t);
+                ui.add_space(6.0);
+                match (t, &r.normal) {
+                    (Err(_), _) => {
+                        ff::title(ui, "Nothing gets out through this adapter", 15.0, BAD);
+                        ui.add(egui::Label::new(dim(&format!(
+                            "{adapter} can't reach the internet, so torrents can't connect either. That usually means it isn't a VPN tunnel (or the VPN is disconnected). Your real address is not being used for torrents."
+                        ))).wrap());
+                    }
+                    (Ok(t), Ok(n)) if t.ip != n.ip => {
+                        ff::title(ui, "Torrents go through your VPN", 15.0, GOOD);
+                        ui.add(egui::Label::new(dim(&format!(
+                            "Peers see {}{}. Your other apps use {} because your VPN only covers some traffic (split tunneling). That's fine: Lifestream is locked to the VPN.",
+                            t.ip,
+                            if t.org.is_empty() { String::new() } else { format!(" ({})", t.org) },
+                            n.ip
+                        ))).wrap());
+                    }
+                    (Ok(t), _) => {
+                        ff::title(ui, "Same address on both routes", 15.0, WARN);
+                        ui.add(egui::Label::new(dim(&format!(
+                            "Peers see {}{}. If that's your VPN provider, everything on this PC goes through the VPN and you're covered. If it's your home internet provider, {adapter} isn't tunnelling to the internet: pick the right adapter.",
+                            t.ip,
+                            if t.org.is_empty() { String::new() } else { format!(" ({})", t.org) }
+                        ))).wrap());
+                    }
+                }
+            }
+        }
+    });
 }

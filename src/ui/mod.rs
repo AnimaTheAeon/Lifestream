@@ -94,6 +94,9 @@ pub struct App {
     #[cfg(windows)]
     tray: Option<crate::tray::Tray>,
     pub restore_pending: bool,
+    pub updater: Arc<crate::updater::Updater>,
+    pub manual_update_check: bool,
+    quitting_for_update: bool,
 }
 
 impl App {
@@ -146,6 +149,13 @@ impl App {
             #[cfg(windows)]
             tray,
             restore_pending: false,
+            updater: {
+                let u = Arc::new(crate::updater::Updater::default());
+                crate::updater::check_in_background(Arc::clone(&u), cc.egui_ctx.clone());
+                u
+            },
+            manual_update_check: false,
+            quitting_for_update: false,
         }
     }
 
@@ -348,6 +358,7 @@ impl App {
             Page::Log => self.page_log(ui),
         });
 
+        self.update_prompt(ui.ctx());
         self.files_popup(ui.ctx(), main);
         self.remove_dialog(ui.ctx());
         self.toasts(ui.ctx(), pos2(main.right() - 14.0, main.top() + 14.0));
@@ -431,6 +442,7 @@ impl eframe::App for App {
                 }
             }
         }
+        self.watch_updater(ctx);
         self.flush_settings(false);
         ctx.request_repaint_after(Duration::from_millis(500));
     }
@@ -453,6 +465,126 @@ impl eframe::App for App {
 }
 
 impl App {
+    /// Quit once the update is staged; report manual checks.
+    fn watch_updater(&mut self, ctx: &egui::Context) {
+        use crate::updater::State;
+        match self.updater.state() {
+            State::Restarting if !self.quitting_for_update => {
+                self.quitting_for_update = true;
+                #[cfg(windows)]
+                crate::tray::QUIT.store(true, std::sync::atomic::Ordering::SeqCst);
+                ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+            }
+            State::Idle if self.manual_update_check => {
+                self.manual_update_check = false;
+                let err = self.updater.last_error.lock().ok().and_then(|e| e.clone());
+                match err {
+                    Some(e) => self.notify(format!("Couldn't check for updates: {e}")),
+                    None => self.notify(format!("You're on the latest version (v{}).", crate::updater::APP_VERSION)),
+                }
+            }
+            _ => {}
+        }
+    }
+
+    /// Shown only when a newer version exists (or one is being installed).
+    fn update_prompt(&mut self, ctx: &egui::Context) {
+        use crate::updater::State;
+        use std::sync::atomic::Ordering::SeqCst;
+        let state = self.updater.state();
+        let show = match &state {
+            State::Available(_) => !self.updater.dismissed.load(SeqCst),
+            State::Downloading(_) | State::Restarting | State::Failed(_) => true,
+            _ => false,
+        };
+        if !show {
+            return;
+        }
+        if matches!(state, State::Available(_)) {
+            self.manual_update_check = false;
+        }
+        let mut install = None;
+        let mut later = false;
+        egui::Modal::new(egui::Id::new("update_prompt"))
+            .frame(egui::Frame::NONE)
+            .backdrop_color(egui::Color32::from_black_alpha(150))
+            .show(ctx, |ui| {
+                ff::window(ui, |ui| {
+                    ui.set_width(460.0);
+                    match &state {
+                        State::Available(r) => {
+                            ff::title(ui, "Update available", 24.0, TEXT);
+                            ff::divider(ui);
+                            ui.horizontal(|ui| {
+                                ff::stat_label(ui, "CURRENT");
+                                ui.label(RichText::new(format!("v{}", crate::updater::APP_VERSION)).strong());
+                                ui.add_space(16.0);
+                                ff::stat_label(ui, "NEW");
+                                ui.label(RichText::new(format!("v{}", r.version)).strong().color(ff::GOOD));
+                            });
+                            if !r.notes.trim().is_empty() {
+                                ui.add_space(6.0);
+                                egui::ScrollArea::vertical().max_height(200.0).show(ui, |ui| {
+                                    ui.add(egui::Label::new(RichText::new(r.notes.trim()).color(TEXT_DIM)).wrap());
+                                });
+                            }
+                            ui.add_space(6.0);
+                            ui.label(dim(if crate::updater::is_installed() {
+                                "Lifestream saves your torrents, closes, installs the update and reopens."
+                            } else {
+                                "Lifestream saves your torrents, swaps in the new version and reopens."
+                            }));
+                            ui.add_space(8.0);
+                            ui.horizontal(|ui| {
+                                if ui.button(RichText::new("Update now").color(ff::GOOD).strong()).clicked() {
+                                    install = Some(r.clone());
+                                }
+                                if ui.button("Later").clicked() {
+                                    later = true;
+                                }
+                                if !r.page_url.is_empty() {
+                                    ui.hyperlink_to("What's new", &r.page_url);
+                                }
+                            });
+                        }
+                        State::Downloading(r) => {
+                            ff::title(ui, &format!("Downloading v{}", r.version), 22.0, TEXT);
+                            let done = self.updater.downloaded.load(SeqCst);
+                            let total = self.updater.total.load(SeqCst).max(1);
+                            ff::stat_bar(ui, done as f32 / total as f32, 420.0, ff::LABEL, egui::Color32::WHITE);
+                            ui.label(dim(&format!(
+                                "{} of {}",
+                                crate::core::human_bytes(done as i64),
+                                crate::core::human_bytes(total as i64)
+                            )));
+                        }
+                        State::Restarting => {
+                            ff::title(ui, "Installing update…", 22.0, TEXT);
+                            ui.label(dim("Saving your torrents. Lifestream will reopen in a moment."));
+                        }
+                        State::Failed(e) => {
+                            ff::title(ui, "Update didn't work", 22.0, ff::BAD);
+                            ui.add(egui::Label::new(RichText::new(e).color(TEXT)).wrap());
+                            ui.label(dim("Nothing was changed. You can try again later or grab it from the releases page."));
+                            if ui.button("OK").clicked() {
+                                later = true;
+                            }
+                        }
+                        _ => {}
+                    }
+                });
+            });
+        if let Some(r) = install {
+            crate::updater::install_in_background(Arc::clone(&self.updater), r, ctx.clone());
+        }
+        if later {
+            self.updater.dismissed.store(true, SeqCst);
+            if matches!(state, State::Failed(_)) {
+                crate::updater::reset(&self.updater);
+            }
+        }
+    }
+
     /// The core changes a few settings itself (tray toggles, VPN port).
     fn snap_settings_differ(&mut self) -> bool {
         // Cheap check: re-read only when the file changed.

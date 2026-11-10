@@ -14,7 +14,16 @@ pub enum Incoming {
 }
 
 /// Returns a listener if we're the first instance, None if we forwarded.
-pub fn claim(args: &[String]) -> Option<TcpListener> {
+pub fn claim(args: &[String], after_update: bool) -> Option<TcpListener> {
+    // Right after an update the old copy may still be saving and shutting down.
+    if after_update {
+        for _ in 0..60 {
+            if let Ok(l) = TcpListener::bind(("127.0.0.1", PORT)) {
+                return Some(l);
+            }
+            std::thread::sleep(Duration::from_millis(500));
+        }
+    }
     match TcpListener::bind(("127.0.0.1", PORT)) {
         Ok(l) => Some(l),
         Err(_) => {

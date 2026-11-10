@@ -65,6 +65,62 @@ pub struct TorrentView {
     pub seed_goal_met: bool,
 }
 
+/// Where traffic comes out on the internet, as seen by ipinfo.io.
+#[derive(Clone, Debug)]
+pub struct IpInfo {
+    pub ip: String,
+    pub org: String,
+    pub place: String,
+}
+
+#[derive(Clone, Debug)]
+pub struct LeakResult {
+    /// Your normal connection (what browsers and other apps use).
+    pub normal: Result<IpInfo, String>,
+    /// Sent from the adapter torrents are bound to, exactly like libtorrent does.
+    pub torrent: Option<Result<IpInfo, String>>,
+    pub bound_ip: Option<String>,
+}
+
+fn lookup_ip(local: Option<std::net::IpAddr>) -> Result<IpInfo, String> {
+    let client = reqwest::blocking::Client::builder()
+        .timeout(Duration::from_secs(15))
+        .local_address(local)
+        .no_proxy()
+        .user_agent("Lifestream")
+        .build()
+        .map_err(|e| e.to_string())?;
+    match client
+        .get("https://ipinfo.io/json")
+        .send()
+        .and_then(|r| r.error_for_status())
+        .and_then(|r| r.json::<serde_json::Value>())
+    {
+        Ok(j) => {
+            let t = |k: &str| j.get(k).and_then(|v| v.as_str()).unwrap_or("").to_string();
+            // "AS9009 M247 Europe SRL" -> "M247 Europe SRL"
+            let org = t("org");
+            let org = match org.split_once(' ') {
+                Some((asn, rest)) if asn.starts_with("AS") => rest.to_string(),
+                _ => org,
+            };
+            let place = [t("city"), t("region"), t("country")]
+                .into_iter()
+                .filter(|s| !s.is_empty())
+                .collect::<Vec<_>>()
+                .join(", ");
+            Ok(IpInfo { ip: t("ip"), org, place })
+        }
+        Err(first) => client
+            .get("https://api.ipify.org")
+            .send()
+            .and_then(|r| r.error_for_status())
+            .and_then(|r| r.text())
+            .map(|ip| IpInfo { ip: ip.trim().to_string(), org: String::new(), place: String::new() })
+            .map_err(|_| format!("no response ({first})")),
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct FeedStatus {
     pub checked: String,
@@ -89,7 +145,7 @@ pub struct Snapshot {
     pub listen_error: String,
     pub incoming_seen: bool,
     pub turtle_active: bool,
-    pub public_ip: Option<Result<String, String>>,
+    pub leak: Option<LeakResult>,
     pub leak_checking: bool,
     pub rss_items: Vec<FeedItem>,
     pub rss_status: HashMap<String, FeedStatus>,
@@ -121,7 +177,7 @@ impl Default for Snapshot {
             listen_error: String::new(),
             incoming_seen: false,
             turtle_active: false,
-            public_ip: None,
+            leak: None,
             leak_checking: false,
             rss_items: Vec::new(),
             rss_status: HashMap::new(),
@@ -187,7 +243,7 @@ enum Bg {
     Rss(String, Result<Vec<FeedItem>, String>),
     RssDone,
     Blocklist(Result<Vec<ffi::IpRange>, String>),
-    PublicIp(Result<String, String>),
+    Leak(LeakResult),
     Download { url: String, category: String, data: Result<Vec<u8>, String> },
 }
 
@@ -219,7 +275,7 @@ struct Core {
     rss_checking: bool,
     blocklist_count: usize,
     blocklist_status: String,
-    public_ip: Option<Result<String, String>>,
+    leak: Option<LeakResult>,
     leak_checking: bool,
     toast: Option<(String, Instant)>,
     started: Instant,
@@ -254,7 +310,7 @@ impl Core {
             rss_checking: false,
             blocklist_count: 0,
             blocklist_status: String::new(),
-            public_ip: None,
+            leak: None,
             leak_checking: false,
             toast: None,
             started: Instant::now(),
@@ -698,15 +754,13 @@ impl Core {
         }
         self.leak_checking = true;
         let tx = self.bg_tx.clone();
+        let bound = if self.settings.bind_only { self.adapter_ip.clone() } else { None };
         std::thread::spawn(move || {
-            let r = reqwest::blocking::Client::builder()
-                .timeout(Duration::from_secs(15))
-                .build()
-                .and_then(|c| c.get("https://api.ipify.org").send())
-                .and_then(|r| r.text())
-                .map(|t| t.trim().to_string())
-                .map_err(|e| e.to_string());
-            let _ = tx.send(Bg::PublicIp(r));
+            let local = bound.as_ref().and_then(|ip| ip.parse::<std::net::IpAddr>().ok());
+            let torrent = local.map(|ip| std::thread::spawn(move || lookup_ip(Some(ip))));
+            let normal = lookup_ip(None);
+            let torrent = torrent.map(|h| h.join().unwrap_or_else(|_| Err("check crashed".into())));
+            let _ = tx.send(Bg::Leak(LeakResult { normal, torrent, bound_ip: bound }));
         });
     }
 
@@ -827,9 +881,9 @@ impl Core {
                     applog::warn(format!("Blocklist: {e}"));
                 }
             },
-            Bg::PublicIp(r) => {
+            Bg::Leak(r) => {
                 self.leak_checking = false;
-                self.public_ip = Some(r);
+                self.leak = Some(r);
             }
             Bg::Download { url, category, data } => match data {
                 Ok(bytes) => {
@@ -1001,7 +1055,7 @@ impl Core {
             s.listen_error = totals.listen_error.clone();
             s.incoming_seen = self.incoming_seen;
             s.turtle_active = self.turtle_active;
-            s.public_ip = self.public_ip.clone();
+            s.leak = self.leak.clone();
             s.leak_checking = self.leak_checking;
             s.rss_items = self.rss_items.clone();
             s.rss_status = self.rss_status.clone();
