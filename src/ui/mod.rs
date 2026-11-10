@@ -128,6 +128,9 @@ pub struct App {
     pub green_zoom: Option<(Page, Instant)>,
     /// The page fading in out of the orb's glow.
     pub green_reveal: Option<Instant>,
+    /// Going back: the page sinks into the glow, then the orb shrinks away.
+    pub green_leave: Option<Instant>,
+    pub green_unzoom: Option<Instant>,
 }
 
 impl App {
@@ -206,6 +209,8 @@ impl App {
             green_cursor: 0,
             green_zoom: None,
             green_reveal: None,
+            green_leave: None,
+            green_unzoom: None,
         }
     }
 

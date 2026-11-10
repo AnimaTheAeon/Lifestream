@@ -222,7 +222,17 @@ impl App {
 
     /// Back to the dashboard, with the cursor on the page just left.
     fn green_back(&mut self) {
+        // The page first sinks into the orb's glow (see green_layout).
+        if self.green_leave.is_none() {
+            self.green_reveal = None;
+            self.green_leave = Some(std::time::Instant::now());
+        }
+    }
+
+    /// Actually back on the dashboard; the orb shrinks back into place.
+    fn green_home_now(&mut self) {
         self.green_in_page = false;
+        self.green_unzoom = Some(std::time::Instant::now());
         if let Some(i) = self.green_menu().iter().position(|m| m.0 == self.page) {
             self.green_cursor = i;
         }
@@ -262,6 +272,12 @@ impl App {
                 self.green_reveal = Some(std::time::Instant::now());
             }
         }
+        if let Some(at) = self.green_leave {
+            if at.elapsed().as_secs_f32() >= REVEAL_SECS {
+                self.green_leave = None;
+                self.green_home_now();
+            }
+        }
         if self.green_in_page {
             paint_background(&ctx, pos2(full.left() + full.width() * 0.2, full.top() + full.height() * 0.15));
             main = self.green_page(ui, full);
@@ -276,6 +292,13 @@ impl App {
                     ctx.request_repaint();
                 }
             }
+            // Going back: the page sinks into the glow (the reveal, reversed).
+            if let Some(at) = self.green_leave {
+                let k = (at.elapsed().as_secs_f32() / REVEAL_SECS).min(1.0);
+                let a = (k * k * 255.0) as u8;
+                zoom_painter(&ctx).rect_filled(full.expand(20.0), 0.0, rgba(170, 236, 60, a));
+                ctx.request_repaint();
+            }
         } else {
             let r = (full.height() * 0.24).min(full.width() * 0.16).max(90.0);
             let orb_c = pos2(full.left() + full.width() * 0.3, full.center().y - 24.0);
@@ -283,9 +306,21 @@ impl App {
             self.green_home(ui, full, orb_c, r, t);
             ctx.request_repaint_after(std::time::Duration::from_millis(33));
             // Zooming into the orb before a page opens.
-            if let Some((page, at)) = self.green_zoom {
-                let k = (at.elapsed().as_secs_f32() / ZOOM_SECS).min(1.0);
-                let _ = page;
+            // Zooming into the orb before a page opens, or (reversed) back out of it.
+            let zoom_k = if let Some((_, at)) = self.green_zoom {
+                Some((at.elapsed().as_secs_f32() / ZOOM_SECS).min(1.0))
+            } else if let Some(at) = self.green_unzoom {
+                let k = 1.0 - at.elapsed().as_secs_f32() / ZOOM_SECS;
+                if k <= 0.0 {
+                    self.green_unzoom = None;
+                    None
+                } else {
+                    Some(k)
+                }
+            } else {
+                None
+            };
+            if let Some(k) = zoom_k {
                 {
                     let e = k * k * k; // ease in: slow start, rushing at the end
                     // Big enough at the end to cover the window from the orb's center.
