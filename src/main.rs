@@ -7,6 +7,7 @@ mod core;
 mod engine;
 mod instance;
 mod netif;
+mod rpc;
 mod rss;
 mod settings;
 #[cfg(windows)]
@@ -48,6 +49,7 @@ fn main() -> eframe::Result<()> {
     winint::set_autostart(settings.start_with_windows);
 
     let (core, join) = core::start(settings.clone());
+    rpc::start(core.clone(), &settings);
 
     let icon = image::load_from_memory(include_bytes!("../resources/icon_256.png"))
         .ok()
