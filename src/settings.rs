@@ -96,9 +96,8 @@ pub struct Settings {
     pub categories: Vec<Category>,
     pub incomplete_enabled: bool,
     pub incomplete_dir: String,
-    pub watch_enabled: bool,
-    pub watch_dir: String,
-    pub watch_delete: bool,
+    /// The folder picked the last time a torrent was added.
+    pub last_save_dir: String,
 
     // Adding
     pub start_paused: bool,
@@ -185,9 +184,7 @@ impl Default for Settings {
             categories: Vec::new(),
             incomplete_enabled: false,
             incomplete_dir: PathBuf::from(&dl).join("Incomplete").display().to_string(),
-            watch_enabled: false,
-            watch_dir: String::new(),
-            watch_delete: true,
+            last_save_dir: String::new(),
             start_paused: false,
             default_sequential: false,
             default_first_last: false,

@@ -6,7 +6,7 @@
 //! lives here.
 
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -21,8 +21,9 @@ use crate::settings::{SeedAction, Settings};
 
 pub enum Cmd {
     ApplySettings(Box<Settings>),
-    AddMagnet { uri: String, category: String, choice: AddChoice },
-    AddTorrent { data: Vec<u8>, category: String, choice: AddChoice, priorities: Option<Vec<u8>> },
+    /// `save_path` is the folder the user picked; None = category/default folder.
+    AddMagnet { uri: String, category: String, choice: AddChoice, save_path: Option<String> },
+    AddTorrent { data: Vec<u8>, category: String, choice: AddChoice, priorities: Option<Vec<u8>>, save_path: Option<String> },
     AddFromUrl { url: String, category: String },
     Pause(String),
     Resume(String),
@@ -577,8 +578,10 @@ impl Core {
 
     // ---------------------------------------------------------------- adding
 
-    fn add_options(&self, category: &str, choice: AddChoice) -> (AddOptions, Option<String>) {
-        let final_path = self.settings.path_for_category(category);
+    fn add_options(&self, category: &str, choice: AddChoice, picked: Option<String>) -> (AddOptions, Option<String>) {
+        let final_path = picked
+            .filter(|p| !p.trim().is_empty())
+            .unwrap_or_else(|| self.settings.path_for_category(category));
         let (save_path, final_dest) = if self.settings.incomplete_enabled
             && !self.settings.incomplete_dir.trim().is_empty()
             && !choice.skip_check
@@ -627,8 +630,8 @@ impl Core {
         }
     }
 
-    fn add_magnet(&mut self, uri: &str, category: &str, choice: AddChoice) -> Result<String, String> {
-        let (opts, final_path) = self.add_options(category, choice);
+    fn add_magnet(&mut self, uri: &str, category: &str, choice: AddChoice, picked: Option<String>) -> Result<String, String> {
+        let (opts, final_path) = self.add_options(category, choice, picked);
         let e = self.engine().ok_or("The torrent engine isn't running.")?;
         let hash = e.add_magnet(uri.trim(), &opts).map_err(|e| e.what().to_string())?;
         self.remember(&hash, category, final_path);
@@ -641,8 +644,9 @@ impl Core {
         category: &str,
         choice: AddChoice,
         priorities: Option<Vec<u8>>,
+        picked: Option<String>,
     ) -> Result<String, String> {
-        let (mut opts, final_path) = self.add_options(category, choice);
+        let (mut opts, final_path) = self.add_options(category, choice, picked);
         if let Some(p) = priorities {
             opts.use_priorities = true;
             opts.file_priorities = p;
@@ -687,18 +691,18 @@ impl Core {
     fn handle(&mut self, cmd: Cmd) -> bool {
         match cmd {
             Cmd::ApplySettings(s) => self.apply_settings(*s),
-            Cmd::AddMagnet { uri, category, choice } => {
-                let r = self.add_magnet(&uri, &category, choice);
+            Cmd::AddMagnet { uri, category, choice, save_path } => {
+                let r = self.add_magnet(&uri, &category, choice, save_path);
                 self.report_add("magnet link", r);
             }
-            Cmd::AddTorrent { data, category, choice, priorities } => {
-                let r = self.add_bytes(&data, &category, choice, priorities);
+            Cmd::AddTorrent { data, category, choice, priorities, save_path } => {
+                let r = self.add_bytes(&data, &category, choice, priorities, save_path);
                 self.report_add("torrent", r);
             }
             Cmd::AddFromUrl { url, category } => {
                 if url.trim_start().starts_with("magnet:") {
                     let c = self.default_choice();
-                    let r = self.add_magnet(&url, &category, c);
+                    let r = self.add_magnet(&url, &category, c, None);
                     self.report_add("magnet link", r);
                 } else {
                     self.download_torrent_url(url, category);
@@ -942,7 +946,7 @@ impl Core {
             Bg::Download { url, category, data } => match data {
                 Ok(bytes) => {
                     let c = self.default_choice();
-                    let r = self.add_bytes(&bytes, &category, c, None);
+                    let r = self.add_bytes(&bytes, &category, c, None, None);
                     self.report_add("torrent from feed", r);
                 }
                 Err(e) => applog::error(format!("Couldn't download {url}: {e}")),
@@ -991,33 +995,6 @@ impl Core {
             "ERROR" => applog::error(msg),
             "METADATA" | "MOVED" | "LOG" => applog::info(msg),
             _ => {}
-        }
-    }
-
-    fn scan_watch_folder(&mut self) {
-        if !self.settings.watch_enabled || self.settings.watch_dir.trim().is_empty() {
-            return;
-        }
-        let dir = PathBuf::from(&self.settings.watch_dir);
-        let Ok(entries) = std::fs::read_dir(&dir) else { return };
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if path.extension().and_then(|e| e.to_str()).map(|e| e.eq_ignore_ascii_case("torrent")) != Some(true) {
-                continue;
-            }
-            // Skip files that are still being written.
-            if let Ok(m) = entry.metadata() {
-                if m.modified().ok().and_then(|t| t.elapsed().ok()).map(|d| d < Duration::from_secs(2)).unwrap_or(false) {
-                    continue;
-                }
-            }
-            let Ok(data) = std::fs::read(&path) else { continue };
-            let c = self.default_choice();
-            let cat = String::new();
-            let r = self.add_bytes(&data, &cat, c, None);
-            let name = path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
-            self.report_add(&name, r);
-            done_with_watched(&path, self.settings.watch_delete);
         }
     }
 
@@ -1216,7 +1193,6 @@ impl Core {
                     applog::info(if turtle { "Turtle mode on." } else { "Turtle mode off." });
                     self.sync_engine();
                 }
-                self.scan_watch_folder();
                 self.check_rss(false);
                 self.set_awake();
                 if self.settings.blocklist_auto
@@ -1270,16 +1246,6 @@ impl Core {
         self.save_meta();
         #[cfg(windows)]
         crate::winint::keep_awake(false);
-    }
-}
-
-fn done_with_watched(path: &Path, delete: bool) {
-    if delete {
-        let _ = std::fs::remove_file(path);
-    } else {
-        let mut added = path.as_os_str().to_owned();
-        added.push(".added");
-        let _ = std::fs::rename(path, PathBuf::from(added));
     }
 }
 

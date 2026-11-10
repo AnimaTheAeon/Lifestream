@@ -45,7 +45,12 @@ struct Ids {
 }
 
 impl Tray {
-    pub fn new(core: CoreHandle, ctx: eframe::egui::Context, download_dir: Arc<std::sync::Mutex<String>>) -> Option<Self> {
+    pub fn new(
+        core: CoreHandle,
+        ctx: eframe::egui::Context,
+        download_dir: Arc<std::sync::Mutex<String>>,
+        to_app: std::sync::mpsc::Sender<crate::instance::Incoming>,
+    ) -> Option<Self> {
         let status = MenuItem::new("Lifestream", false, None);
         let pause = MenuItem::new("Pause all", true, None);
         let turtle = CheckMenuItem::new("Turtle mode", true, false, None);
@@ -102,7 +107,9 @@ impl Tray {
                 if let Ok(text) = arboard::Clipboard::new().and_then(|mut c| c.get_text()) {
                     let text = text.trim().to_string();
                     if text.starts_with("magnet:") {
-                        core.send(Cmd::AddFromUrl { url: text, category: String::new() });
+                        // Goes through the Add page so it asks where to save.
+                        let _ = to_app.send(crate::instance::Incoming::Open(text));
+                        show_window(&ctx);
                     }
                 }
             } else if e.id == ids.folder {

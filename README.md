@@ -11,6 +11,7 @@ qBittorrent and Deluge) with a Rust + egui interface.
 
 **Torrents**
 - Magnet links and .torrent files; drag and drop onto the window
+- Asks where to save each download and remembers the last folder you picked
 - Click a torrent's square icon for its files: skip files, set priority
 - Seeders vs. leechers shown as connected (whole swarm), plus a swarm health bar
 - Download in order, first-and-last-pieces-first, super-seeding, recheck, queue
@@ -30,13 +31,12 @@ qBittorrent and Deluge) with a Rust + egui interface.
 **Automation**
 - RSS feeds with rules: must / must-not contain, episode ranges
   (`S02E05-`), regex, skip duplicates, per-rule category
-- Watch folder for .torrent files
 - Turtle mode (alternate limits) on demand or on a schedule
 - Stop seeding at a ratio or time, then pause / remove / remove + delete
 
 **App**
 - Simple / Advanced mode: Simple shows what most people need
-- Help text on every setting, also as a tooltip
+- Every setting has a Shinra-logo help icon: hover it to read what it does
 - Tray icon with quick toggles: pause all, turtle, RSS, kill switch status,
   add magnet from clipboard
 - Opens magnet links and .torrent files (Config → Make default)
