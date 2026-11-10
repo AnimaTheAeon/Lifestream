@@ -17,6 +17,8 @@
 #include <libtorrent/extensions/ut_metadata.hpp>
 #include <libtorrent/extensions/ut_pex.hpp>
 #include <libtorrent/ip_filter.hpp>
+#include <libtorrent/load_torrent.hpp>
+#include <libtorrent/version.hpp>
 #include <libtorrent/magnet_uri.hpp>
 #include <libtorrent/peer_info.hpp>
 #include <libtorrent/read_resume_data.hpp>
@@ -31,6 +33,24 @@ namespace fs = std::filesystem;
 namespace ls {
 
 namespace {
+
+// libtorrent 2.1 renamed torrent_info::files() to layout().
+const lt::file_storage &layout_of(const lt::torrent_info &ti) {
+#if LIBTORRENT_VERSION_NUM >= 20100
+  return ti.layout();
+#else
+  return ti.files();
+#endif
+}
+
+lt::add_torrent_params load_buffer(const uint8_t *data, size_t len) {
+  try {
+    return lt::load_torrent_buffer(
+        lt::span<char const>(reinterpret_cast<const char *>(data), (std::ptrdiff_t)len));
+  } catch (const std::exception &e) {
+    throw std::runtime_error(std::string("That .torrent file couldn't be read: ") + e.what());
+  }
+}
 
 std::string hex_of(const lt::torrent_handle &h) {
   std::ostringstream ss;
@@ -142,9 +162,9 @@ TorrentPreview preview_from(const lt::torrent_info &ti) {
   pv.total_size = ti.total_size();
   pv.is_private = ti.priv();
   pv.hash = rs(hex_of(ti.info_hashes()));
-  pv.comment = rs(ti.comment());
+  pv.comment = rs(std::string());
   pv.has_metadata = true;
-  const auto &fst = ti.files();
+  const auto &fst = layout_of(ti);
   for (auto i : fst.file_range()) {
     if (fst.pad_file_at(i)) continue;
     FileEntry fe;
@@ -175,8 +195,16 @@ Engine::Engine(const LtSettings &s, bool enable_pex, rust::Str state_dir, bool s
     } catch (...) {
     }
   }
+#if LIBTORRENT_VERSION_NUM >= 20100
+  // 2.1 has no "start paused" constructor. When the kill switch holds, the
+  // settings already confine everything to loopback with DHT off, and we
+  // pause before any torrent is loaded.
+  ses_ = std::make_unique<lt::session>(std::move(params));
+  if (start_paused) ses_->pause();
+#else
   ses_ = std::make_unique<lt::session>(
       std::move(params), start_paused ? lt::session_handle::paused : lt::session_flags_t{});
+#endif
   ses_->add_extension(&lt::create_ut_metadata_plugin);
   ses_->add_extension(&lt::create_smart_ban_plugin);
   if (enable_pex) ses_->add_extension(&lt::create_ut_pex_plugin);
@@ -233,14 +261,10 @@ rust::String Engine::add_magnet(rust::Str uri, const AddOptions &opts) {
 
 rust::String Engine::add_torrent_bytes(rust::Slice<const uint8_t> data, const AddOptions &opts) {
   lt::error_code ec;
-  auto ti = std::make_shared<lt::torrent_info>(
-      lt::span<char const>(reinterpret_cast<const char *>(data.data()), (std::ptrdiff_t)data.size()),
-      ec, lt::from_span);
-  if (ec) throw std::runtime_error("That .torrent file couldn't be read: " + ec.message());
-  std::string hash = hex_of(ti->info_hashes());
+  lt::add_torrent_params atp = load_buffer(data.data(), data.size());
+  if (!atp.ti) throw std::runtime_error("That .torrent file couldn't be read.");
+  std::string hash = hex_of(atp.ti->info_hashes());
   if (handles_.count(hash)) throw std::runtime_error("That torrent is already in your list.");
-  lt::add_torrent_params atp;
-  atp.ti = ti;
   fill_add(atp, opts);
   lt::torrent_handle h = ses_->add_torrent(std::move(atp), ec);
   if (ec) throw std::runtime_error(ec.message());
@@ -316,7 +340,7 @@ rust::Vec<FileEntry> Engine::files(rust::Str hash) const {
   if (!ti) return out;
   std::vector<std::int64_t> progress = h.file_progress(lt::torrent_handle::piece_granularity);
   auto prios = h.get_file_priorities();
-  const auto &fst = ti->files();
+  const auto &fst = layout_of(*ti);
   for (auto i : fst.file_range()) {
     if (fst.pad_file_at(i)) continue;
     int idx = static_cast<int>(i);
@@ -406,7 +430,7 @@ void Engine::set_super_seeding(rust::Str hash, bool on) {
 void Engine::apply_first_last(const lt::torrent_handle &h) {
   auto ti = h.torrent_file();
   if (!ti) return;
-  const auto &fst = ti->files();
+  const auto &fst = layout_of(*ti);
   for (auto i : fst.file_range()) {
     std::int64_t size = fst.file_size(i);
     if (size <= 0) continue;
@@ -449,7 +473,11 @@ void Engine::queue_top(rust::Str hash) {
 rust::String Engine::magnet_link(rust::Str hash) const {
   auto h = find(hash);
   if (!h.is_valid()) return rust::String();
-  return rs(lt::make_magnet_uri(h));
+  lt::add_torrent_params p;
+  p.info_hashes = h.info_hashes();
+  p.name = h.status(lt::torrent_handle::query_name).name;
+  for (const auto &t : h.trackers()) p.trackers.push_back(t.url);
+  return rs(lt::make_magnet_uri(p));
 }
 
 void Engine::pause_session() { ses_->pause(); }
@@ -471,7 +499,7 @@ bool Engine::check_incoming() const {
     std::vector<lt::peer_info> peers;
     kv.second.get_peer_info(peers);
     for (const auto &p : peers)
-      if (!(p.flags & lt::peer_info::local_connection)) return true;
+      if (!(p.flags & lt::peer_info::outgoing_connection)) return true;
   }
   return false;
 }
@@ -608,12 +636,9 @@ std::unique_ptr<Engine> new_engine(const LtSettings &s, bool enable_pex, rust::S
 }
 
 TorrentPreview parse_torrent(rust::Slice<const uint8_t> data) {
-  lt::error_code ec;
-  lt::torrent_info ti(
-      lt::span<char const>(reinterpret_cast<const char *>(data.data()), (std::ptrdiff_t)data.size()),
-      ec, lt::from_span);
-  if (ec) throw std::runtime_error("That .torrent file couldn't be read: " + ec.message());
-  return preview_from(ti);
+  lt::add_torrent_params atp = load_buffer(data.data(), data.size());
+  if (!atp.ti) throw std::runtime_error("That .torrent file couldn't be read.");
+  return preview_from(*atp.ti);
 }
 
 } // namespace ls
