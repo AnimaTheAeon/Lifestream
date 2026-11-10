@@ -104,13 +104,26 @@ impl App {
                 }
             }
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                egui::ComboBox::from_id_salt("sort")
-                    .selected_text(sort_name(self.sort))
-                    .show_ui(ui, |ui| {
-                        for s in [Sort::Queue, Sort::Name, Sort::Health, Sort::DownSpeed, Sort::Ratio, Sort::Added] {
-                            ui.selectable_value(&mut self.sort, s, sort_name(s));
+                // A plain menu rather than egui's ComboBox: the ComboBox wraps its
+                // list in a scroll area that grew on every repaint (mouse move)
+                // with this app's non-floating scroll bars.
+                let button = egui::Button::new(format!("{}      ", sort_name(self.sort))).min_size(egui::vec2(124.0, 24.0));
+                let (resp, _) = egui::containers::menu::MenuButton::from_button(button).ui(ui, |ui| {
+                    ui.set_width(190.0);
+                    for s in [Sort::Queue, Sort::Name, Sort::Health, Sort::DownSpeed, Sort::Ratio, Sort::Added] {
+                        if ui.add(egui::Button::selectable(self.sort == s, sort_name(s))).clicked() {
+                            self.sort = s;
+                            ui.close();
                         }
-                    });
+                    }
+                });
+                // Drop-down arrow on the button's right edge.
+                let c = egui::pos2(resp.rect.right() - 14.0, resp.rect.center().y);
+                ui.painter().add(egui::Shape::convex_polygon(
+                    vec![c + egui::vec2(-5.0, -3.0), c + egui::vec2(5.0, -3.0), c + egui::vec2(0.0, 3.5)],
+                    TEXT(),
+                    egui::Stroke::NONE,
+                ));
                 ff::stat_label(ui, "SORT");
             });
         });
