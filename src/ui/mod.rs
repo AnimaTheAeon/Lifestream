@@ -80,6 +80,10 @@ pub struct App {
     pub sort: Sort,
     /// Hash of the torrent being dragged to a new queue spot.
     pub drag_row: Option<String>,
+    /// Where in the row it was grabbed, so the ghost stays under the cursor.
+    pub drag_grab: egui::Vec2,
+    /// The mouse has moved far enough for this to be a drag, not a click.
+    pub drag_live: bool,
     pub popup: Option<String>,
     pub popup_tab: u8,
     pub confirm_remove: Option<(String, String)>,
@@ -144,6 +148,8 @@ impl App {
             filter: Filter::All,
             sort: Sort::Queue,
             drag_row: None,
+            drag_grab: egui::Vec2::ZERO,
+            drag_live: false,
             popup: None,
             popup_tab: 0,
             confirm_remove: None,

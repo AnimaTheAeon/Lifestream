@@ -186,6 +186,9 @@ impl App {
                         let rect = resp.rect;
                         if resp.drag_started() {
                             self.drag_row = Some(h.clone());
+                            self.drag_live = false;
+                            let origin = ui.input(|i| i.pointer.press_origin()).unwrap_or(rect.min);
+                            self.drag_grab = origin - rect.min;
                         }
                         if resp.drag_stopped() && self.drag_row.as_deref() == Some(h.as_str()) {
                             dropped = true;
@@ -208,6 +211,19 @@ impl App {
         };
         let Some(pointer) = ui.ctx().pointer_latest_pos() else { return };
 
+        // Pressing a button on the row isn't a drag: wait until the mouse
+        // has actually moved a few pixels before showing anything.
+        if !self.drag_live {
+            let moved = ui.input(|i| i.pointer.press_origin().map(|o| o.distance(pointer) > 6.0).unwrap_or(false));
+            if dropped || !moved {
+                if dropped {
+                    self.drag_row = None;
+                }
+                return;
+            }
+            self.drag_live = true;
+        }
+
         // Drop before the first row whose middle is below the pointer.
         let before = slots.iter().position(|s| pointer.y < s.2.center().y);
         let (target, line_y) = match before {
@@ -224,6 +240,7 @@ impl App {
 
         if dropped {
             self.drag_row = None;
+            self.drag_live = false;
             if target != from.0 {
                 self.core.send(Cmd::QueueSet(hash.clone(), target));
                 // Show the new order right away; the next update confirms it.
@@ -243,9 +260,8 @@ impl App {
         ui.ctx().set_cursor_icon(egui::CursorIcon::Grabbing);
         let accent = ff::pal().accent;
         let p = ui.painter();
-        // Lift the dragged row and mark where it will land.
-        p.rect_filled(from.1.expand(2.0), 4.0, accent.gamma_multiply(0.12));
-        p.rect_stroke(from.1.expand(2.0), 4.0, egui::Stroke::new(1.5, accent), egui::StrokeKind::Outside);
+        // Leave a faded gap where the row was; a ghost copy follows the mouse.
+        p.rect_filled(from.1, 4.0, egui::Color32::from_black_alpha(120));
         if target != from.0 {
             let clip = ui.clip_rect();
             let line_y = line_y.clamp(clip.top() + 3.0, clip.bottom() - 3.0);
@@ -269,7 +285,34 @@ impl App {
         if dy != 0.0 {
             ui.scroll_with_delta(egui::vec2(0.0, dy));
         }
+        self.drag_ghost(ui.ctx(), &hash, from.1, pointer);
         ui.ctx().request_repaint();
+    }
+
+    /// A see-through copy of the dragged row, floating with the mouse.
+    fn drag_ghost(&mut self, ctx: &egui::Context, hash: &str, row: egui::Rect, pointer: egui::Pos2) {
+        let Some(t) = self.snap.torrents.iter().find(|t| t.info.hash == hash).cloned() else { return };
+        let margin = 8.0;
+        let at = pointer - self.drag_grab - egui::vec2(margin, margin);
+        let accent = ff::pal().accent;
+        egui::Area::new(egui::Id::new("queue_drag_ghost"))
+            .order(egui::Order::Tooltip)
+            .fixed_pos(at)
+            .interactable(false)
+            .show(ctx, |ui| {
+                ui.set_opacity(0.9);
+                egui::Frame::new()
+                    .fill(ui.visuals().window_fill)
+                    .stroke(egui::Stroke::new(2.0, accent))
+                    .corner_radius(6.0)
+                    .inner_margin(margin)
+                    .shadow(egui::epaint::Shadow { offset: [0, 10], blur: 24, spread: 0, color: egui::Color32::from_black_alpha(140) })
+                    .show(ui, |ui| {
+                        ui.set_width(row.width());
+                        ui.set_max_height(row.height());
+                        self.torrent_row(ui, &t);
+                    });
+            });
     }
 
     /// Draws one torrent and returns its rect.
