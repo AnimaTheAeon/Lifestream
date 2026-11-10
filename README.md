@@ -46,10 +46,23 @@ qBittorrent and Deluge) with a Rust + egui interface.
 
 Data and logs live in `%APPDATA%\Lifestream`.
 
+## Download
+
+Each [release](https://github.com/AnimaTheAeon/Lifestream/releases) has two files:
+
+- **Lifestream-Setup-x.y.z.exe**: installer. Adds Start menu and optional
+  desktop shortcuts, can set Lifestream as the app for magnet links and
+  .torrent files, and shows up in Windows' installed apps for uninstalling.
+  No admin rights needed.
+- **lifestream.exe**: portable. Run it from anywhere; nothing is installed.
+
+Both keep settings in the same place, so you can switch between them.
+
 ## Building
 
 Windows builds run on GitHub Actions (`.github/workflows/build-windows.yml`):
-vcpkg builds libtorrent, then `cargo build --release` makes `lifestream.exe`.
+vcpkg builds libtorrent, `cargo build --release` makes `lifestream.exe`, and
+Inno Setup (`installer/lifestream.iss`) wraps it into the installer.
 Bumping `version` in `Cargo.toml` and pushing to `main` publishes a release.
 
 Locally on Windows:
