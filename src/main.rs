@@ -12,6 +12,7 @@ mod settings;
 #[cfg(windows)]
 mod tray;
 mod ui;
+mod updater;
 #[cfg(windows)]
 mod winint;
 
@@ -20,13 +21,15 @@ use eframe::egui;
 fn main() -> eframe::Result<()> {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let start_hidden = args.iter().any(|a| a == "--tray");
+    let after_update = args.iter().any(|a| a == updater::AFTER_UPDATE_ARG);
     let open_args: Vec<String> = args.iter().filter(|a| !a.starts_with("--")).cloned().collect();
 
     // Hand off to a running copy if there is one.
-    let Some(listener) = instance::claim(&open_args) else {
+    let Some(listener) = instance::claim(&open_args, after_update) else {
         return Ok(());
     };
 
+    updater::cleanup_old_exe();
     let restored = backup::apply_pending_restore();
     if let Some(msg) = &restored {
         applog::info(msg.clone());
