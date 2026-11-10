@@ -121,12 +121,12 @@ impl Tray {
     }
 
     /// Keep labels and the tooltip in step with the app.
-    pub fn update(&mut self, snap: &crate::core::Snapshot, rss_on: bool, kill_on: bool) {
+    pub fn update(&mut self, snap: &crate::core::Snapshot, rss_on: bool, kill_on: bool, protection: &str) {
         let tip = format!(
-            "Lifestream\nDown {}  ·  Up {}{}",
+            "Lifestream · VPN: {}\nDown {}  ·  Up {}",
+            protection.to_lowercase(),
             crate::core::human_rate(snap.dl_rate),
             crate::core::human_rate(snap.ul_rate),
-            if snap.kill_hold { "\nKill switch: paused" } else { "" }
         );
         if tip != self.last_tip {
             let _ = self.icon.set_tooltip(Some(&tip));

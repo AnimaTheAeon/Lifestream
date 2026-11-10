@@ -444,3 +444,42 @@ pub fn tag(ui: &mut Ui, text: &str, color: Color32) -> Response {
     ui.painter().galley(rect.min + Vec2::new(5.0, 2.0), galley, color);
     response
 }
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Badge {
+    Good,
+    Warn,
+    Bad,
+}
+
+/// Round status badge: green check, amber "!" or red cross.
+pub fn badge(ui: &mut Ui, kind: Badge, size: f32) -> Response {
+    let (rect, response) = ui.allocate_exact_size(Vec2::splat(size), Sense::hover());
+    let painter = ui.painter();
+    let c = rect.center();
+    let r = size / 2.0;
+    let (fill, dark) = match kind {
+        Badge::Good => (GOOD, Color32::from_rgb(20, 110, 50)),
+        Badge::Warn => (WARN, Color32::from_rgb(150, 110, 0)),
+        Badge::Bad => (BAD, Color32::from_rgb(140, 30, 30)),
+    };
+    painter.circle_filled(c + Vec2::new(1.0, 1.5), r, Color32::from_black_alpha(140));
+    painter.circle(c, r - 0.5, fill, Stroke::new(1.5, dark));
+    let w = Stroke::new((size * 0.13).max(1.8), Color32::WHITE);
+    let p = |x: f32, y: f32| c + Vec2::new(x, y) * r;
+    match kind {
+        Badge::Good => {
+            painter.line_segment([p(-0.45, 0.02), p(-0.12, 0.35)], w);
+            painter.line_segment([p(-0.12, 0.35), p(0.48, -0.32)], w);
+        }
+        Badge::Warn => {
+            painter.line_segment([p(0.0, -0.5), p(0.0, 0.12)], w);
+            painter.circle_filled(p(0.0, 0.42), w.width * 0.6, Color32::WHITE);
+        }
+        Badge::Bad => {
+            painter.line_segment([p(-0.38, -0.38), p(0.38, 0.38)], w);
+            painter.line_segment([p(0.38, -0.38), p(-0.38, 0.38)], w);
+        }
+    }
+    response
+}

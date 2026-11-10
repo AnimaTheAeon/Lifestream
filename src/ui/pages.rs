@@ -873,6 +873,21 @@ impl App {
 
     pub(super) fn page_network(&mut self, ui: &mut egui::Ui) {
         page_title(ui, "Network", "Which adapter torrents use, and what happens if your VPN drops.");
+        let (prot, title, detail) = self.protection();
+        ui.horizontal(|ui| {
+            ff::badge(ui, prot, 30.0);
+            ui.add_space(4.0);
+            ui.vertical(|ui| {
+                let color = match prot {
+                    ff::Badge::Good => GOOD,
+                    ff::Badge::Warn => WARN,
+                    ff::Badge::Bad => BAD,
+                };
+                ff::title(ui, &title, 18.0, color);
+                ui.add(egui::Label::new(dim(&detail)).wrap());
+            });
+        });
+        ff::divider(ui);
         self.refresh_adapters(false);
         let adv = self.settings.advanced_mode;
         let adapters = self.adapters.clone();
@@ -1393,6 +1408,20 @@ fn leak_report(ui: &mut egui::Ui, r: &crate::core::LeakResult, adapter: &str) {
                             t.ip,
                             if t.org.is_empty() { String::new() } else { format!(" ({})", t.org) },
                             n.ip
+                        ))).wrap());
+                    }
+                    (Ok(t), _) if crate::core::org_kind(&t.org) == crate::core::OrgKind::Vpn => {
+                        ff::title(ui, "Everything goes through your VPN", 15.0, GOOD);
+                        ui.add(egui::Label::new(dim(&format!(
+                            "Peers see {} ({}), a VPN or datacenter address. Your whole PC is on the VPN, torrents included.",
+                            t.ip, t.org
+                        ))).wrap());
+                    }
+                    (Ok(t), _) if crate::core::org_kind(&t.org) == crate::core::OrgKind::HomeIsp => {
+                        ff::title(ui, "Torrents are NOT going through a VPN", 15.0, BAD);
+                        ui.add(egui::Label::new(dim(&format!(
+                            "Peers see {} ({}), which looks like a home internet provider. {adapter} isn't tunnelling to the internet: pick your VPN's adapter, and make sure the VPN is connected.",
+                            t.ip, t.org
                         ))).wrap());
                     }
                     (Ok(t), _) => {
