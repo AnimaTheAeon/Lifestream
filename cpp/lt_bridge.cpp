@@ -92,6 +92,8 @@ lt::settings_pack make_pack(const LtSettings &s) {
             std::max(s.active_limit, s.active_downloads + s.active_seeds));
   p.set_str(lt::settings_pack::listen_interfaces, std::string(s.listen_interfaces));
   p.set_str(lt::settings_pack::outgoing_interfaces, std::string(s.outgoing_interfaces));
+  // Saying goodbye to trackers at quit: don't wait more than a second on slow ones.
+  p.set_int(lt::settings_pack::stop_tracker_timeout, 1);
   p.set_bool(lt::settings_pack::enable_dht, s.enable_dht);
   p.set_bool(lt::settings_pack::enable_lsd, s.enable_lsd);
   p.set_bool(lt::settings_pack::enable_upnp, s.enable_upnp);
@@ -258,6 +260,8 @@ Engine::Engine(const LtSettings &s, bool enable_pex, rust::Str state_dir, bool s
 }
 
 Engine::~Engine() {
+  // Normally already saved by save_all_and_wait() at quit; don't do it twice.
+  if (shut_down_) return;
   try {
     save_all_and_wait(4000);
   } catch (...) {
@@ -689,6 +693,7 @@ void Engine::save_all_and_wait(int32_t wait_ms) {
     ses_->wait_for_alert(std::chrono::milliseconds(200));
     pop_alerts();
   }
+  shut_down_ = true;
 }
 
 void Engine::set_ip_filter(const rust::Vec<IpRange> &ranges) {
