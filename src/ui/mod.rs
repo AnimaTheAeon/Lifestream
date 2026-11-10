@@ -191,6 +191,12 @@ impl App {
         while let Ok(msg) = self.incoming.try_recv() {
             match msg {
                 Incoming::Show => show(ctx),
+                Incoming::Replace => {
+                    crate::applog::info("A newer Lifestream was started; handing over.");
+                    #[cfg(windows)]
+                    crate::tray::QUIT.store(true, std::sync::atomic::Ordering::SeqCst);
+                    ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+                }
                 Incoming::Open(arg) => {
                     show(ctx);
                     self.open_argument(&arg);
