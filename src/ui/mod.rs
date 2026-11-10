@@ -400,10 +400,6 @@ impl App {
 
     fn layout(&mut self, ui: &mut egui::Ui) {
         if ff::is_green() {
-            // Switched themes from Config: stay on Config in the new layout.
-            if self.page == Page::Config && self.menu_touched {
-                self.green_in_page = true;
-            }
             return self.green_layout(ui);
         }
         let full = ui.max_rect();
