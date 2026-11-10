@@ -99,35 +99,39 @@ jobs:
           overwrite_files: true
 
   # Headless Lifestream for Synology DSM 7 (x86_64, e.g. DS923+), controlled
-  # from its web page. Built on Ubuntu 22.04 so it runs on DSM 7.2's glibc;
-  # libtorrent and the C++ runtime are bundled next to the binary.
+  # from its web page. Built on Debian 11 (glibc 2.31), older than any DSM 7.2
+  # system library, so it runs there; libtorrent, OpenSSL and the C++ runtime
+  # are bundled next to the binary.
   synology:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
+    container: debian:bullseye
     steps:
-      - uses: actions/checkout@v4
-      # Ubuntu 22.04's libtorrent is too old (2.0.5), so build 2.0.10 once and cache it.
       - name: Build tools
-        run: sudo apt-get update -q && sudo apt-get install -y -q build-essential cmake ninja-build libboost-dev libssl-dev pkg-config
+        run: |
+          apt-get update -q
+          apt-get install -y -q build-essential cmake ninja-build libboost-dev libssl-dev pkg-config curl wget git ca-certificates file
+      - uses: actions/checkout@v4
+      # Debian 11's libtorrent is too old, so build 2.0.10 once and cache it.
       - name: Restore libtorrent
         id: lt-cache
         uses: actions/cache@v4
         with:
-          path: ~/lt
-          key: libtorrent-2.0.10-ubuntu-22.04
+          path: /opt/lt
+          key: libtorrent-2.0.10-debian-11
       - name: Build libtorrent
         if: steps.lt-cache.outputs.cache-hit != 'true'
         run: |
           wget -q -O lt.tar.gz https://github.com/arvidn/libtorrent/releases/download/v2.0.10/libtorrent-rasterbar-2.0.10.tar.gz
           tar xzf lt.tar.gz
           cmake -S libtorrent-rasterbar-2.0.10 -B lt-build -G Ninja -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_INSTALL_PREFIX=$HOME/lt -DCMAKE_INSTALL_LIBDIR=lib -DCMAKE_CXX_STANDARD=17 \
+            -DCMAKE_INSTALL_PREFIX=/opt/lt -DCMAKE_INSTALL_LIBDIR=lib -DCMAKE_CXX_STANDARD=17 \
             -Dpython-bindings=OFF -Dbuild_tests=OFF -Dbuild_examples=OFF -Dbuild_tools=OFF
           cmake --build lt-build
           cmake --install lt-build
       - name: Use libtorrent
         run: |
-          echo "PKG_CONFIG_PATH=$HOME/lt/lib/pkgconfig" >> "$GITHUB_ENV"
-          echo "LD_LIBRARY_PATH=$HOME/lt/lib" >> "$GITHUB_ENV"
+          echo "PKG_CONFIG_PATH=/opt/lt/lib/pkgconfig" >> "$GITHUB_ENV"
+          echo "LD_LIBRARY_PATH=/opt/lt/lib" >> "$GITHUB_ENV"
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
@@ -149,7 +153,8 @@ jobs:
             | grep -vE '/(libc|libm|libpthread|libdl|librt|ld-linux[^/]*)\.so' \
             | xargs -r -I{} cp -L {} stage/lib/
           ls -la stage/lib
-          ldd stage/lifestream | grep -c "$PWD/stage/lib" || true
+          # Newest glibc symbol it needs (must be older than DSM's).
+          for f in stage/lifestream stage/lib/*; do objdump -T "$f" | grep -o 'GLIBC_[0-9.]*'; done | sort -uV | tail -1
           sh synology/build-spk.sh stage "$v" dist
       - uses: actions/upload-artifact@v4
         with:
