@@ -148,6 +148,7 @@ pub mod ffi {
         fn set_torrent_limits(self: Pin<&mut Engine>, hash: &str, max_conn: i32, max_uploads: i32);
         fn move_storage(self: Pin<&mut Engine>, hash: &str, path: &str);
         fn queue_top(self: Pin<&mut Engine>, hash: &str);
+        fn queue_set(self: Pin<&mut Engine>, hash: &str, pos: i32);
         fn magnet_link(self: &Engine, hash: &str) -> String;
         fn pause_session(self: Pin<&mut Engine>);
         fn resume_session(self: Pin<&mut Engine>);

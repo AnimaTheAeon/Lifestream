@@ -37,6 +37,8 @@ pub enum Cmd {
     SuperSeed(String, bool),
     FirstLast(String),
     QueueTop(String),
+    /// Move a torrent to this download-queue position (0 = top).
+    QueueSet(String, i32),
     FilePriority { hash: String, index: i32, priority: i32 },
     AddTracker(String, String),
     WatchFiles(Option<String>),
@@ -794,6 +796,11 @@ impl Core {
             Cmd::QueueTop(h) => {
                 if let Some(e) = self.engine() {
                     e.queue_top(&h)
+                }
+            }
+            Cmd::QueueSet(h, pos) => {
+                if let Some(e) = self.engine() {
+                    e.queue_set(&h, pos)
                 }
             }
             Cmd::FilePriority { hash, index, priority } => {

@@ -1,7 +1,10 @@
 #include "lifestream/cpp/lt_bridge.h"
 #include "lifestream/src/engine/bridge.rs.h"
 
+#include <algorithm>
 #include <chrono>
+#include <climits>
+#include <map>
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
@@ -219,11 +222,33 @@ Engine::Engine(const LtSettings &s, bool enable_pex, rust::Str state_dir, bool s
   ses_->add_extension(&lt::create_smart_ban_plugin);
   if (enable_pex) ses_->add_extension(&lt::create_ut_pex_plugin);
 
-  // Reload every torrent from its resume file.
+  // Reload every torrent from its resume file, in the saved queue order.
+  std::map<std::string, int> rank;
+  {
+    std::vector<char> q;
+    if (read_file(fs::path(state_dir_) / "queue.txt", q)) {
+      std::string line;
+      for (char c : q) {
+        if (c == '\n' || c == '\r') {
+          if (!line.empty()) rank.emplace(line, (int)rank.size());
+          line.clear();
+        } else {
+          line += c;
+        }
+      }
+      if (!line.empty()) rank.emplace(line, (int)rank.size());
+    }
+  }
+  std::vector<std::pair<int, fs::path>> files;
   for (auto &entry : fs::directory_iterator(fs::path(state_dir_) / "resume", fec)) {
     if (entry.path().extension() != ".fastresume") continue;
+    auto it = rank.find(entry.path().stem().string());
+    files.emplace_back(it == rank.end() ? INT_MAX : it->second, entry.path());
+  }
+  std::sort(files.begin(), files.end());
+  for (auto &file : files) {
     std::vector<char> buf;
-    if (!read_file(entry.path(), buf)) continue;
+    if (!read_file(file.second, buf)) continue;
     lt::error_code ec;
     lt::add_torrent_params atp = lt::read_resume_data(buf, ec);
     if (ec) continue;
@@ -479,6 +504,29 @@ void Engine::move_storage(rust::Str hash, rust::Str path) {
 void Engine::queue_top(rust::Str hash) {
   auto h = find(hash);
   if (h.is_valid()) h.queue_position_top();
+  save_queue_order();
+}
+
+void Engine::queue_set(rust::Str hash, int32_t pos) {
+  auto h = find(hash);
+  if (!h.is_valid() || pos < 0) return;
+  h.queue_position_set(lt::queue_position_t{pos});
+  save_queue_order();
+}
+
+// libtorrent doesn't keep queue order in resume data, so it goes in its own
+// file: one hash per line, download queue first, then the rest.
+void Engine::save_queue_order() {
+  std::vector<std::pair<int, std::string>> order;
+  for (const auto &kv : handles_) {
+    if (!kv.second.is_valid()) continue;
+    int q = static_cast<int>(kv.second.queue_position());
+    order.emplace_back(q < 0 ? INT_MAX : q, kv.first);
+  }
+  std::sort(order.begin(), order.end());
+  std::string text;
+  for (const auto &o : order) text += o.second + "\n";
+  write_file_atomic(fs::path(state_dir_) / "queue.txt", std::vector<char>(text.begin(), text.end()));
 }
 
 rust::String Engine::magnet_link(rust::Str hash) const {
@@ -614,6 +662,7 @@ void Engine::request_resume_save(bool all) {
     pending_saves_++;
   }
   save_session_state();
+  save_queue_order();
 }
 
 void Engine::save_all_and_wait(int32_t wait_ms) {

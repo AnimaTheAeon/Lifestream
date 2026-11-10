@@ -21,9 +21,11 @@ fn files_to_save() -> Vec<(String, PathBuf)> {
         }
     }
     let engine = dir.join("engine");
-    let state = engine.join("session.state");
-    if state.exists() {
-        out.push(("engine/session.state".into(), state));
+    for name in ["session.state", "queue.txt"] {
+        let p = engine.join(name);
+        if p.exists() {
+            out.push((format!("engine/{name}"), p));
+        }
     }
     if let Ok(entries) = std::fs::read_dir(engine.join("resume")) {
         for e in entries.flatten() {

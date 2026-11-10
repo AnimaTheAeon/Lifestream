@@ -78,6 +78,8 @@ pub struct App {
     pub snap: Snapshot,
     pub filter: Filter,
     pub sort: Sort,
+    /// Hash of the torrent being dragged to a new queue spot.
+    pub drag_row: Option<String>,
     pub popup: Option<String>,
     pub popup_tab: u8,
     pub confirm_remove: Option<(String, String)>,
@@ -141,6 +143,7 @@ impl App {
             snap: Snapshot::default(),
             filter: Filter::All,
             sort: Sort::Queue,
+            drag_row: None,
             popup: None,
             popup_tab: 0,
             confirm_remove: None,
