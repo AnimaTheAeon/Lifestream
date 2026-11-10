@@ -16,22 +16,22 @@ const GOLD: (Color32, Color32) = (Color32::from_rgb(200, 150, 20), Color32::from
 fn status_of(t: &TorrentView, held: bool) -> (&'static str, Color32) {
     let i = &t.info;
     if held && !i.paused {
-        return ("HELD", WARN);
+        return ("HELD", WARN());
     }
     if !i.error.is_empty() {
-        return ("ERROR", BAD);
+        return ("ERROR", BAD());
     }
     if i.moving {
-        return ("MOVING", WARN);
+        return ("MOVING", WARN());
     }
     if i.paused {
-        return if i.auto_managed { ("QUEUED", TEXT_DIM) } else { ("PAUSED", WARN) };
+        return if i.auto_managed { ("QUEUED", TEXT_DIM()) } else { ("PAUSED", WARN()) };
     }
     match i.state {
-        0 => ("CHECKING", WARN),
-        1 => ("FINDING INFO", LABEL),
-        2 => ("DOWNLOADING", GOOD),
-        _ => ("SEEDING", GOOD),
+        0 => ("CHECKING", WARN()),
+        1 => ("FINDING INFO", LABEL()),
+        2 => ("DOWNLOADING", GOOD()),
+        _ => ("SEEDING", GOOD()),
     }
 }
 
@@ -41,7 +41,7 @@ impl App {
     pub(super) fn page_torrents(&mut self, ui: &mut egui::Ui) {
         let paused_all = self.snap.user_paused;
         ui.horizontal(|ui| {
-            ff::title(ui, "Torrents", 26.0, TEXT);
+            ff::title(ui, "Torrents", 26.0, TEXT());
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                 if ui.button("Add torrent").clicked() {
                     self.page = Page::Add;
@@ -49,13 +49,13 @@ impl App {
                 }
                 let turtle = self.snap.turtle_active;
                 if ui
-                    .button(RichText::new(if turtle { "TURTLE: ON" } else { "TURTLE: OFF" }).color(if turtle { WARN } else { TEXT }).strong())
+                    .button(RichText::new(if turtle { "TURTLE: ON" } else { "TURTLE: OFF" }).color(if turtle { WARN() } else { TEXT() }).strong())
                     .on_hover_text("Switch to your slower turtle limits (set on the Speed page).")
                     .clicked()
                 {
                     self.core.send(Cmd::SetTurtle(!turtle));
                 }
-                let (label, color) = if paused_all { ("ALL: PAUSED", WARN) } else { ("ALL: RUNNING", GOOD) };
+                let (label, color) = if paused_all { ("ALL: PAUSED", WARN()) } else { ("ALL: RUNNING", GOOD()) };
                 if ui
                     .button(RichText::new(label).color(color).strong())
                     .on_hover_text("Pause or resume every torrent at once.")
@@ -65,14 +65,14 @@ impl App {
                 }
             });
         });
-        ui.label(dim("Your party of downloads. Click a torrent's square icon to see its files."));
+        ui.label(dim("Your party of downloads. Click a torrent's icon to see its files."));
 
         if self.snap.kill_hold {
             ui.add_space(4.0);
             ff::window(ui, |ui| {
                 ui.set_width(ui.available_width());
-                ff::title(ui, "Kill switch is holding everything", 16.0, WARN);
-                ui.add(egui::Label::new(RichText::new(&self.snap.kill_reason).color(TEXT)).wrap());
+                ff::title(ui, "Kill switch is holding everything", 16.0, WARN());
+                ui.add(egui::Label::new(RichText::new(&self.snap.kill_reason).color(TEXT())).wrap());
                 if ui.button("Go to Network").clicked() {
                     self.page = Page::Network;
                     self.menu_touched = true;
@@ -140,7 +140,7 @@ impl App {
                 if list.is_empty() {
                     ui.add_space(30.0);
                     ui.vertical_centered(|ui| {
-                        ff::title(ui, if self.snap.torrents.is_empty() { "No torrents yet" } else { "Nothing here" }, 20.0, TEXT_DIM);
+                        ff::title(ui, if self.snap.torrents.is_empty() { "No torrents yet" } else { "Nothing here" }, 20.0, TEXT_DIM());
                         ui.label(dim("Add a magnet link or a .torrent file, or drop one onto this window."));
                     });
                 }
@@ -171,18 +171,18 @@ impl App {
                     let max_name = (ui.available_width() - 330.0).max(120.0);
                     ui.scope(|ui| {
                         ui.set_max_width(max_name);
-                        ui.add(egui::Label::new(RichText::new(&i.name).color(TEXT).size(18.0).strong()).truncate())
+                        ui.add(egui::Label::new(RichText::new(&i.name).color(TEXT()).size(18.0).strong()).truncate())
                             .on_hover_text(&i.name);
                     });
                     ui.add_space(8.0);
                     ff::title(ui, status, 13.0, color);
                     if i.is_private {
-                        ff::tag(ui, "PRIVATE", WARN).on_hover_text(
+                        ff::tag(ui, "PRIVATE", WARN()).on_hover_text(
                             "From a private tracker: DHT, peer exchange and local discovery are off for it, and it only talks to its own tracker.",
                         );
                     }
                     if !t.category.is_empty() {
-                        ff::tag(ui, &t.category.to_uppercase(), LABEL);
+                        ff::tag(ui, &t.category.to_uppercase(), LABEL());
                     }
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                         ui.menu_button("More", |ui| self.torrent_menu(ui, t));
@@ -199,7 +199,7 @@ impl App {
                     let colors = if i.paused { GREY } else if done { GREEN } else { BLUE };
                     let bw = (ui.available_width() - 330.0).clamp(80.0, 320.0);
                     ff::stat_bar(ui, i.progress, bw, colors.0, colors.1);
-                    ff::title(ui, &format!("{:.0}%", i.progress * 100.0), 14.0, TEXT);
+                    ff::title(ui, &format!("{:.0}%", i.progress * 100.0), 14.0, TEXT());
                     ui.add_space(6.0);
                     let disp = self.settings.seeder_display;
                     let fmt = |c: i32, s: i32| match disp {
@@ -236,7 +236,7 @@ impl App {
                         ));
                     }
                     if advanced && t.seed_goal_met {
-                        ff::tag(ui, "GOAL MET", GOOD);
+                        ff::tag(ui, "GOAL MET", GOOD());
                     }
                 });
             });
@@ -300,7 +300,7 @@ impl App {
             }
         }
         ui.separator();
-        if ui.button(RichText::new("Remove…").color(BAD)).clicked() {
+        if ui.button(RichText::new("Remove…").color(BAD())).clicked() {
             self.confirm_remove = Some((h, i.name.clone()));
             ui.close();
         }
@@ -315,8 +315,8 @@ impl App {
             .show(ctx, |ui| {
                 ff::window(ui, |ui| {
                     ui.set_width(420.0);
-                    ff::title(ui, "Remove torrent?", 20.0, TEXT);
-                    ui.add(egui::Label::new(RichText::new(&name).color(TEXT_DIM)).wrap());
+                    ff::title(ui, "Remove torrent?", 20.0, TEXT());
+                    ui.add(egui::Label::new(RichText::new(&name).color(TEXT_DIM())).wrap());
                     ui.add_space(8.0);
                     ui.horizontal(|ui| {
                         if ui.button("Cancel").clicked() {
@@ -326,7 +326,7 @@ impl App {
                             self.core.send(Cmd::Remove { hash: hash.clone(), delete_files: false });
                             close = true;
                         }
-                        if ui.button(RichText::new("Remove and delete files").color(BAD)).clicked() {
+                        if ui.button(RichText::new("Remove and delete files").color(BAD())).clicked() {
                             self.core.send(Cmd::Remove { hash: hash.clone(), delete_files: true });
                             close = true;
                         }
@@ -361,7 +361,7 @@ impl App {
                     ui.horizontal(|ui| {
                         ui.scope(|ui| {
                             ui.set_max_width(width - 90.0);
-                            ui.add(egui::Label::new(RichText::new(&t.info.name).color(TEXT).size(18.0).strong()).truncate());
+                            ui.add(egui::Label::new(RichText::new(&t.info.name).color(TEXT()).size(18.0).strong()).truncate());
                         });
                         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                             if ui.button("Close").clicked() {
@@ -413,7 +413,7 @@ impl App {
                     let name_w = (ui.available_width() - 250.0).max(100.0);
                     ui.scope(|ui| {
                         ui.set_max_width(name_w);
-                        ui.add(egui::Label::new(RichText::new(&f.path).color(if wanted { TEXT } else { TEXT_DIM })).truncate())
+                        ui.add(egui::Label::new(RichText::new(&f.path).color(if wanted { TEXT() } else { TEXT_DIM() })).truncate())
                             .on_hover_text(&f.path);
                     });
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
@@ -452,7 +452,7 @@ impl App {
         }
         egui::ScrollArea::vertical().id_salt("popup_trackers").max_height(260.0).show(ui, |ui| {
             for tr in &trackers {
-                ui.label(RichText::new(tr).color(TEXT).monospace());
+                ui.label(RichText::new(tr).color(TEXT()).monospace());
             }
         });
         if t.info.is_private {
@@ -495,7 +495,7 @@ impl App {
                 ff::window(ui, |ui| {
                     ui.set_width(ui.available_width());
                     ui.vertical_centered(|ui| {
-                        ff::title(ui, "Drop .torrent files here", 18.0, TEXT);
+                        ff::title(ui, "Drop .torrent files here", 18.0, TEXT());
                         ui.label(dim("or"));
                         if ui.button("Choose .torrent file").clicked() {
                             if let Some(p) = rfd::FileDialog::new().add_filter("Torrent", &["torrent"]).pick_file() {
@@ -509,9 +509,9 @@ impl App {
                 });
             } else if let Some((_, pv, wanted)) = self.add.preview.as_mut() {
                 ui.horizontal(|ui| {
-                    ff::title(ui, &pv.name, 19.0, TEXT);
+                    ff::title(ui, &pv.name, 19.0, TEXT());
                     if pv.is_private {
-                        ff::tag(ui, "PRIVATE", WARN);
+                        ff::tag(ui, "PRIVATE", WARN());
                     }
                 });
                 let picked: i64 = pv.files.iter().zip(wanted.iter()).filter(|(_, w)| **w).map(|(f, _)| f.size).sum();
@@ -527,7 +527,7 @@ impl App {
                 egui::ScrollArea::vertical().id_salt("add_files").max_height(220.0).show(ui, |ui| {
                     for (f, w) in pv.files.iter().zip(wanted.iter_mut()).take(3000) {
                         ui.horizontal(|ui| {
-                            ui.checkbox(w, RichText::new(&f.path).color(TEXT));
+                            ui.checkbox(w, RichText::new(&f.path).color(TEXT()));
                             ui.with_layout(Layout::right_to_left(Align::Center), |ui| ui.label(dim(&human_bytes(f.size))));
                         });
                     }
@@ -567,14 +567,14 @@ impl App {
             }
 
             if let Some(e) = &self.add.error {
-                ui.colored_label(BAD, e);
+                ui.colored_label(BAD(), e);
             }
             ui.add_space(10.0);
             ui.horizontal(|ui| {
                 let has_preview = self.add.preview.is_some();
                 let can_add = has_preview || self.add.magnet.trim().starts_with("magnet:");
                 let add_clicked = ui
-                    .add_enabled(can_add, egui::Button::new(RichText::new("Add to party…").color(GOOD).strong()))
+                    .add_enabled(can_add, egui::Button::new(RichText::new("Add to party…").color(GOOD()).strong()))
                     .clicked();
                 let picked = if add_clicked { self.ask_save_folder(&self.add.category.clone()) } else { None };
                 if let Some(save_path) = picked {
@@ -609,7 +609,7 @@ impl App {
                     self.add.error = None;
                 }
                 if !can_add && !self.add.magnet.is_empty() {
-                    ui.colored_label(WARN, "Magnet links start with magnet:");
+                    ui.colored_label(WARN(), "Magnet links start with magnet:");
                 }
             });
         });
@@ -619,7 +619,7 @@ impl App {
 
     pub(super) fn page_rss(&mut self, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
-            ff::title(ui, "RSS", 26.0, TEXT);
+            ff::title(ui, "RSS", 26.0, TEXT());
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                 let checking = self.snap.rss_checking;
                 if ui.add_enabled(!checking, egui::Button::new(if checking { "Checking…" } else { "Check now" })).clicked() {
@@ -643,8 +643,8 @@ impl App {
                 let status = self.snap.rss_status.get(&feed.name);
                 ui.horizontal(|ui| {
                     ui.vertical(|ui| {
-                        ui.label(RichText::new(&feed.name).color(TEXT).strong());
-                        ui.label(RichText::new(&feed.url).color(TEXT_DIM).size(12.0).monospace());
+                        ui.label(RichText::new(&feed.name).color(TEXT()).strong());
+                        ui.label(RichText::new(&feed.url).color(TEXT_DIM()).size(12.0).monospace());
                     });
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                         if ui.small_button("Remove").clicked() {
@@ -653,10 +653,10 @@ impl App {
                         changed |= toggle(ui, &mut feed.enabled);
                         match status {
                             Some(s) => match &s.result {
-                                Ok(n) => ff::title(ui, &format!("OK · {n} items · {}", s.checked), 13.0, GOOD),
-                                Err(e) => ff::title(ui, &format!("FAILED · {}", s.checked), 13.0, BAD).on_hover_text(e),
+                                Ok(n) => ff::title(ui, &format!("OK · {n} items · {}", s.checked), 13.0, GOOD()),
+                                Err(e) => ff::title(ui, &format!("FAILED · {}", s.checked), 13.0, BAD()).on_hover_text(e),
                             },
-                            None => ff::title(ui, "Not checked yet", 13.0, TEXT_DIM),
+                            None => ff::title(ui, "Not checked yet", 13.0, TEXT_DIM()),
                         };
                     });
                 });
@@ -766,18 +766,18 @@ impl App {
                 let err = self.snap.rss_items.first().and_then(|i| crate::rss::rule_matches(rule, i).err());
                 ui.horizontal(|ui| {
                     if let Some(e) = &err {
-                        ui.colored_label(BAD, e);
+                        ui.colored_label(BAD(), e);
                     } else {
-                        ff::title(ui, &format!("Matches right now: {}", matches.len()), 14.0, LABEL);
+                        ff::title(ui, &format!("Matches right now: {}", matches.len()), 14.0, LABEL());
                     }
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        if ui.button(RichText::new("Delete rule").color(BAD)).clicked() {
+                        if ui.button(RichText::new("Delete rule").color(BAD())).clicked() {
                             delete_rule = true;
                         }
                     });
                 });
                 for m in matches.iter().take(12) {
-                    ui.label(RichText::new(format!("• {}", m.title)).color(TEXT_DIM).size(12.5));
+                    ui.label(RichText::new(format!("• {}", m.title)).color(TEXT_DIM()).size(12.5));
                 }
             }
             if delete_rule {
@@ -794,7 +794,7 @@ impl App {
                         if ui.small_button("Get").on_hover_text("Download this item now").clicked() {
                             self.core.send(Cmd::AddFromUrl { url: it.link.clone(), category: String::new() });
                         }
-                        ui.label(RichText::new(&it.title).color(TEXT).size(13.0));
+                        ui.label(RichText::new(&it.title).color(TEXT()).size(13.0));
                         ui.label(dim(&it.feed));
                     });
                 }
@@ -879,9 +879,9 @@ impl App {
             ui.add_space(4.0);
             ui.vertical(|ui| {
                 let color = match prot {
-                    ff::Badge::Good => GOOD,
-                    ff::Badge::Warn => WARN,
-                    ff::Badge::Bad => BAD,
+                    ff::Badge::Good => GOOD(),
+                    ff::Badge::Warn => WARN(),
+                    ff::Badge::Bad => BAD(),
                 };
                 ff::title(ui, &title, 18.0, color);
                 ui.add(egui::Label::new(dim(&detail)).wrap());
@@ -912,7 +912,7 @@ impl App {
                 });
             });
             if s.adapter.is_empty() && s.kill_switch {
-                ui.colored_label(WARN, "The kill switch needs an adapter to watch. Until you pick one, downloads stay paused.");
+                ui.colored_label(WARN(), "The kill switch needs an adapter to watch. Until you pick one, downloads stay paused.");
             }
             row(ui, "Only use this adapter", "Torrent traffic can never fall back to your normal connection.", |ui| {
                 changed |= toggle(ui, &mut s.bind_only)
@@ -920,7 +920,7 @@ impl App {
             w::row_tagged(
                 ui,
                 "Kill switch",
-                Some(("ON BY DEFAULT", GOOD)),
+                Some(("ON BY DEFAULT", GOOD())),
                 "If the adapter goes down, pause everything and don't resume until it's back. Also holds downloads if Lifestream starts before your VPN connects.",
                 |ui| changed |= w::toggle_labeled(ui, &mut s.kill_switch, "ARMED", "OFF"),
             );
@@ -955,20 +955,20 @@ impl App {
             ui.horizontal_wrapped(|ui| {
                 ff::stat_label(ui, "LISTENING");
                 if sn.listen_port > 0 {
-                    ff::title(ui, &sn.listen_port.to_string(), 15.0, GOOD);
+                    ff::title(ui, &sn.listen_port.to_string(), 15.0, GOOD());
                 } else {
-                    ff::title(ui, "—", 15.0, TEXT_DIM);
+                    ff::title(ui, "—", 15.0, TEXT_DIM());
                 }
                 if sn.external_port > 0 {
                     ff::stat_label(ui, "VPN PORT");
-                    ff::title(ui, &sn.external_port.to_string(), 15.0, GOOD);
+                    ff::title(ui, &sn.external_port.to_string(), 15.0, GOOD());
                 }
                 ff::stat_label(ui, "INCOMING PEERS");
-                let (t, c) = if sn.incoming_seen { ("SEEN · PORT IS OPEN", GOOD) } else { ("NONE YET", WARN) };
+                let (t, c) = if sn.incoming_seen { ("SEEN · PORT IS OPEN", GOOD()) } else { ("NONE YET", WARN()) };
                 ff::title(ui, t, 15.0, c).on_hover_text("Once a peer connects to you, your port is reachable. It can take a few minutes with active torrents.");
             });
             if !sn.listen_error.is_empty() {
-                ui.colored_label(BAD, &sn.listen_error);
+                ui.colored_label(BAD(), &sn.listen_error);
             }
 
             w::section_help(ui, "Leak check", "Asks a lookup site where your traffic comes out: once over your normal connection, and once from the adapter torrents use, exactly the way the torrent engine connects. Runs on its own when Lifestream opens, when the VPN reconnects, and every 30 minutes.");
@@ -984,9 +984,9 @@ impl App {
             if w::disclosure(ui, self.leak_open, |ui| {
                 ff::badge(ui, prot, 18.0);
                 let color = match prot {
-                    ff::Badge::Good => GOOD,
-                    ff::Badge::Warn => WARN,
-                    ff::Badge::Bad => BAD,
+                    ff::Badge::Good => GOOD(),
+                    ff::Badge::Warn => WARN(),
+                    ff::Badge::Bad => BAD(),
                 };
                 ff::title(ui, &prot_title, 15.0, color);
                 ui.label(dim(&summary));
@@ -1007,7 +1007,7 @@ impl App {
             if ["tailscale", "zerotier", "hamachi", "radmin"].iter().any(|n| lower.contains(n)) {
                 ui.add_space(4.0);
                 ui.colored_label(
-                    WARN,
+                    WARN(),
                     "This adapter is a private-network tool, not an internet VPN. Unless it's set to use an exit node, torrents bound to it can't reach peers at all.",
                 );
             }
@@ -1063,7 +1063,7 @@ impl App {
                 row(ui, "DHT", "Finds peers without a tracker. Needed for most magnet links.", |ui| changed |= toggle(ui, &mut s.dht));
                 row(ui, "Peer exchange (PEX)", "Peers share other peers with you. Takes effect after a restart.", |ui| changed |= toggle(ui, &mut s.pex));
                 if restart {
-                    ui.colored_label(WARN, "Restart Lifestream for the peer exchange change to apply.");
+                    ui.colored_label(WARN(), "Restart Lifestream for the peer exchange change to apply.");
                 }
                 row(ui, "Local peer discovery", "Looks for peers on your home network. Keep off when using a VPN.", |ui| changed |= toggle(ui, &mut s.lsd));
 
@@ -1176,6 +1176,26 @@ impl App {
             let s = &mut self.settings;
             row(ui, "Mode", "Simple shows the settings most people need. Advanced shows everything, plus the Log.", |ui| {
                 changed |= w::toggle_labeled(ui, &mut s.advanced_mode, "ADVANCED", "SIMPLE");
+            });
+            row(ui, "Theme", "Switches the whole app's look right away. FFVII menu: blue windows and the pointing hand. Green dashboard: glowing grid, jelly orb and slanted tabs.", |ui| {
+                // Right-to-left row: list in reverse so they read FFVII, Green.
+                for theme in [ff::Theme::GreenDash, ff::Theme::FfMenu] {
+                    let selected = ff::theme() == theme;
+                    let mut text = RichText::new(theme.label()).strong();
+                    if selected {
+                        text = text.color(ff::pal().on_accent);
+                    }
+                    let mut button = egui::Button::new(text);
+                    if selected {
+                        button = button.fill(ff::pal().accent);
+                    }
+                    if ui.add(button).clicked() && !selected {
+                        ff::set_theme(theme);
+                        ff::apply_style(ui.ctx());
+                        s.theme = theme.key().to_string();
+                        changed = true;
+                    }
+                }
             });
             section(ui, "Folders");
             w::label_help(ui, "Default download folder", "Where RSS downloads go when their rule has no category, and the first folder offered when you add a torrent. After that, Lifestream offers the last folder you picked.");
@@ -1319,7 +1339,7 @@ impl App {
 
     pub(super) fn page_log(&mut self, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
-            ff::title(ui, "Log", 26.0, TEXT);
+            ff::title(ui, "Log", 26.0, TEXT());
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                 if ui.button("Clear").clicked() {
                     crate::applog::clear();
@@ -1335,12 +1355,12 @@ impl App {
             crate::applog::with_lines(|lines| {
                 for l in lines {
                     let color = match l.level {
-                        crate::applog::Level::Info => TEXT,
-                        crate::applog::Level::Warn => WARN,
-                        crate::applog::Level::Error => BAD,
+                        crate::applog::Level::Info => TEXT(),
+                        crate::applog::Level::Warn => WARN(),
+                        crate::applog::Level::Error => BAD(),
                     };
                     ui.horizontal_wrapped(|ui| {
-                        ui.label(RichText::new(&l.time).color(TEXT_DIM).monospace());
+                        ui.label(RichText::new(&l.time).color(TEXT_DIM()).monospace());
                         ui.label(RichText::new(&l.text).color(color));
                     });
                 }
@@ -1367,7 +1387,7 @@ fn popup_info(ui: &mut egui::Ui, t: &TorrentView) {
     egui::Grid::new("info_grid").num_columns(2).spacing([16.0, 6.0]).show(ui, |ui| {
         for (k, v) in rows {
             ff::stat_label(ui, k);
-            ui.label(RichText::new(v).color(TEXT));
+            ui.label(RichText::new(v).color(TEXT()));
             ui.end_row();
         }
     });
@@ -1389,7 +1409,7 @@ fn ip_line(ui: &mut egui::Ui, label: &str, r: &Result<crate::core::IpInfo, Strin
         ff::stat_label(ui, label);
         match r {
             Ok(i) => {
-                ff::title(ui, &i.ip, 15.0, TEXT);
+                ff::title(ui, &i.ip, 15.0, TEXT());
                 let mut bits = Vec::new();
                 if !i.org.is_empty() {
                     bits.push(i.org.clone());
@@ -1398,11 +1418,11 @@ fn ip_line(ui: &mut egui::Ui, label: &str, r: &Result<crate::core::IpInfo, Strin
                     bits.push(i.place.clone());
                 }
                 if !bits.is_empty() {
-                    ui.label(RichText::new(bits.join(" · ")).color(TEXT_DIM));
+                    ui.label(RichText::new(bits.join(" · ")).color(TEXT_DIM()));
                 }
             }
             Err(e) => {
-                ff::title(ui, "NO CONNECTION", 15.0, BAD).on_hover_text(e);
+                ff::title(ui, "NO CONNECTION", 15.0, BAD()).on_hover_text(e);
             }
         }
     });
@@ -1416,7 +1436,7 @@ fn leak_report(ui: &mut egui::Ui, r: &crate::core::LeakResult, adapter: &str) {
         match &r.torrent {
             None => {
                 ui.add_space(4.0);
-                ff::title(ui, "Torrents aren't bound to an adapter", 15.0, WARN);
+                ff::title(ui, "Torrents aren't bound to an adapter", 15.0, WARN());
                 ui.add(egui::Label::new(dim(
                     "They use whatever route Windows picks, which is the address above. Pick your VPN adapter and turn on \"Only use this adapter\" so torrents can only go through it.",
                 )).wrap());
@@ -1427,13 +1447,13 @@ fn leak_report(ui: &mut egui::Ui, r: &crate::core::LeakResult, adapter: &str) {
                 ui.add_space(6.0);
                 match (t, &r.normal) {
                     (Err(_), _) => {
-                        ff::title(ui, "Nothing gets out through this adapter", 15.0, BAD);
+                        ff::title(ui, "Nothing gets out through this adapter", 15.0, BAD());
                         ui.add(egui::Label::new(dim(&format!(
                             "{adapter} can't reach the internet, so torrents can't connect either. That usually means it isn't a VPN tunnel (or the VPN is disconnected). Your real address is not being used for torrents."
                         ))).wrap());
                     }
                     (Ok(t), Ok(n)) if t.ip != n.ip => {
-                        ff::title(ui, "Torrents go through your VPN", 15.0, GOOD);
+                        ff::title(ui, "Torrents go through your VPN", 15.0, GOOD());
                         ui.add(egui::Label::new(dim(&format!(
                             "Peers see {}{}. Your other apps use {} because your VPN only covers some traffic (split tunneling). That's fine: Lifestream is locked to the VPN.",
                             t.ip,
@@ -1442,21 +1462,21 @@ fn leak_report(ui: &mut egui::Ui, r: &crate::core::LeakResult, adapter: &str) {
                         ))).wrap());
                     }
                     (Ok(t), _) if crate::core::org_kind(&t.org) == crate::core::OrgKind::Vpn => {
-                        ff::title(ui, "Everything goes through your VPN", 15.0, GOOD);
+                        ff::title(ui, "Everything goes through your VPN", 15.0, GOOD());
                         ui.add(egui::Label::new(dim(&format!(
                             "Peers see {} ({}), a VPN or datacenter address. Your whole PC is on the VPN, torrents included.",
                             t.ip, t.org
                         ))).wrap());
                     }
                     (Ok(t), _) if crate::core::org_kind(&t.org) == crate::core::OrgKind::HomeIsp => {
-                        ff::title(ui, "Torrents are NOT going through a VPN", 15.0, BAD);
+                        ff::title(ui, "Torrents are NOT going through a VPN", 15.0, BAD());
                         ui.add(egui::Label::new(dim(&format!(
                             "Peers see {} ({}), which looks like a home internet provider. {adapter} isn't tunnelling to the internet: pick your VPN's adapter, and make sure the VPN is connected.",
                             t.ip, t.org
                         ))).wrap());
                     }
                     (Ok(t), _) => {
-                        ff::title(ui, "Same address on both routes", 15.0, WARN);
+                        ff::title(ui, "Same address on both routes", 15.0, WARN());
                         ui.add(egui::Label::new(dim(&format!(
                             "Peers see {}{}. If that's your VPN provider, everything on this PC goes through the VPN and you're covered. If it's your home internet provider, {adapter} isn't tunnelling to the internet: pick the right adapter.",
                             t.ip,

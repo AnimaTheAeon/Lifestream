@@ -90,6 +90,8 @@ pub enum SeederDisplay {
 pub struct Settings {
     // Mode
     pub advanced_mode: bool,
+    /// "ff" (FFVII menu) or "green" (green dashboard).
+    pub theme: String,
 
     // Folders
     pub download_dir: String,
@@ -187,6 +189,7 @@ impl Default for Settings {
         let dl = default_download_dir();
         Self {
             advanced_mode: false,
+            theme: "ff".into(),
             download_dir: dl.clone(),
             categories: Vec::new(),
             incomplete_enabled: false,
