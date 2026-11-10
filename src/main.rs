@@ -57,7 +57,7 @@ fn main() -> eframe::Result<()> {
             egui::IconData { rgba: i.into_raw(), width: w, height: h }
         });
     let mut viewport = egui::ViewportBuilder::default()
-        .with_title("Lifestream")
+        .with_title(format!("Lifestream {}", updater::APP_VERSION))
         .with_inner_size([1180.0, 800.0])
         .with_min_inner_size([860.0, 600.0])
         .with_drag_and_drop(true);
