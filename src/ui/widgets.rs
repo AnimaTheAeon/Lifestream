@@ -24,14 +24,14 @@ pub fn help_icon(ui: &mut Ui, help: &str) -> egui::Response {
     let size = egui::vec2(17.0, 17.0);
     let r = match SHINRA.get() {
         Some(tex) => ui.add(egui::Image::new((tex.id(), size)).sense(egui::Sense::hover())),
-        None => ui.label(RichText::new("?").color(LABEL).strong()),
+        None => ui.label(RichText::new("?").color(LABEL()).strong()),
     };
     if r.hovered() {
         ui.ctx().set_cursor_icon(egui::CursorIcon::Help);
     }
     r.on_hover_ui(|ui| {
         ui.set_max_width(320.0);
-        ui.label(RichText::new(help).color(TEXT));
+        ui.label(RichText::new(help).color(TEXT()));
     })
 }
 
@@ -39,7 +39,7 @@ pub fn help_icon(ui: &mut Ui, help: &str) -> egui::Response {
 pub fn section_help(ui: &mut Ui, text: &str, help: &str) {
     ui.add_space(8.0);
     ui.horizontal(|ui| {
-        ff::title(ui, text, 17.0, WARN);
+        ff::title(ui, text, 17.0, WARN());
         help_icon(ui, help);
     });
     ui.add_space(2.0);
@@ -48,7 +48,7 @@ pub fn section_help(ui: &mut Ui, text: &str, help: &str) {
 /// A white label with a help icon after it.
 pub fn label_help(ui: &mut Ui, text: &str, help: &str) {
     ui.horizontal(|ui| {
-        ui.label(RichText::new(text).color(TEXT).strong().size(15.0));
+        ui.label(RichText::new(text).color(TEXT()).strong().size(15.0));
         if !help.is_empty() {
             help_icon(ui, help);
         }
@@ -57,15 +57,15 @@ pub fn label_help(ui: &mut Ui, text: &str, help: &str) {
 
 /// Page heading plus a one-line description.
 pub fn page_title(ui: &mut Ui, title: &str, subtitle: &str) {
-    ff::title(ui, title, 26.0, TEXT);
-    ui.label(RichText::new(subtitle).color(TEXT_DIM));
+    ff::title(ui, title, 26.0, TEXT());
+    ui.label(RichText::new(subtitle).color(TEXT_DIM()));
     ff::divider(ui);
 }
 
 /// Gold section heading.
 pub fn section(ui: &mut Ui, text: &str) {
     ui.add_space(8.0);
-    ff::title(ui, text, 17.0, WARN);
+    ff::title(ui, text, 17.0, WARN());
     ui.add_space(2.0);
 }
 
@@ -89,7 +89,7 @@ pub fn row_tagged<R>(
             ui.allocate_ui_with_layout(egui::vec2(left_w, 0.0), Layout::top_down(Align::Min), |ui| {
                 ui.set_width(left_w);
                 ui.horizontal(|ui| {
-                    ui.label(RichText::new(title).color(TEXT).strong().size(15.0));
+                    ui.label(RichText::new(title).color(TEXT()).strong().size(15.0));
                     if let Some((t, c)) = tag {
                         ff::tag(ui, t, c);
                     }
@@ -105,7 +105,11 @@ pub fn row_tagged<R>(
     let rect = ui.available_rect_before_wrap();
     ui.painter().line_segment(
         [egui::pos2(rect.left(), rect.top() + 2.0), egui::pos2(rect.right(), rect.top() + 2.0)],
-        egui::Stroke::new(1.0, Color32::from_rgba_premultiplied(150, 160, 220, 40)),
+        if ff::is_green() {
+            egui::Stroke::new(1.0, Color32::from_rgba_unmultiplied(150, 255, 70, 40))
+        } else {
+            egui::Stroke::new(1.0, Color32::from_rgba_premultiplied(150, 160, 220, 40))
+        },
     );
     ui.add_space(5.0);
     out.unwrap()
@@ -117,7 +121,7 @@ pub fn toggle(ui: &mut Ui, value: &mut bool) -> bool {
 }
 
 pub fn toggle_labeled(ui: &mut Ui, value: &mut bool, on: &str, off: &str) -> bool {
-    let (label, color) = if *value { (on, GOOD) } else { (off, BAD) };
+    let (label, color) = if *value { (on, GOOD()) } else { (off, BAD()) };
     let clicked = ui
         .add(egui::Button::new(RichText::new(label).color(color).strong()).min_size(egui::vec2(64.0, 26.0)))
         .clicked();
@@ -132,7 +136,7 @@ pub fn field<R>(ui: &mut Ui, label: &str, help: &str, add: impl FnOnce(&mut Ui) 
     let mut out = None;
     ui.vertical(|ui| {
         ui.horizontal(|ui| {
-            ff::title(ui, label, 13.0, LABEL);
+            ff::title(ui, label, 13.0, LABEL());
             if !help.is_empty() {
                 help_icon(ui, help);
             }
@@ -172,8 +176,19 @@ pub fn folder_field(ui: &mut Ui, value: &mut String, width: f32) -> bool {
 
 /// Filter chips at the top of the torrent list.
 pub fn pill(ui: &mut Ui, text: &str, selected: bool) -> egui::Response {
-    let color = if selected { Color32::WHITE } else { Color32::from_rgb(214, 218, 236) };
-    let fill = if selected { Color32::from_rgb(60, 100, 200) } else { Color32::from_rgb(12, 20, 72) };
+    let green = ff::is_green();
+    let color = match (selected, green) {
+        (true, true) => ff::pal().on_accent,
+        (true, false) => Color32::WHITE,
+        (false, true) => Color32::from_rgb(200, 240, 160),
+        (false, false) => Color32::from_rgb(214, 218, 236),
+    };
+    let fill = match (selected, green) {
+        (true, _) => ff::pal().accent,
+        (false, true) => Color32::from_rgb(8, 36, 6),
+        (false, false) => Color32::from_rgb(12, 20, 72),
+    };
+    let fill = if selected && !green { Color32::from_rgb(60, 100, 200) } else { fill };
     ui.add(
         egui::Button::new(RichText::new(text).color(color).strong())
             .fill(fill)
@@ -194,7 +209,7 @@ pub fn disclosure(ui: &mut Ui, open: bool, header: impl FnOnce(&mut Ui)) -> bool
             } else {
                 vec![c + egui::vec2(-3.0, -5.0), c + egui::vec2(4.0, 0.0), c + egui::vec2(-3.0, 5.0)]
             };
-            ui.painter().add(egui::Shape::convex_polygon(pts, LABEL, egui::Stroke::NONE));
+            ui.painter().add(egui::Shape::convex_polygon(pts, LABEL(), egui::Stroke::NONE));
             header(ui);
         })
         .response

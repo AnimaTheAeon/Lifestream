@@ -1,5 +1,6 @@
 //! The party-menu style window.
 
+mod green;
 mod pages;
 pub mod theme;
 mod widgets;
@@ -98,6 +99,10 @@ pub struct App {
     pub manual_update_check: bool,
     quitting_for_update: bool,
     pub leak_open: bool,
+    /// Green dashboard: a page is open (false = the home screen with the orb).
+    pub green_in_page: bool,
+    /// Green dashboard: highlighted menu entry on the home screen.
+    pub green_cursor: usize,
 }
 
 impl App {
@@ -112,6 +117,7 @@ impl App {
         startup_notice: Option<String>,
     ) -> Self {
         configure_fonts(&cc.egui_ctx);
+        ff::set_theme(ff::Theme::from_key(&settings.theme));
         widgets::init_icons(&cc.egui_ctx);
         ff::apply_style(&cc.egui_ctx);
         let download_dir = Arc::new(Mutex::new(settings.download_dir.clone()));
@@ -160,6 +166,8 @@ impl App {
             manual_update_check: false,
             quitting_for_update: false,
             leak_open: false,
+            green_in_page: false,
+            green_cursor: 0,
         }
     }
 
@@ -344,7 +352,7 @@ impl App {
         }
     }
 
-    fn status_line(&self) -> String {
+    pub(crate) fn status_line(&self) -> String {
         let s = &self.snap;
         if let Some(e) = &s.engine_error {
             return e.clone();
@@ -375,7 +383,29 @@ impl App {
         parts.join(" · ")
     }
 
+    /// The current page's contents; shared by both themes' layouts.
+    pub(crate) fn render_page_body(&mut self, ui: &mut egui::Ui) {
+        match self.page {
+            Page::Torrents => self.page_torrents(ui),
+            Page::Add => self.page_add(ui),
+            Page::Rss => self.page_rss(ui),
+            Page::Speed => self.page_speed(ui),
+            Page::Network => self.page_network(ui),
+            Page::Privacy => self.page_privacy(ui),
+            Page::Seeding => self.page_seeding(ui),
+            Page::Config => self.page_config(ui),
+            Page::Log => self.page_log(ui),
+        }
+    }
+
     fn layout(&mut self, ui: &mut egui::Ui) {
+        if ff::is_green() {
+            // Switched themes from Config: stay on Config in the new layout.
+            if self.page == Page::Config && self.menu_touched {
+                self.green_in_page = true;
+            }
+            return self.green_layout(ui);
+        }
         let full = ui.max_rect();
         let gap = 12.0;
         let side_w = 210.0_f32.min(full.width() * 0.3);
@@ -415,9 +445,9 @@ impl App {
                 .horizontal(|ui| {
                     ff::badge(ui, prot, 20.0);
                     let color = match prot {
-                        ff::Badge::Good => ff::GOOD,
-                        ff::Badge::Warn => ff::WARN,
-                        ff::Badge::Bad => ff::BAD,
+                        ff::Badge::Good => ff::GOOD(),
+                        ff::Badge::Warn => ff::WARN(),
+                        ff::Badge::Bad => ff::BAD(),
                     };
                     ff::title(ui, &prot_title, 14.0, color);
                 })
@@ -434,7 +464,7 @@ impl App {
             ui.add_space(4.0);
             let label = if advanced { "MODE: ADVANCED" } else { "MODE: SIMPLE" };
             mode_clicked = ui
-                .add_sized([ui.available_width(), 26.0], egui::Button::new(RichText::new(label).color(LABEL).strong()))
+                .add_sized([ui.available_width(), 26.0], egui::Button::new(RichText::new(label).color(LABEL()).strong()))
                 .on_hover_text("Simple shows the settings most people need. Advanced shows everything, plus the Log.")
                 .clicked();
         });
@@ -454,21 +484,11 @@ impl App {
             ui.horizontal_centered(|ui| {
                 ff::badge(ui, prot, 18.0).on_hover_text(&prot_detail);
                 ui.add_space(4.0);
-                ff::title(ui, &status, 16.0, if warn { ff::WARN } else { TEXT });
+                ff::title(ui, &status, 16.0, if warn { ff::WARN() } else { TEXT() });
             });
         });
 
-        ff::window_at(ui, main, "main", |ui| match self.page {
-            Page::Torrents => self.page_torrents(ui),
-            Page::Add => self.page_add(ui),
-            Page::Rss => self.page_rss(ui),
-            Page::Speed => self.page_speed(ui),
-            Page::Network => self.page_network(ui),
-            Page::Privacy => self.page_privacy(ui),
-            Page::Seeding => self.page_seeding(ui),
-            Page::Config => self.page_config(ui),
-            Page::Log => self.page_log(ui),
-        });
+        ff::window_at(ui, main, "main", |ui| self.render_page_body(ui));
 
         self.update_prompt(ui.ctx());
         self.files_popup(ui.ctx(), main);
@@ -499,7 +519,7 @@ impl App {
                     ui.set_max_width(360.0);
                     ff::window(ui, |ui| {
                         ui.set_width(320.0);
-                        ui.add(egui::Label::new(RichText::new(m).color(TEXT).strong()).wrap());
+                        ui.add(egui::Label::new(RichText::new(m).color(TEXT()).strong()).wrap());
                     })
                 });
             y += area.response.rect.height() + 10.0;
@@ -511,7 +531,7 @@ fn info_row(ui: &mut egui::Ui, label: &str, value: &str) {
     ui.horizontal(|ui| {
         ff::stat_label(ui, label);
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            ff::title(ui, value, 17.0, TEXT);
+            ff::title(ui, value, 17.0, TEXT());
         });
     });
 }
@@ -565,7 +585,7 @@ impl eframe::App for App {
         let ctx = ui.ctx().clone();
         self.handle_drops(&ctx);
         egui::CentralPanel::default()
-            .frame(egui::Frame::new().fill(ff::BACKDROP).inner_margin(egui::Margin::same(14)))
+            .frame(egui::Frame::new().fill(ff::BACKDROP()).inner_margin(egui::Margin::same(14)))
             .show(ui, |ui| self.layout(ui));
     }
 
@@ -627,19 +647,19 @@ impl App {
                     ui.set_width(460.0);
                     match &state {
                         State::Available(r) => {
-                            ff::title(ui, "Update available", 24.0, TEXT);
+                            ff::title(ui, "Update available", 24.0, TEXT());
                             ff::divider(ui);
                             ui.horizontal(|ui| {
                                 ff::stat_label(ui, "CURRENT");
                                 ui.label(RichText::new(format!("v{}", crate::updater::APP_VERSION)).strong());
                                 ui.add_space(16.0);
                                 ff::stat_label(ui, "NEW");
-                                ui.label(RichText::new(format!("v{}", r.version)).strong().color(ff::GOOD));
+                                ui.label(RichText::new(format!("v{}", r.version)).strong().color(ff::GOOD()));
                             });
                             if !r.notes.trim().is_empty() {
                                 ui.add_space(6.0);
                                 egui::ScrollArea::vertical().max_height(200.0).show(ui, |ui| {
-                                    ui.add(egui::Label::new(RichText::new(r.notes.trim()).color(TEXT_DIM)).wrap());
+                                    ui.add(egui::Label::new(RichText::new(r.notes.trim()).color(TEXT_DIM())).wrap());
                                 });
                             }
                             ui.add_space(6.0);
@@ -650,7 +670,7 @@ impl App {
                             }));
                             ui.add_space(8.0);
                             ui.horizontal(|ui| {
-                                if ui.button(RichText::new("Update now").color(ff::GOOD).strong()).clicked() {
+                                if ui.button(RichText::new("Update now").color(ff::GOOD()).strong()).clicked() {
                                     install = Some(r.clone());
                                 }
                                 if ui.button("Later").clicked() {
@@ -662,10 +682,10 @@ impl App {
                             });
                         }
                         State::Downloading(r) => {
-                            ff::title(ui, &format!("Downloading v{}", r.version), 22.0, TEXT);
+                            ff::title(ui, &format!("Downloading v{}", r.version), 22.0, TEXT());
                             let done = self.updater.downloaded.load(SeqCst);
                             let total = self.updater.total.load(SeqCst).max(1);
-                            ff::stat_bar(ui, done as f32 / total as f32, 420.0, ff::LABEL, egui::Color32::WHITE);
+                            ff::stat_bar(ui, done as f32 / total as f32, 420.0, ff::LABEL(), egui::Color32::WHITE);
                             ui.label(dim(&format!(
                                 "{} of {}",
                                 crate::core::human_bytes(done as i64),
@@ -673,12 +693,12 @@ impl App {
                             )));
                         }
                         State::Restarting => {
-                            ff::title(ui, "Installing update…", 22.0, TEXT);
+                            ff::title(ui, "Installing update…", 22.0, TEXT());
                             ui.label(dim("Saving your torrents. Lifestream will reopen in a moment."));
                         }
                         State::Failed(e) => {
-                            ff::title(ui, "Update didn't work", 22.0, ff::BAD);
-                            ui.add(egui::Label::new(RichText::new(e).color(TEXT)).wrap());
+                            ff::title(ui, "Update didn't work", 22.0, ff::BAD());
+                            ui.add(egui::Label::new(RichText::new(e).color(TEXT())).wrap());
                             ui.label(dim("Nothing was changed. You can try again later or grab it from the releases page."));
                             if ui.button("OK").clicked() {
                                 later = true;
@@ -731,6 +751,15 @@ fn configure_fonts(ctx: &egui::Context) {
     if let Some(m) = fonts.families.get_mut(&egui::FontFamily::Monospace) {
         m.push("Inter".to_owned());
     }
+    // Blocky display face for the green dashboard theme.
+    fonts.font_data.insert(
+        "Orbitron".to_owned(),
+        Arc::new(egui::FontData::from_static(include_bytes!("../../resources/Orbitron-800.ttf"))),
+    );
+    fonts.families.insert(
+        egui::FontFamily::Name("display".into()),
+        vec!["Orbitron".to_owned(), "Nunito".to_owned(), "Inter".to_owned()],
+    );
     ctx.set_fonts(fonts);
 }
 
@@ -748,5 +777,5 @@ pub fn open_path(path: &str) {
 }
 
 pub fn dim(text: &str) -> RichText {
-    RichText::new(text).color(TEXT_DIM)
+    RichText::new(text).color(TEXT_DIM())
 }
