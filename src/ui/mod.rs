@@ -38,7 +38,7 @@ const MENU: &[(Page, &str, bool)] = &[
     (Page::Network, "Network", false),
     (Page::Privacy, "Privacy", false),
     (Page::Seeding, "Seeding", false),
-    (Page::Config, "Config", false),
+    (Page::Config, "Settings", false),
     (Page::Log, "Log", true),
 ];
 

@@ -1398,7 +1398,7 @@ impl App {
     // ===================================================================== Config
 
     pub(super) fn page_config(&mut self, ui: &mut egui::Ui) {
-        page_title(ui, "Config", "Where files go and how the app starts.");
+        page_title(ui, "Settings", "Where files go and how the app starts.");
         let adv = self.settings.advanced_mode;
         let mut changed = false;
         let mut export = false;

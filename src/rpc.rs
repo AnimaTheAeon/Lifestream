@@ -98,7 +98,7 @@ fn handle(core: CoreHandle, mut req: Request, session: &str, user: &str, pass: &
             crate::web::handle(&core, req, true);
             return;
         }
-        let _ = req.respond(Response::from_string("Set a username and password in Lifestream (Config → Remote control) to allow other devices.").with_status_code(403));
+        let _ = req.respond(Response::from_string("Set a username and password in Lifestream (Settings → Remote control) to allow other devices.").with_status_code(403));
         return;
     }
     if !authorized(&req, user, pass) {
