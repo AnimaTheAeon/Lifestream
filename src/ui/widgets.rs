@@ -169,18 +169,6 @@ pub fn rate(ui: &mut Ui, v: &mut i32) -> egui::Response {
     }
 }
 
-pub fn folder_field(ui: &mut Ui, value: &mut String, width: f32) -> bool {
-    let mut changed = false;
-    if ui.button("Browse").clicked() {
-        if let Some(p) = rfd::FileDialog::new().set_directory(value.as_str()).pick_folder() {
-            *value = p.display().to_string();
-            changed = true;
-        }
-    }
-    changed |= ui.add(egui::TextEdit::singleline(value).desired_width(width)).changed();
-    changed
-}
-
 /// Filter chips at the top of the torrent list.
 pub fn pill(ui: &mut Ui, text: &str, selected: bool) -> egui::Response {
     let green = ff::is_green();

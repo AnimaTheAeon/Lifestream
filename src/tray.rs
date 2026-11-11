@@ -107,7 +107,7 @@ impl Tray {
                 if let Ok(text) = arboard::Clipboard::new().and_then(|mut c| c.get_text()) {
                     let text = text.trim().to_string();
                     if text.starts_with("magnet:") {
-                        // Goes through the Add page so it asks where to save.
+                        // Same as a browser magnet link: asks where to save, then adds it.
                         let _ = to_app.send(crate::instance::Incoming::Open(text));
                         show_window(&ctx);
                     }

@@ -395,6 +395,7 @@ impl App {
         }
         self.update_prompt(&ctx);
         self.files_popup(&ctx, main);
+        self.add_dialog(&ctx);
         self.remove_dialog(&ctx);
         self.toasts(&ctx, pos2(full.right() - 14.0, full.top() + 80.0));
     }
@@ -471,6 +472,8 @@ impl App {
         if esc || mouse_back {
             if self.confirm_remove.is_some() {
                 self.confirm_remove = None;
+            } else if self.add_open {
+                // The Add window closes itself on Esc.
             } else if self.popup.is_some() {
                 self.popup = None;
                 self.core.send(Cmd::WatchFiles(None));
@@ -498,9 +501,9 @@ impl App {
         if sb_w > 200.0 {
             let r = Rect::from_min_size(pos2(full.right() - sb_w, full.top() + 2.0), Vec2::new(sb_w, 52.0));
             status_box(ui, r, &top, &bottom, badge);
-            // The badge box doubles as a shortcut to the Network page.
-            if ui.interact(r, ui.id().with("green_status"), Sense::click()).on_hover_text("Open Network").clicked() {
-                self.page = Page::Network;
+            // The badge box doubles as a shortcut to the Connection page.
+            if ui.interact(r, ui.id().with("green_status"), Sense::click()).on_hover_text("Open Connection").clicked() {
+                self.page = Page::Connection;
             }
         }
 

@@ -719,7 +719,9 @@ pub fn paint_orb(painter: &egui::Painter, center: Pos2, r: f32, lit: bool, wobbl
 
 /// Corner badge on a torrent emblem showing it opens the file list.
 fn file_badge(ui: &Ui, rect: Rect, response: &Response) {
-    let badge = Rect::from_min_size(rect.right_bottom() - Vec2::splat(18.0), Vec2::splat(18.0));
+    // Smaller on small icons so it doesn't cover the letter.
+    let b = (rect.width() * 0.3).clamp(12.0, 18.0);
+    let badge = Rect::from_min_size(rect.right_bottom() - Vec2::new(b, b) + Vec2::splat(if b < 18.0 { 3.0 } else { 0.0 }), Vec2::splat(b));
     let painter = ui.painter();
     let (fill, stroke, ink) = if is_green() {
         (Color32::from_rgb(6, 34, 4), BORDER_LIGHT(), Color32::from_rgb(220, 255, 160))
@@ -727,11 +729,12 @@ fn file_badge(ui: &Ui, rect: Rect, response: &Response) {
         (Color32::from_rgb(10, 14, 90), BORDER_LIGHT(), TEXT())
     };
     painter.rect(badge, CornerRadius::same(3), fill, Stroke::new(1.0, stroke), StrokeKind::Inside);
+    let k = b / 18.0;
     for (i, w) in [9.0, 9.0, 6.0].iter().enumerate() {
-        let y = badge.top() + 5.0 + i as f32 * 4.0;
+        let y = badge.top() + (5.0 + i as f32 * 4.0) * k;
         painter.line_segment(
-            [Pos2::new(badge.left() + 4.5, y), Pos2::new(badge.left() + 4.5 + w, y)],
-            Stroke::new(1.4, ink),
+            [Pos2::new(badge.left() + 4.5 * k, y), Pos2::new(badge.left() + (4.5 + w) * k, y)],
+            Stroke::new(1.4 * k.max(0.8), ink),
         );
     }
     if response.hovered() {

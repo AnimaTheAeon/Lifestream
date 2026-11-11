@@ -277,10 +277,15 @@ impl Settings {
 
     pub fn load() -> Self {
         match std::fs::read_to_string(Self::path()) {
-            Ok(text) => serde_json::from_str(&text).unwrap_or_else(|e| {
-                crate::applog::warn(format!("Settings file couldn't be read ({e}); using defaults."));
-                Self::default()
-            }),
+            Ok(text) => {
+                let mut s: Self = serde_json::from_str(&text).unwrap_or_else(|e| {
+                    crate::applog::warn(format!("Settings file couldn't be read ({e}); using defaults."));
+                    Self::default()
+                });
+                // "Only use this adapter" and the kill switch are one switch now.
+                s.bind_only = s.kill_switch;
+                s
+            }
             Err(_) => {
                 let s = Self::default();
                 s.save();
