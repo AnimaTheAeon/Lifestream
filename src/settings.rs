@@ -172,6 +172,8 @@ pub struct Settings {
     pub close_to_tray: bool,
     /// Windows pop-up notifications for finished downloads and VPN changes.
     pub system_notifications: bool,
+    /// No page transitions, click glows or sliding rows.
+    pub reduce_motion: bool,
     pub prevent_sleep: bool,
     pub auto_backup: bool,
     pub backup_dir: String,
@@ -253,6 +255,7 @@ impl Default for Settings {
             start_with_windows: false,
             close_to_tray: true,
             system_notifications: true,
+            reduce_motion: false,
             prevent_sleep: true,
             auto_backup: true,
             backup_dir: data_dir().join("backups").display().to_string(),
