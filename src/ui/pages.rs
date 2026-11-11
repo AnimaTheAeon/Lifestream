@@ -201,7 +201,7 @@ impl App {
                 for t in &list {
                     let h = t.info.hash.clone();
                     let y = ui.cursor().top() - top0;
-                    if reordered {
+                    if reordered && !self.settings.reduce_motion {
                         if let Some(prev) = self.row_y.get(&h) {
                             let off = prev - y;
                             if off.abs() > 1.0 {
@@ -1580,6 +1580,12 @@ impl App {
                     }
                 }
             });
+            row(
+                ui,
+                "Reduce motion",
+                "Turns off page transitions, click glows and sliding rows, so pages switch instantly.",
+                |ui| changed |= toggle(ui, &mut s.reduce_motion),
+            );
             section(ui, "Folders");
             w::label_help(ui, "Default download folder", "Where RSS downloads go, and the first folder offered when you add a torrent. After that, Lifestream offers the last folder you picked.");
             ui.horizontal(|ui| changed |= w::folder_field(ui, &mut s.download_dir, (ui.available_width() - 90.0).max(200.0)));

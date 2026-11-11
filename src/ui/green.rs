@@ -41,8 +41,20 @@ pub fn paint_background(ctx: &egui::Context, hub: Pos2) {
     }
 }
 
-const ZOOM_SECS: f32 = 0.5;
-const REVEAL_SECS: f32 = 0.35;
+// Gentle on purpose: a slow dip into the dark background, never a bright flash.
+const ZOOM_SECS: f32 = 0.6;
+const REVEAL_SECS: f32 = 0.5;
+
+/// Smooth start and end (no sudden changes in brightness).
+fn ease(k: f32) -> f32 {
+    let k = k.clamp(0.0, 1.0);
+    k * k * (3.0 - 2.0 * k)
+}
+
+/// The dark veil pages fade through: the theme's own backdrop green.
+fn veil(alpha: f32) -> Color32 {
+    rgba(3, 18, 3, (alpha.clamp(0.0, 1.0) * 245.0) as u8)
+}
 
 /// Painter above everything else, for the zoom into the orb.
 fn zoom_painter(ctx: &egui::Context) -> egui::Painter {
@@ -261,6 +273,11 @@ impl App {
 
     /// Back to the dashboard, with the cursor on the page just left.
     fn green_back(&mut self) {
+        if self.settings.reduce_motion {
+            self.green_home_now();
+            self.green_unzoom = None;
+            return;
+        }
         // The page first sinks into the orb's glow (see green_layout).
         if self.green_leave.is_none() {
             self.green_reveal = None;
@@ -279,6 +296,12 @@ impl App {
 
     /// Opens a page from home: first the camera zooms into the orb.
     fn green_open(&mut self, page: Page) {
+        if self.settings.reduce_motion {
+            self.menu_touched = true;
+            self.page = page;
+            self.green_in_page = true;
+            return;
+        }
         if self.green_zoom.is_none() {
             self.green_zoom = Some((page, std::time::Instant::now()));
         }
@@ -326,16 +349,14 @@ impl App {
                 if k >= 1.0 {
                     self.green_reveal = None;
                 } else {
-                    let a = ((1.0 - k) * (1.0 - k) * 255.0) as u8;
-                    zoom_painter(&ctx).rect_filled(full.expand(20.0), 0.0, rgba(170, 236, 60, a));
+                    zoom_painter(&ctx).rect_filled(full.expand(20.0), 0.0, veil(1.0 - ease(k)));
                     ctx.request_repaint();
                 }
             }
             // Going back: the page sinks into the glow (the reveal, reversed).
             if let Some(at) = self.green_leave {
                 let k = (at.elapsed().as_secs_f32() / REVEAL_SECS).min(1.0);
-                let a = (k * k * 255.0) as u8;
-                zoom_painter(&ctx).rect_filled(full.expand(20.0), 0.0, rgba(170, 236, 60, a));
+                zoom_painter(&ctx).rect_filled(full.expand(20.0), 0.0, veil(ease(k)));
                 ctx.request_repaint();
             }
         } else {
@@ -361,15 +382,12 @@ impl App {
             };
             if let Some(k) = zoom_k {
                 {
-                    let e = k * k * k; // ease in: slow start, rushing at the end
-                    // Big enough at the end to cover the window from the orb's center.
-                    let reach = (orb_c - full.right_bottom()).length().max((orb_c - full.right_top()).length());
-                    let big = r + (reach * 1.15 - r) * e;
+                    // The orb drifts a little closer while everything eases into the
+                    // dark backdrop: a soft dissolve, no bright frames.
+                    let e = ease(k);
                     let p = zoom_painter(&ctx);
-                    p.rect_filled(full.expand(20.0), 0.0, rgba(1, 10, 1, (k * 150.0) as u8));
-                    paint_big_orb(&p, orb_c, big, t);
-                    let glow = ((k - 0.55).max(0.0) / 0.45).powi(2);
-                    p.rect_filled(full.expand(20.0), 0.0, rgba(170, 236, 60, (glow * 255.0) as u8));
+                    paint_big_orb(&p, orb_c, r * (1.0 + 0.6 * e), t);
+                    p.rect_filled(full.expand(20.0), 0.0, veil(e));
                 }
                 ctx.request_repaint();
             }
@@ -527,7 +545,9 @@ impl App {
                 self.page = *page;
                 self.menu_touched = true;
                 self.green_cursor = i;
-                self.green_reveal = Some(std::time::Instant::now());
+                if !self.settings.reduce_motion {
+                    self.green_reveal = Some(std::time::Instant::now());
+                }
             }
         }
     }

@@ -502,8 +502,11 @@ impl App {
         if self.click_flashes.is_empty() {
             return;
         }
-        // Lighter than the accent so it shows on accent-colored buttons too.
-        let ring = ff::pal().accent.lerp_to_gamma(egui::Color32::WHITE, 0.55);
+        if self.settings.reduce_motion {
+            self.click_flashes.clear();
+            return;
+        }
+        let ring = ff::pal().accent;
         for &(id, t0) in &self.click_flashes {
             // Only while the widget is still on screen (a click that opens
             // another page shouldn't leave a glow over the new one).
@@ -515,12 +518,11 @@ impl App {
             let k = ((now - t0) / SECS) as f32;
             let fade = 1.0 - k;
             let p = ctx.layer_painter(w.layer_id);
-            // A bright fill that fades, plus a ring that grows outward.
-            p.rect_filled(rect, 4.0, egui::Color32::from_white_alpha((110.0 * fade) as u8));
+            // A soft outline that fades: noticeable, but no flash of light.
             p.rect_stroke(
-                rect.expand(1.0 + 8.0 * k),
-                6.0,
-                egui::Stroke::new(3.0 * fade + 0.5, ring.gamma_multiply(fade)),
+                rect.expand(1.0 + 3.0 * k),
+                5.0,
+                egui::Stroke::new(2.0, ring.gamma_multiply(0.6 * fade)),
                 egui::StrokeKind::Outside,
             );
         }
