@@ -135,8 +135,9 @@ pub fn notify(title: &str, body: &str) {
         if !body.is_empty() {
             t = t.text1(&body);
         }
-        if let Err(e) = t.show() {
-            crate::applog::warn(format!("Notification failed: {e:?}"));
+        match t.show() {
+            Ok(()) => crate::applog::info(format!("Windows notification sent: {title}")),
+            Err(e) => crate::applog::warn(format!("Windows notification failed: {e:?}")),
         }
     });
 }
