@@ -37,7 +37,7 @@ qBittorrent and Deluge) with a Rust + egui interface.
   by default), so [Turks](https://github.com/AnimaTheAeon/Turks),
   [Midgar](https://github.com/AnimaTheAeon/Midgar) and
   Radarr/Sonarr/Prowlarr can use Lifestream as their download client
-  (Config → Remote control). In those apps pick **Transmission**, port 9091,
+  (Settings → Remote control). In those apps pick **Transmission**, port 9091,
   URL base `/transmission/`. Other devices (like a NAS) need a username and
   password set.
 
@@ -46,7 +46,7 @@ qBittorrent and Deluge) with a Rust + egui interface.
 - Every setting has a Shinra-logo help icon: hover it to read what it does
 - Tray icon with quick toggles: pause all, turtle, RSS, kill switch status,
   add magnet from clipboard
-- Opens magnet links and .torrent files (Config → Make default)
+- Opens magnet links and .torrent files (Settings → Make default)
 - Start with Windows, close to tray, prevent sleep while downloading
 - Backup and restore of settings, RSS rules and the torrent list (with
   progress), plus automatic weekly backups
