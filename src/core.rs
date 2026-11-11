@@ -52,6 +52,8 @@ pub enum Cmd {
     #[cfg_attr(not(windows), allow(dead_code))]
     SetRss(bool),
     CopyMagnet(String),
+    /// Copy several magnet links, one per line.
+    CopyMagnets(Vec<String>),
     RssCheckNow,
     UpdateBlocklist,
     LeakCheck,
@@ -888,6 +890,18 @@ impl Core {
                     let _ = link;
                 }
                 self.toast("Magnet link copied");
+            }
+            Cmd::CopyMagnets(hashes) => {
+                if let Some(e) = self.engine.as_ref() {
+                    let links: Vec<String> = hashes.iter().map(|h| e.magnet_link(h)).collect();
+                    #[cfg(feature = "gui")]
+                    if let Ok(mut c) = arboard::Clipboard::new() {
+                        let _ = c.set_text(links.join("\n"));
+                    }
+                    #[cfg(not(feature = "gui"))]
+                    let _ = links;
+                }
+                self.toast(format!("{} magnet links copied", hashes.len()));
             }
             Cmd::UpdateBlocklist => self.update_blocklist(),
             Cmd::LeakCheck => self.leak_check(),

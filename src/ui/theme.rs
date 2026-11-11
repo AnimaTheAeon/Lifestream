@@ -794,3 +794,17 @@ pub fn badge(ui: &mut Ui, kind: Badge, size: f32) -> Response {
     }
     response
 }
+
+/// A check-mark badge on an emblem's top-right corner: fully downloaded.
+pub fn done_check(ui: &Ui, rect: Rect) {
+    let c = Pos2::new(rect.right() - 7.0, rect.top() + 7.0);
+    let painter = ui.painter();
+    let (fill, ink) = if is_green() {
+        (Color32::from_rgb(140, 255, 110), Color32::from_rgb(14, 44, 4))
+    } else {
+        (Color32::from_rgb(70, 200, 90), Color32::WHITE)
+    };
+    painter.circle(c, 9.5, fill, Stroke::new(1.5, Color32::from_rgb(4, 20, 4)));
+    painter.line_segment([c + Vec2::new(-4.5, 0.3), c + Vec2::new(-1.3, 3.6)], Stroke::new(2.2, ink));
+    painter.line_segment([c + Vec2::new(-1.3, 3.6), c + Vec2::new(4.8, -3.6)], Stroke::new(2.2, ink));
+}

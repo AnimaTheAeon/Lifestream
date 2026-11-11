@@ -160,6 +160,13 @@ impl App {
             Sort::Added => list.sort_by_key(|t| -t.info.added_time),
         }
 
+        // Forget ticks on torrents that are gone, then the bulk-action bar.
+        let present: std::collections::HashSet<&str> = self.snap.torrents.iter().map(|t| t.info.hash.as_str()).collect();
+        self.selected.retain(|h| present.contains(h.as_str()));
+        if !list.is_empty() {
+            self.selection_bar(ui, &list);
+        }
+
         // Only unfinished torrents have a queue spot; reorder them in queue view.
         let can_reorder = self.sort == Sort::Queue;
         if !can_reorder {
@@ -373,8 +380,21 @@ impl App {
         let active = !i.paused && i.error.is_empty();
         let advanced = self.settings.advanced_mode;
         ui.add_space(6.0);
+        let done = i.state >= 4 && i.error.is_empty();
         let row = ui.horizontal(|ui| {
-            let e = ff::emblem(ui, &letter, 58.0, active).on_hover_text("Show files");
+            let mut ticked = self.selected.contains(&i.hash);
+            if ui.checkbox(&mut ticked, "").on_hover_text("Select for bulk actions").changed() {
+                if ticked {
+                    self.selected.insert(i.hash.clone());
+                } else {
+                    self.selected.remove(&i.hash);
+                }
+            }
+            let e = ff::emblem(ui, &letter, 58.0, active)
+                .on_hover_text(if done { "Fully downloaded, seeding. Click to show files." } else { "Show files" });
+            if done {
+                ff::done_check(ui, e.rect);
+            }
             if e.clicked() {
                 self.popup = Some(i.hash.clone());
                 self.popup_tab = 0;
@@ -504,6 +524,133 @@ impl App {
         }
     }
 
+    /// Tick boxes for bulk actions: select all / finished / none, and the
+    /// same actions as a torrent's More menu, for every ticked torrent.
+    fn selection_bar(&mut self, ui: &mut egui::Ui, list: &[TorrentView]) {
+        ui.horizontal(|ui| {
+            let shown: Vec<&String> = list.iter().map(|t| &t.info.hash).collect();
+            let all = shown.iter().all(|h| self.selected.contains(*h));
+            let mut tick = all;
+            if ui.checkbox(&mut tick, "").on_hover_text(if all { "Clear selection" } else { "Select all shown" }).changed() {
+                if tick {
+                    self.selected.extend(shown.iter().map(|h| (*h).clone()));
+                } else {
+                    self.selected.clear();
+                }
+            }
+            let n = self.selected.len();
+            if n == 0 {
+                ui.label(dim("Tick torrents to act on several at once."));
+            } else {
+                ui.label(RichText::new(format!("{n} selected")).color(TEXT()).strong());
+            }
+            let finished: Vec<String> = list.iter().filter(|t| t.info.state >= 4 && t.info.error.is_empty()).map(|t| t.info.hash.clone()).collect();
+            if !finished.is_empty()
+                && ui
+                    .button(format!("Select finished ({})", finished.len()))
+                    .on_hover_text("Tick every torrent that's fully downloaded (green check).")
+                    .clicked()
+            {
+                self.selected = finished.into_iter().collect();
+            }
+            if n > 0 {
+                if ui.button("Clear").clicked() {
+                    self.selected.clear();
+                }
+                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                    let size = egui::vec2(96.0, 24.0);
+                    if ui.add(egui::Button::new(RichText::new(format!("Remove {n}…")).color(BAD())).min_size(size)).clicked() {
+                        let hashes: Vec<String> = self.selected.iter().cloned().collect();
+                        self.confirm_remove = Some((hashes, format!("{n} torrents")));
+                    }
+                    egui::containers::menu::MenuButton::from_button(egui::Button::new("Actions").min_size(size))
+                        .ui(ui, |ui| self.bulk_menu(ui));
+                });
+            }
+        });
+        ff::divider(ui);
+    }
+
+    /// The More menu's actions, for every ticked torrent.
+    fn bulk_menu(&mut self, ui: &mut egui::Ui) {
+        let hashes: Vec<String> = self.selected.iter().cloned().collect();
+        let picked: Vec<TorrentView> = self.snap.torrents.iter().filter(|t| self.selected.contains(&t.info.hash)).cloned().collect();
+        let adv = self.settings.advanced_mode;
+        let each = |s: &mut Self, f: &dyn Fn(String) -> Cmd| {
+            for h in &hashes {
+                s.core.send(f(h.clone()));
+            }
+        };
+        if ui.button("Start").clicked() {
+            each(self, &|h| Cmd::Resume(h));
+            ui.close();
+        }
+        if ui.button("Pause").clicked() {
+            each(self, &|h| Cmd::Pause(h));
+            ui.close();
+        }
+        if ui.button("Stop").clicked() {
+            each(self, &|h| Cmd::Stop(h));
+            ui.close();
+        }
+        ui.separator();
+        if ui.button("Open folders").clicked() {
+            let mut seen = std::collections::HashSet::new();
+            for t in &picked {
+                if seen.insert(t.info.save_path.clone()) {
+                    open_path(&t.info.save_path);
+                }
+            }
+            ui.close();
+        }
+        if ui.button("Copy magnet links").clicked() {
+            self.core.send(Cmd::CopyMagnets(hashes.clone()));
+            ui.close();
+        }
+        ui.separator();
+        if ui.button("Download in order: ON").on_hover_text("Grabs pieces start to finish so you can watch while it downloads.").clicked() {
+            each(self, &|h| Cmd::Sequential(h, true));
+            ui.close();
+        }
+        if ui.button("Download in order: OFF").clicked() {
+            each(self, &|h| Cmd::Sequential(h, false));
+            ui.close();
+        }
+        if ui.button("First and last pieces first").clicked() {
+            each(self, &|h| Cmd::FirstLast(h));
+            ui.close();
+        }
+        if ui.button("Move to top of queue").on_hover_text("Keeps their order among themselves.").clicked() {
+            // Last first, so the first ticked one ends up on top.
+            let mut queued: Vec<&TorrentView> = picked.iter().collect();
+            queued.sort_by_key(|t| t.info.queue_position);
+            for t in queued.iter().rev() {
+                self.core.send(Cmd::QueueTop(t.info.hash.clone()));
+            }
+            ui.close();
+        }
+        if adv {
+            if ui.button("Super-seeding: ON").clicked() {
+                each(self, &|h| Cmd::SuperSeed(h, true));
+                ui.close();
+            }
+            if ui.button("Super-seeding: OFF").clicked() {
+                each(self, &|h| Cmd::SuperSeed(h, false));
+                ui.close();
+            }
+            if ui.button("Check files again").clicked() {
+                each(self, &|h| Cmd::Recheck(h));
+                ui.close();
+            }
+        }
+        ui.separator();
+        if ui.button(RichText::new("Remove…").color(BAD())).clicked() {
+            let n = hashes.len();
+            self.confirm_remove = Some((hashes.clone(), format!("{n} torrents")));
+            ui.close();
+        }
+    }
+
     fn torrent_menu(&mut self, ui: &mut egui::Ui, t: &TorrentView) {
         let i = &t.info;
         let h = i.hash.clone();
@@ -559,13 +706,14 @@ impl App {
         }
         ui.separator();
         if ui.button(RichText::new("Remove…").color(BAD())).clicked() {
-            self.confirm_remove = Some((h, i.name.clone()));
+            self.confirm_remove = Some((vec![h], i.name.clone()));
             ui.close();
         }
     }
 
     pub(super) fn remove_dialog(&mut self, ctx: &egui::Context) {
-        let Some((hash, name)) = self.confirm_remove.clone() else { return };
+        let Some((hashes, name)) = self.confirm_remove.clone() else { return };
+        let many = hashes.len() > 1;
         let mut close = false;
         egui::Area::new(egui::Id::new("remove_dialog"))
             .order(egui::Order::Foreground)
@@ -573,19 +721,25 @@ impl App {
             .show(ctx, |ui| {
                 ff::window(ui, |ui| {
                     ui.set_width(420.0);
-                    ff::title(ui, "Remove torrent?", 20.0, TEXT());
+                    ff::title(ui, if many { "Remove torrents?" } else { "Remove torrent?" }, 20.0, TEXT());
                     ui.add(egui::Label::new(RichText::new(&name).color(TEXT_DIM())).wrap());
                     ui.add_space(8.0);
                     ui.horizontal(|ui| {
                         if ui.button("Cancel").clicked() {
                             close = true;
                         }
+                        let mut remove = None;
                         if ui.button("Remove, keep files").clicked() {
-                            self.core.send(Cmd::Remove { hash: hash.clone(), delete_files: false });
-                            close = true;
+                            remove = Some(false);
                         }
                         if ui.button(RichText::new("Remove and delete files").color(BAD())).clicked() {
-                            self.core.send(Cmd::Remove { hash: hash.clone(), delete_files: true });
+                            remove = Some(true);
+                        }
+                        if let Some(delete_files) = remove {
+                            for hash in &hashes {
+                                self.core.send(Cmd::Remove { hash: hash.clone(), delete_files });
+                                self.selected.remove(hash);
+                            }
                             close = true;
                         }
                     });
@@ -593,7 +747,7 @@ impl App {
             });
         if close {
             self.confirm_remove = None;
-            if self.popup.as_deref() == Some(hash.as_str()) {
+            if self.popup.as_ref().map(|p| hashes.contains(p)).unwrap_or(false) {
                 self.popup = None;
             }
         }

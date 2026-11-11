@@ -99,7 +99,10 @@ pub struct App {
     pub click_flashes: Vec<(egui::Id, f64)>,
     pub popup: Option<String>,
     pub popup_tab: u8,
-    pub confirm_remove: Option<(String, String)>,
+    /// Torrents waiting on the remove dialog: (hashes, what to call them).
+    pub confirm_remove: Option<(Vec<String>, String)>,
+    /// Torrents ticked for bulk actions.
+    pub selected: std::collections::BTreeSet<String>,
     pub add: AddState,
     incoming: Receiver<Incoming>,
     pub rss_rule: usize,
@@ -182,6 +185,7 @@ impl App {
             popup: None,
             popup_tab: 0,
             confirm_remove: None,
+            selected: Default::default(),
             add: AddState { magnet: String::new(), preview: None, choice, error: None },
             incoming,
             rss_rule: 0,
