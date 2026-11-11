@@ -987,31 +987,105 @@ impl App {
             section(ui, "Feeds");
             let mut remove = None;
             let mut changed = false;
+            let mut toggle_open = None;
+            let mut renamed: Option<(String, String)> = None;
+            let rules_snapshot: Vec<(String, Vec<String>)> = self.settings.rules.iter().map(|r| (r.name.clone(), r.feeds.clone())).collect();
             for (i, feed) in self.settings.feeds.iter_mut().enumerate() {
+                let open = self.rss_feed_open == Some(i);
                 let status = self.snap.rss_status.get(&feed.name);
+                // One line per feed: click the name to open it; the switch and
+                // status stay on the right.
                 ui.horizontal(|ui| {
-                    ui.vertical(|ui| {
-                        ui.label(RichText::new(&feed.name).color(TEXT()).strong());
-                        ui.label(RichText::new(&feed.url).color(TEXT_DIM()).size(12.0).monospace());
-                    });
+                    let (dot, tip) = match status {
+                        Some(s) => match &s.result {
+                            Ok(n) => (GOOD(), format!("OK · {n} items · checked {}", s.checked)),
+                            Err(e) => (BAD(), format!("Failed at {}: {e}", s.checked)),
+                        },
+                        None => (TEXT_DIM(), "Not checked yet".to_string()),
+                    };
+                    let head = ui
+                        .horizontal(|ui| {
+                            let (rect, _) = ui.allocate_exact_size(egui::vec2(14.0, 14.0), egui::Sense::hover());
+                            let c = rect.center();
+                            let pts = if open {
+                                vec![c + egui::vec2(-5.0, -3.0), c + egui::vec2(5.0, -3.0), c + egui::vec2(0.0, 4.0)]
+                            } else {
+                                vec![c + egui::vec2(-3.0, -5.0), c + egui::vec2(4.0, 0.0), c + egui::vec2(-3.0, 5.0)]
+                            };
+                            ui.painter().add(egui::Shape::convex_polygon(pts, LABEL(), egui::Stroke::NONE));
+                            let (r, _) = ui.allocate_exact_size(egui::vec2(10.0, 10.0), egui::Sense::hover());
+                            ui.painter().circle_filled(r.center(), 4.5, dot);
+                            ui.add(egui::Label::new(RichText::new(&feed.name).color(TEXT()).strong().size(15.0)).selectable(false));
+                        })
+                        .response
+                        .interact(egui::Sense::click());
+                    if head.hovered() {
+                        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+                    }
+                    if head.on_hover_text(&tip).clicked() {
+                        toggle_open = Some(i);
+                    }
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        if ui.small_button("Remove").clicked() {
-                            remove = Some(i);
-                        }
                         changed |= toggle(ui, &mut feed.enabled);
-                        match status {
-                            Some(s) => match &s.result {
-                                Ok(n) => ff::title(ui, &format!("OK · {n} items · {}", s.checked), 13.0, GOOD()),
-                                Err(e) => ff::title(ui, &format!("FAILED · {}", s.checked), 13.0, BAD()).on_hover_text(e),
-                            },
-                            None => ff::title(ui, "Not checked yet", 13.0, TEXT_DIM()),
-                        };
+                        if let Some(Ok(n)) = status.map(|s| &s.result) {
+                            ui.label(dim(&format!("{n} items")));
+                        } else if let Some(Err(_)) = status.map(|s| &s.result) {
+                            ui.colored_label(BAD(), "FAILED");
+                        }
                     });
                 });
+                if open {
+                    ui.indent(("feed", i), |ui| {
+                        let old = feed.name.clone();
+                        ui.horizontal(|ui| {
+                            ff::stat_label(ui, "NAME");
+                            if ui.add(egui::TextEdit::singleline(&mut feed.name).desired_width(200.0)).changed() {
+                                changed = true;
+                                renamed = Some((old.clone(), feed.name.clone()));
+                            }
+                        });
+                        ui.horizontal(|ui| {
+                            ff::stat_label(ui, "ADDRESS");
+                            changed |= ui.add(egui::TextEdit::singleline(&mut feed.url).desired_width((ui.available_width() - 10.0).max(200.0))).changed();
+                        });
+                        if let Some(s) = status {
+                            match &s.result {
+                                Ok(n) => ui.label(dim(&format!("Last checked {} · {n} items", s.checked))),
+                                Err(e) => ui.colored_label(BAD(), format!("Last check failed ({}): {e}", s.checked)),
+                            };
+                        }
+                        let users: Vec<&str> = rules_snapshot
+                            .iter()
+                            .filter(|(_, feeds)| feeds.is_empty() || feeds.contains(&old))
+                            .map(|(n, _)| n.as_str())
+                            .collect();
+                        ui.label(dim(&if users.is_empty() { "No rules use this feed yet.".to_string() } else { format!("Rules using it: {}", users.join(", ")) }));
+                        if ui.button(RichText::new("Remove feed").color(BAD())).clicked() {
+                            remove = Some(i);
+                        }
+                    });
+                }
                 ff::divider(ui);
             }
+            if let Some(i) = toggle_open {
+                self.rss_feed_open = if self.rss_feed_open == Some(i) { None } else { Some(i) };
+            }
+            // Keep rules pointing at a feed that was renamed.
+            if let Some((old, new)) = renamed {
+                for r in self.settings.rules.iter_mut() {
+                    for f in r.feeds.iter_mut() {
+                        if *f == old {
+                            *f = new.clone();
+                        }
+                    }
+                }
+            }
             if let Some(i) = remove {
-                self.settings.feeds.remove(i);
+                let name = self.settings.feeds.remove(i).name;
+                for r in self.settings.rules.iter_mut() {
+                    r.feeds.retain(|f| *f != name);
+                }
+                self.rss_feed_open = None;
                 changed = true;
             }
             ui.horizontal(|ui| {
@@ -1033,10 +1107,35 @@ impl App {
 
             w::section_help(ui, "Rules", "A rule says which feed items to download, like \"Show Name 1080p\" from season 2 on. Anything it matches is added automatically and saved to your default download folder.");
             ui.horizontal_wrapped(|ui| {
-                for (i, r) in self.settings.rules.iter().enumerate() {
-                    if w::pill(ui, &r.name, self.rss_rule == i).clicked() {
-                        self.rss_rule = i;
+                if self.settings.rules.len() <= 6 {
+                    for (i, r) in self.settings.rules.iter().enumerate() {
+                        if w::pill(ui, &r.name, self.rss_rule == i).clicked() {
+                            self.rss_rule = i;
+                        }
                     }
+                } else {
+                    // Lots of rules: a drop-down instead of a row of buttons.
+                    let current = self.settings.rules.get(self.rss_rule).map(|r| r.name.clone()).unwrap_or_default();
+                    ff::stat_label(ui, "RULE");
+                    let button = egui::Button::new(format!("{current}      ")).min_size(egui::vec2(220.0, 24.0));
+                    let (resp, _) = egui::containers::menu::MenuButton::from_button(button).ui(ui, |ui| {
+                        ui.set_width(260.0);
+                        egui::ScrollArea::vertical().max_height(320.0).show(ui, |ui| {
+                            for (i, r) in self.settings.rules.iter().enumerate() {
+                                let label = if r.enabled { r.name.clone() } else { format!("{} (off)", r.name) };
+                                if ui.add(egui::Button::selectable(self.rss_rule == i, label)).clicked() {
+                                    self.rss_rule = i;
+                                    ui.close();
+                                }
+                            }
+                        });
+                    });
+                    let c = egui::pos2(resp.rect.right() - 14.0, resp.rect.center().y);
+                    ui.painter().add(egui::Shape::convex_polygon(
+                        vec![c + egui::vec2(-5.0, -3.0), c + egui::vec2(5.0, -3.0), c + egui::vec2(0.0, 3.5)],
+                        TEXT(),
+                        egui::Stroke::NONE,
+                    ));
                 }
                 if ui.button("New rule").clicked() {
                     self.settings.rules.push(RssRule::default());
@@ -1072,25 +1171,42 @@ impl App {
                     )
                     .changed();
                 });
+                row(ui, "Feed", "", |ui| {
+                    let label = match rule.feeds.len() {
+                        0 => "All feeds".to_string(),
+                        1 => rule.feeds[0].clone(),
+                        n => format!("{n} feeds"),
+                    };
+                    let button = egui::Button::new(format!("{label}      ")).min_size(egui::vec2(180.0, 24.0));
+                    let (resp, _) = egui::containers::menu::MenuButton::from_button(button).ui(ui, |ui| {
+                        ui.set_width(220.0);
+                        if ui.add(egui::Button::selectable(rule.feeds.is_empty(), "All feeds")).clicked() {
+                            rule.feeds.clear();
+                            changed = true;
+                            ui.close();
+                        }
+                        for f in &feed_names {
+                            let only = rule.feeds.len() == 1 && rule.feeds[0] == *f;
+                            if ui.add(egui::Button::selectable(only, f)).clicked() {
+                                rule.feeds = vec![f.clone()];
+                                changed = true;
+                                ui.close();
+                            }
+                        }
+                    });
+                    let c = egui::pos2(resp.rect.right() - 14.0, resp.rect.center().y);
+                    ui.painter().add(egui::Shape::convex_polygon(
+                        vec![c + egui::vec2(-5.0, -3.0), c + egui::vec2(5.0, -3.0), c + egui::vec2(0.0, 3.5)],
+                        TEXT(),
+                        egui::Stroke::NONE,
+                    ));
+                });
                 row(ui, "Rule on", "", |ui| changed |= toggle(ui, &mut rule.enabled));
                 row(ui, "Skip duplicates", "Only grab each episode once, even if a second release shows up.", |ui| {
                     changed |= toggle(ui, &mut rule.skip_duplicates)
                 });
                 if adv {
                     row(ui, "Use regular expressions", "For precise matching. Case doesn't matter.", |ui| changed |= toggle(ui, &mut rule.use_regex));
-                    row(ui, "Only these feeds", "None checked = every feed.", |ui| {
-                        for f in feed_names.iter().rev() {
-                            let mut on = rule.feeds.contains(f);
-                            if ui.checkbox(&mut on, f).changed() {
-                                if on {
-                                    rule.feeds.push(f.clone());
-                                } else {
-                                    rule.feeds.retain(|x| x != f);
-                                }
-                                changed = true;
-                            }
-                        }
-                    });
                 }
                 let matches: Vec<&crate::rss::FeedItem> = self
                     .snap
