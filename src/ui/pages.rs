@@ -11,7 +11,6 @@ use crate::settings::{Feed, RssRule, SeedAction, SeederDisplay};
 const BLUE: (Color32, Color32) = (Color32::from_rgb(30, 110, 230), Color32::from_rgb(140, 230, 255));
 const GREEN: (Color32, Color32) = (Color32::from_rgb(30, 154, 70), Color32::from_rgb(160, 240, 176));
 const GREY: (Color32, Color32) = (Color32::from_rgb(90, 94, 120), Color32::from_rgb(164, 168, 192));
-const GOLD: (Color32, Color32) = (Color32::from_rgb(200, 150, 20), Color32::from_rgb(255, 236, 140));
 
 fn status_of(t: &TorrentView, held: bool) -> (&'static str, Color32) {
     let i = &t.info;
@@ -41,19 +40,28 @@ fn status_of(t: &TorrentView, held: bool) -> (&'static str, Color32) {
 impl App {
     // ===================================================================== Torrents
 
+    fn filter_matches(&self, t: &TorrentView) -> bool {
+        match self.filter {
+            Filter::All => true,
+            Filter::Downloading => t.info.state <= 2 && !t.info.paused,
+            Filter::Finished => t.info.state >= 3,
+            Filter::Paused => t.info.paused,
+        }
+    }
+
     pub(super) fn page_torrents(&mut self, ui: &mut egui::Ui) {
         let paused_all = self.snap.user_paused;
         ui.horizontal(|ui| {
             ff::title(ui, "Torrents", 26.0, TEXT());
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                if ui.button("Add torrent").clicked() {
-                    self.page = Page::Add;
-                    self.menu_touched = true;
+                if ui.add(egui::Button::new(RichText::new("+ Add").strong()).min_size(egui::vec2(84.0, 26.0))).clicked() {
+                    self.add.error = None;
+                    self.add_open = true;
                 }
                 let turtle = self.snap.turtle_active;
                 if ui
                     .button(RichText::new(if turtle { "TURTLE: ON" } else { "TURTLE: OFF" }).color(if turtle { WARN() } else { TEXT() }).strong())
-                    .on_hover_text("Switch to your slower turtle limits (set on the Speed page).")
+                    .on_hover_text("Switch to your slower turtle limits (set in Settings).")
                     .clicked()
                 {
                     self.core.send(Cmd::SetTurtle(!turtle));
@@ -74,12 +82,8 @@ impl App {
         } else {
             "Your party of downloads."
         };
-        let how = if self.sort == Sort::Queue {
-            "Click a torrent's icon to see its files. Click and hold a download to drag it up or down the queue."
-        } else {
-            "Click a torrent's icon to see its files. Sort by queue order to drag downloads into a new order."
-        };
-        ui.label(dim(&format!("{opener} {how}")));
+        ui.label(dim(opener))
+            .on_hover_text("Click a torrent's icon for its files and details. In queue order, drag a download up or down to reorder it.");
 
         if self.snap.kill_hold {
             ui.add_space(4.0);
@@ -87,8 +91,8 @@ impl App {
                 ui.set_width(ui.available_width());
                 ff::title(ui, "Kill switch is holding everything", 16.0, WARN());
                 ui.add(egui::Label::new(RichText::new(&self.snap.kill_reason).color(TEXT())).wrap());
-                if ui.button("Go to Network").clicked() {
-                    self.page = Page::Network;
+                if ui.button("Go to Connection").clicked() {
+                    self.page = Page::Connection;
                     self.menu_touched = true;
                 }
             });
@@ -96,14 +100,29 @@ impl App {
 
         let ts = &self.snap.torrents;
         let n_dl = ts.iter().filter(|t| t.info.state <= 2 && !t.info.paused).count();
-        let n_seed = ts.iter().filter(|t| t.info.state >= 3 && !t.info.paused).count();
+        let n_done = ts.iter().filter(|t| t.info.state >= 3).count();
         let n_paused = ts.iter().filter(|t| t.info.paused).count();
+        let shown: Vec<String> = ts.iter().filter(|t| self.filter_matches(t)).map(|t| t.info.hash.clone()).collect();
         ui.add_space(6.0);
         ui.horizontal_wrapped(|ui| {
+            // Tick everything shown (pick Finished first to clear out completed ones).
+            let all = !shown.is_empty() && shown.iter().all(|h| self.selected.contains(h));
+            let mut tick = all;
+            if ui
+                .add_enabled(!shown.is_empty(), egui::Checkbox::without_text(&mut tick))
+                .on_hover_text(if all { "Clear selection" } else { "Select all shown" })
+                .changed()
+            {
+                if tick {
+                    self.selected.extend(shown.iter().cloned());
+                } else {
+                    self.selected.clear();
+                }
+            }
             for (f, label) in [
                 (Filter::All, format!("All {}", ts.len())),
                 (Filter::Downloading, format!("Downloading {n_dl}")),
-                (Filter::Seeding, format!("Seeding {n_seed}")),
+                (Filter::Finished, format!("Finished {n_done}")),
                 (Filter::Paused, format!("Paused {n_paused}")),
             ] {
                 if w::pill(ui, &label, self.filter == f).clicked() {
@@ -140,12 +159,7 @@ impl App {
             .snap
             .torrents
             .iter()
-            .filter(|t| match self.filter {
-                Filter::All => true,
-                Filter::Downloading => t.info.state <= 2 && !t.info.paused,
-                Filter::Seeding => t.info.state >= 3 && !t.info.paused,
-                Filter::Paused => t.info.paused,
-            })
+            .filter(|t| self.filter_matches(t))
             .cloned()
             .collect();
         match self.sort {
@@ -163,8 +177,18 @@ impl App {
         // Forget ticks on torrents that are gone, then the bulk-action bar.
         let present: std::collections::HashSet<&str> = self.snap.torrents.iter().map(|t| t.info.hash.as_str()).collect();
         self.selected.retain(|h| present.contains(h.as_str()));
-        if !list.is_empty() {
+        if !self.selected.is_empty() {
             self.selection_bar(ui, &list);
+        }
+        if list.is_empty() {
+            ui.add_space(20.0);
+            ui.vertical_centered(|ui| {
+                ui.label(dim(if self.snap.torrents.is_empty() {
+                    "Nothing here yet. Press + Add, open a magnet link, or drop a .torrent file on this window."
+                } else {
+                    "Nothing matches this filter."
+                }));
+            });
         }
 
         // Only unfinished torrents have a queue spot; reorder them in queue view.
@@ -378,20 +402,19 @@ impl App {
         let (status, color) = status_of(t, held);
         let letter: String = i.name.chars().find(|c| c.is_alphanumeric()).map(|c| c.to_uppercase().collect()).unwrap_or_default();
         let active = !i.paused && i.error.is_empty();
-        let advanced = self.settings.advanced_mode;
-        ui.add_space(6.0);
-        let done = i.state >= 4 && i.error.is_empty();
+        let done = i.state >= 3 && i.error.is_empty();
+        ui.add_space(4.0);
         let row = ui.horizontal(|ui| {
             let mut ticked = self.selected.contains(&i.hash);
-            if ui.checkbox(&mut ticked, "").on_hover_text("Select for bulk actions").changed() {
+            if ui.add(egui::Checkbox::without_text(&mut ticked)).on_hover_text("Select for bulk actions").changed() {
                 if ticked {
                     self.selected.insert(i.hash.clone());
                 } else {
                     self.selected.remove(&i.hash);
                 }
             }
-            let e = ff::emblem(ui, &letter, 58.0, active)
-                .on_hover_text(if done { "Fully downloaded, seeding. Click to show files." } else { "Show files" });
+            let e = ff::emblem(ui, &letter, 40.0, active)
+                .on_hover_text(if done { "Fully downloaded. Click for files and details." } else { "Click for files and details." });
             if done {
                 ff::done_check(ui, e.rect);
             }
@@ -400,145 +423,90 @@ impl App {
                 self.popup_tab = 0;
                 self.core.send(Cmd::WatchFiles(Some(i.hash.clone())));
             }
-            ui.add_space(8.0);
+            ui.add_space(6.0);
             ui.vertical(|ui| {
+                // Line 1: name, status, size and the two buttons.
                 ui.horizontal(|ui| {
                     let max_name = (ui.available_width() - 330.0).max(120.0);
                     ui.scope(|ui| {
                         ui.set_max_width(max_name);
-                        ui.add(egui::Label::new(RichText::new(&i.name).color(TEXT()).size(18.0).strong()).truncate())
-                            .on_hover_text(&i.name);
+                        ui.add(egui::Label::new(RichText::new(&i.name).color(TEXT()).size(16.0).strong()).truncate()).on_hover_text(&i.name);
                     });
-                    ui.add_space(8.0);
-                    ff::title(ui, status, 13.0, color);
+                    ui.add_space(6.0);
+                    ff::title(ui, status, 12.0, color);
                     if i.is_private {
-                        ff::tag(ui, "PRIVATE", WARN()).on_hover_text(
-                            "From a private tracker: DHT, peer exchange and local discovery are off for it, and it only talks to its own tracker.",
-                        );
+                        ff::tag(ui, "PRIVATE", WARN()).on_hover_text("From a private tracker: it only talks to its own tracker.");
                     }
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        let size = egui::vec2(76.0, 24.0);
-                        egui::containers::menu::MenuButton::from_button(egui::Button::new("More").min_size(size))
-                            .ui(ui, |ui| self.torrent_menu(ui, t));
+                        let size = egui::vec2(84.0, 24.0);
+                        egui::containers::menu::MenuButton::from_button(egui::Button::new("More").min_size(size)).ui(ui, |ui| self.torrent_menu(ui, t));
+                        // One button that does the obvious thing for this torrent's state.
+                        let queued = i.paused && i.auto_managed && i.error.is_empty();
+                        let (label, tip, cmd) = if queued {
+                            ("Start now", "Waiting its turn in the queue. Start it now anyway.", Cmd::ForceStart(i.hash.clone()))
+                        } else if i.paused {
+                            ("Resume", "Pick up where it left off.", Cmd::Resume(i.hash.clone()))
+                        } else {
+                            ("Pause", "Pause this torrent.", Cmd::Pause(i.hash.clone()))
+                        };
+                        if ui.add(egui::Button::new(label).min_size(size)).on_hover_text(tip).clicked() {
+                            self.core.send(cmd);
+                        }
                         ui.label(dim(&human_bytes(i.total_wanted)));
                     });
                 });
-                let mut counts_x = 0.0;
+                // Line 2: progress, then speed / time left / seeders.
                 ui.horizontal(|ui| {
-                    let done = i.state >= 3;
-                    ff::stat_label(ui, if done { "UP" } else { "DL" });
                     let colors = if i.paused { GREY } else if done { GREEN } else { BLUE };
-                    let bw = (ui.available_width() - 330.0).clamp(80.0, 320.0);
+                    let bw = (ui.available_width() * 0.42).clamp(90.0, 360.0);
                     ff::stat_bar(ui, i.progress, bw, colors.0, colors.1);
-                    ff::title(ui, &format!("{:.0}%", i.progress * 100.0), 14.0, TEXT());
-                    ui.add_space(6.0);
+                    ui.label(RichText::new(format!("{:.0}%", i.progress * 100.0)).color(TEXT()).strong());
+                    let mut bits: Vec<String> = Vec::new();
+                    if !i.error.is_empty() {
+                        ui.colored_label(BAD(), &i.error);
+                    } else if !i.paused && !held {
+                        if done {
+                            bits.push(format!("Up {}", human_rate(i.ul_rate as i64)));
+                            bits.push(format!("Ratio {:.2}", t.ratio));
+                        } else {
+                            bits.push(format!("Down {}", human_rate(i.dl_rate as i64)));
+                            if let Some(eta) = t.eta_secs {
+                                bits.push(format!("{} left", human_eta(eta)));
+                            }
+                        }
+                    } else if done {
+                        bits.push(format!("Ratio {:.2}", t.ratio));
+                    }
                     let disp = self.settings.seeder_display;
                     let fmt = |c: i32, s: i32| match disp {
                         SeederDisplay::Both => format!("{c} ({})", s.max(0)),
                         SeederDisplay::Connected => c.to_string(),
                         SeederDisplay::Swarm => s.max(0).to_string(),
                     };
-                    counts_x = ff::stat_label(ui, "S").on_hover_text("Seeders: connected (in the whole swarm)").rect.left();
-                    ui.label(RichText::new(fmt(i.num_seeds, i.swarm_seeds)).strong());
-                    ff::stat_label(ui, "L").on_hover_text("Leechers: connected (in the whole swarm)");
-                    ui.label(RichText::new(fmt(i.num_peers, i.swarm_peers)).strong());
-                    ff::stat_label(ui, "RATIO").on_hover_text("Uploaded ÷ downloaded");
-                    ui.label(RichText::new(format!("{:.2}", t.ratio)).strong());
-                });
-                // Start / Pause / Stop, lined up under the S, L and RATIO counts.
-                ui.add_space(3.0);
-                ui.horizontal(|ui| {
-                    ui.add_space((counts_x - ui.cursor().left()).max(0.0));
-                    self.transport_buttons(ui, t);
-                });
-                ui.horizontal(|ui| {
-                    let (dr, ur) = if held { (0, 0) } else { (i.dl_rate as i64, i.ul_rate as i64) };
-                    let mut bits = vec![format!("Down {}", human_rate(dr)), format!("Up {}", human_rate(ur))];
-                    if let Some(eta) = t.eta_secs {
-                        bits.push(format!("ETA {}", human_eta(eta)));
+                    if !i.paused {
+                        bits.push(format!("S {}  L {}", fmt(i.num_seeds, i.swarm_seeds), fmt(i.num_peers, i.swarm_peers)));
                     }
-                    if i.sequential {
-                        bits.push("In order".into());
-                    }
-                    if !i.error.is_empty() {
-                        bits.push(i.error.clone());
-                    }
-                    ui.label(dim(&bits.join("   ")));
-                    if self.settings.health_bar && i.has_metadata {
-                        ui.add_space(8.0);
-                        let copies = i.distributed_copies.max(0.0);
-                        ff::stat_label(ui, "HEALTH");
-                        ff::stat_bar(ui, (copies / 5.0).min(1.0), 70.0, GOLD.0, GOLD.1).on_hover_text(format!(
-                            "{copies:.1} full copies among connected peers. Under 1 means the torrent may never finish."
-                        ));
-                    }
-                    if advanced && t.seed_goal_met {
-                        ff::tag(ui, "GOAL MET", GOOD());
+                    if !bits.is_empty() {
+                        ui.label(dim(&bits.join("  ·  "))).on_hover_text("S = seeders, L = leechers: connected (in the whole swarm)");
                     }
                 });
             });
         });
         row.response.context_menu(|ui| self.torrent_menu(ui, t));
-        ui.add_space(4.0);
+        ui.add_space(2.0);
         ff::divider(ui);
         row.response.rect
-    }
-
-    fn transport_buttons(&mut self, ui: &mut egui::Ui, t: &TorrentView) {
-        let i = &t.info;
-        let h = i.hash.clone();
-        let running = !i.paused;
-        let queued = i.paused && i.auto_managed && !t.stopped;
-        let paused = i.paused && !i.auto_managed && !t.stopped;
-        ui.spacing_mut().item_spacing.x = 8.0;
-
-        let start_tip = if running {
-            "Running."
-        } else if queued {
-            "Waiting in the queue. Start it now anyway, past the active-torrent limit."
-        } else {
-            "Start it again. It picks up right where it left off."
-        };
-        if transport_button(ui, Transport::Start, running, start_tip).clicked() {
-            self.core.send(if queued { Cmd::ForceStart(h.clone()) } else { Cmd::Resume(h.clone()) });
-        }
-        let pause_tip = if paused {
-            "Paused."
-        } else {
-            "Pause once the pieces it's in the middle of are done, so nothing is wasted."
-        };
-        if transport_button(ui, Transport::Pause, paused, pause_tip).clicked() {
-            self.core.send(Cmd::Pause(h.clone()));
-        }
-        let stop_tip = if t.stopped {
-            "Stopped."
-        } else {
-            "Stop right now: drops every connection immediately and closes its files. Shows as STOPPED until you start it."
-        };
-        if transport_button(ui, Transport::Stop, t.stopped, stop_tip).clicked() {
-            self.core.send(Cmd::Stop(h));
-        }
     }
 
     /// Tick boxes for bulk actions: select all / finished / none, and the
     /// same actions as a torrent's More menu, for every ticked torrent.
     fn selection_bar(&mut self, ui: &mut egui::Ui, list: &[TorrentView]) {
         ui.horizontal(|ui| {
-            let shown: Vec<&String> = list.iter().map(|t| &t.info.hash).collect();
-            let all = shown.iter().all(|h| self.selected.contains(*h));
-            let mut tick = all;
-            if ui.checkbox(&mut tick, "").on_hover_text(if all { "Clear selection" } else { "Select all shown" }).changed() {
-                if tick {
-                    self.selected.extend(shown.iter().map(|h| (*h).clone()));
-                } else {
-                    self.selected.clear();
-                }
-            }
             let n = self.selected.len();
             if n > 0 {
                 ui.label(RichText::new(format!("{n} selected")).color(TEXT()).strong());
             }
-            let finished: Vec<String> = list.iter().filter(|t| t.info.state >= 4 && t.info.error.is_empty()).map(|t| t.info.hash.clone()).collect();
+            let finished: Vec<String> = list.iter().filter(|t| t.info.state >= 3 && t.info.error.is_empty()).map(|t| t.info.hash.clone()).collect();
             if !finished.is_empty()
                 && ui
                     .button(format!("Select finished ({})", finished.len()))
@@ -581,10 +549,6 @@ impl App {
         }
         if ui.button("Pause").clicked() {
             each(self, &|h| Cmd::Pause(h));
-            ui.close();
-        }
-        if ui.button("Stop").clicked() {
-            each(self, &|h| Cmd::Stop(h));
             ui.close();
         }
         ui.separator();
@@ -879,133 +843,124 @@ impl App {
 
     // ===================================================================== Add
 
-    pub(super) fn page_add(&mut self, ui: &mut egui::Ui) {
-        page_title(ui, "Add", "Paste a magnet link or open a .torrent file. You can also drop .torrent files anywhere on this window.");
-        egui::ScrollArea::vertical().id_salt("add").auto_shrink([false, false]).show(ui, |ui| {
-            if self.add.preview.is_none() {
-                field(ui, "MAGNET LINK", "Starts with magnet:?xt=", |ui| {
-                    ui.horizontal(|ui| {
-                        ui.add(
-                            egui::TextEdit::singleline(&mut self.add.magnet)
-                                .hint_text("magnet:?xt=urn:btih:…")
-                                .desired_width((ui.available_width() - 80.0).max(200.0)),
-                        );
-                        if ui.button("Paste").clicked() {
-                            if let Ok(t) = arboard::Clipboard::new().and_then(|mut c| c.get_text()) {
-                                self.add.magnet = t.trim().to_string();
+    /// The Add window: a magnet link or a .torrent file, then where to save it.
+    pub(super) fn add_dialog(&mut self, ctx: &egui::Context) {
+        if !self.add_open {
+            return;
+        }
+        let typing = ctx.egui_wants_keyboard_input();
+        if !typing && ctx.input(|i| i.key_pressed(egui::Key::Escape)) && self.picking.is_none() {
+            self.add_open = false;
+            return;
+        }
+        let picking = self.picking.is_some();
+        let mut close = false;
+        let mut add_clicked = false;
+        let mut choose_file = false;
+        // Dim what's behind so the window reads as the thing to deal with.
+        // (Its own area, so it also blocks clicks on what's behind.)
+        let screen = ctx.content_rect();
+        egui::Area::new(egui::Id::new("add_dim")).order(egui::Order::Foreground).fixed_pos(screen.min).show(ctx, |ui| {
+            let (r, _) = ui.allocate_exact_size(screen.size(), egui::Sense::click());
+            ui.painter().rect_filled(r, 0.0, Color32::from_black_alpha(140));
+        });
+        egui::Area::new(egui::Id::new("add_dialog"))
+            .order(egui::Order::Foreground)
+            .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
+            .show(ctx, |ui| {
+                ff::window(ui, |ui| {
+                    ui.set_width(560.0);
+                    ff::title(ui, "Add a torrent", 22.0, TEXT());
+                    ui.add_space(6.0);
+                    if let Some((_, pv, wanted)) = self.add.preview.as_mut() {
+                        ui.horizontal(|ui| {
+                            ff::title(ui, &pv.name, 17.0, TEXT());
+                            if pv.is_private {
+                                ff::tag(ui, "PRIVATE", WARN());
                             }
+                        });
+                        let picked: i64 = pv.files.iter().zip(wanted.iter()).filter(|(_, w)| **w).map(|(f, _)| f.size).sum();
+                        ui.label(dim(&format!("{} files · {} of {} selected", pv.files.len(), human_bytes(picked), human_bytes(pv.total_size))));
+                        if pv.files.len() > 1 {
+                            ui.horizontal(|ui| {
+                                if ui.small_button("All").clicked() {
+                                    wanted.iter_mut().for_each(|w| *w = true);
+                                }
+                                if ui.small_button("None").clicked() {
+                                    wanted.iter_mut().for_each(|w| *w = false);
+                                }
+                            });
+                            egui::ScrollArea::vertical().id_salt("add_files").max_height(240.0).show(ui, |ui| {
+                                for (f, w) in pv.files.iter().zip(wanted.iter_mut()).take(3000) {
+                                    ui.horizontal(|ui| {
+                                        ui.checkbox(w, RichText::new(&f.path).color(TEXT()));
+                                        ui.with_layout(Layout::right_to_left(Align::Center), |ui| ui.label(dim(&human_bytes(f.size))));
+                                    });
+                                }
+                            });
+                        }
+                    } else {
+                        ui.label(dim("Paste a magnet link, or choose a .torrent file. You can also drop .torrent files on the window."));
+                        ui.add_space(4.0);
+                        ui.horizontal(|ui| {
+                            let r = ui.add(egui::TextEdit::singleline(&mut self.add.magnet).hint_text("magnet:?xt=urn:btih:…").desired_width(400.0));
+                            if self.add.magnet.is_empty() && !r.has_focus() && ui.memory(|m| m.focused().is_none()) {
+                                r.request_focus();
+                            }
+                            if ui.button("Paste").clicked() {
+                                if let Ok(t) = arboard::Clipboard::new().and_then(|mut c| c.get_text()) {
+                                    self.add.magnet = t.trim().to_string();
+                                }
+                            }
+                        });
+                        if !self.add.magnet.trim().is_empty() && !self.add.magnet.trim().starts_with("magnet:") {
+                            ui.colored_label(WARN(), "Magnet links start with magnet:");
+                        }
+                        ui.add_space(4.0);
+                        if ui.add_enabled(!picking, egui::Button::new("Choose .torrent file…")).clicked() {
+                            choose_file = true;
+                        }
+                    }
+                    if let Some(e) = &self.add.error {
+                        ui.colored_label(BAD(), e);
+                    }
+                    ui.add_space(10.0);
+                    let can_add = self.add.preview.is_some() || self.add.magnet.trim().starts_with("magnet:");
+                    ui.horizontal(|ui| {
+                        let label = if picking { "Choose a folder…" } else { "Add" };
+                        let mut text = RichText::new(label).size(18.0).strong();
+                        let mut button = egui::Button::new(text.clone()).min_size(egui::vec2(160.0, 38.0));
+                        if can_add && !picking {
+                            text = text.color(ff::pal().on_accent);
+                            button = egui::Button::new(text).fill(ff::pal().accent).min_size(egui::vec2(160.0, 38.0));
+                        }
+                        if ui
+                            .add_enabled(can_add && !picking, button)
+                            .on_hover_text("Asks where to save it, starting in the last folder you picked.")
+                            .clicked()
+                        {
+                            add_clicked = true;
+                        }
+                        if ui.add(egui::Button::new("Cancel").min_size(egui::vec2(90.0, 38.0))).clicked() {
+                            close = true;
                         }
                     });
                 });
-                ui.add_space(8.0);
-                field(ui, ".TORRENT FILE", "Or drop one anywhere on this window", |ui| {
-                    if ui.button("Choose .torrent file…").clicked() {
-                        if let Some(p) = rfd::FileDialog::new().add_filter("Torrent", &["torrent"]).pick_file() {
-                            match std::fs::read(&p) {
-                                Ok(d) => self.preview_bytes(d),
-                                Err(e) => self.add.error = Some(e.to_string()),
-                            }
-                        }
-                    }
-                });
-            } else if let Some((_, pv, wanted)) = self.add.preview.as_mut() {
-                ui.horizontal(|ui| {
-                    ff::title(ui, &pv.name, 19.0, TEXT());
-                    if pv.is_private {
-                        ff::tag(ui, "PRIVATE", WARN());
-                    }
-                });
-                let picked: i64 = pv.files.iter().zip(wanted.iter()).filter(|(_, w)| **w).map(|(f, _)| f.size).sum();
-                ui.label(dim(&format!("{} files · {} selected of {}", pv.files.len(), human_bytes(picked), human_bytes(pv.total_size))));
-                ui.horizontal(|ui| {
-                    if ui.small_button("Select all").clicked() {
-                        wanted.iter_mut().for_each(|w| *w = true);
-                    }
-                    if ui.small_button("Select none").clicked() {
-                        wanted.iter_mut().for_each(|w| *w = false);
-                    }
-                });
-                egui::ScrollArea::vertical().id_salt("add_files").max_height(220.0).show(ui, |ui| {
-                    for (f, w) in pv.files.iter().zip(wanted.iter_mut()).take(3000) {
-                        ui.horizontal(|ui| {
-                            ui.checkbox(w, RichText::new(&f.path).color(TEXT()));
-                            ui.with_layout(Layout::right_to_left(Align::Center), |ui| ui.label(dim(&human_bytes(f.size))));
-                        });
-                    }
-                });
-            }
-
-            section(ui, "Options");
-            row(ui, "Start right away", "Off = add it paused so you can start it later.", |ui| {
-                let mut on = !self.add.choice.paused;
-                if toggle(ui, &mut on) {
-                    self.add.choice.paused = !on;
-                }
             });
-            row(ui, "Download in order", "Lets you start watching a video before it's done. Slightly worse for the swarm.", |ui| {
-                toggle(ui, &mut self.add.choice.sequential);
-            });
-            row(ui, "First and last pieces first", "Helps video players start sooner.", |ui| {
-                toggle(ui, &mut self.add.choice.first_last);
-            });
-            if self.settings.advanced_mode {
-                row(ui, "Skip hash check", "Only for files you already have complete and trust. Lifestream will assume they're right.", |ui| {
-                    toggle(ui, &mut self.add.choice.skip_check);
-                });
-            }
-
-            if let Some(e) = &self.add.error {
-                ui.colored_label(BAD(), e);
-            }
-            ui.add_space(12.0);
-            let has_preview = self.add.preview.is_some();
-            let can_add = has_preview || self.add.magnet.trim().starts_with("magnet:");
-            let big = egui::Button::new(RichText::new("Add to party…").size(24.0).color(if can_add { GOOD() } else { TEXT_DIM() }).strong())
-                .min_size(egui::vec2(0.0, 64.0));
-            let add_clicked = ui
-                .with_layout(Layout::top_down_justified(Align::Center), |ui| {
-                    ui.add_enabled(can_add, big).on_hover_text("Asks where to save it, starting in the last folder you picked.").on_disabled_hover_text("Paste a magnet link or choose a .torrent file first.").clicked()
-                })
-                .inner;
-            ui.add_space(6.0);
-            ui.horizontal(|ui| {
-                let picked = if add_clicked { self.ask_save_folder("") } else { None };
-                if let Some(save_path) = picked {
-                    let save_path = Some(save_path);
-                    let category = String::new();
-                    let choice = self.add.choice;
-                    if let Some((data, pv, wanted)) = self.add.preview.take() {
-                        let priorities = if wanted.iter().all(|w| *w) {
-                            None
-                        } else {
-                            // Indexed by the torrent's real file index (padding files are hidden).
-                            let len = pv.files.iter().map(|f| f.index as usize + 1).max().unwrap_or(0);
-                            let mut p = vec![4u8; len];
-                            for (f, w) in pv.files.iter().zip(wanted.iter()) {
-                                if !*w {
-                                    p[f.index as usize] = 0;
-                                }
-                            }
-                            Some(p)
-                        };
-                        self.core.send(Cmd::AddTorrent { data, category, choice, priorities, save_path });
-                    } else {
-                        self.core.send(Cmd::AddMagnet { uri: self.add.magnet.trim().to_string(), category, choice, save_path });
-                        self.add.magnet.clear();
-                    }
-                    self.add.error = None;
-                    self.page = Page::Torrents;
-                }
-                if (has_preview || !self.add.magnet.is_empty()) && ui.button("Cancel").clicked() {
-                    self.add.preview = None;
-                    self.add.magnet.clear();
-                    self.add.error = None;
-                }
-                if !can_add && !self.add.magnet.is_empty() {
-                    ui.colored_label(WARN(), "Magnet links start with magnet:");
-                }
-            });
-        });
+        // Keep the window above its dimmed backdrop.
+        ctx.move_to_top(egui::LayerId::new(egui::Order::Foreground, egui::Id::new("add_dialog")));
+        if choose_file {
+            self.ask_torrent_file(ctx);
+        }
+        if add_clicked {
+            self.ask_save_folder(ctx, super::Pick::AddWindow);
+        }
+        if close {
+            self.add_open = false;
+            self.add.preview = None;
+            self.add.magnet.clear();
+            self.add.error = None;
+        }
     }
 
     // ===================================================================== RSS
@@ -1185,74 +1140,10 @@ impl App {
         });
     }
 
-    // ===================================================================== Speed
+    // ===================================================================== Connection
 
-    pub(super) fn page_speed(&mut self, ui: &mut egui::Ui) {
-        page_title(ui, "Speed", "Bandwidth limits and how many connections to keep open. 0 means no limit.");
-        let adv = self.settings.advanced_mode;
-        let s = &mut self.settings;
-        let mut changed = false;
-        egui::ScrollArea::vertical().id_salt("speed").auto_shrink([false, false]).show(ui, |ui| {
-            row(ui, "Download limit", "Total for all torrents.", |ui| changed |= rate(ui, &mut s.dl_limit_kb).changed());
-            row(ui, "Upload limit", "Total for all torrents. Leaving some upload free keeps your browsing snappy.", |ui| {
-                changed |= rate(ui, &mut s.ul_limit_kb).changed()
-            });
-
-            section(ui, "Turtle mode");
-            row(ui, "Turtle mode now", "Switch to the slower limits below right away. Also in the tray menu.", |ui| {
-                changed |= toggle(ui, &mut s.turtle_manual)
-            });
-            row(ui, "Turtle download", "", |ui| changed |= rate(ui, &mut s.turtle_dl_kb).changed());
-            row(ui, "Turtle upload", "", |ui| changed |= rate(ui, &mut s.turtle_ul_kb).changed());
-            row(ui, "Use turtle limits on a schedule", "Slows things down while you game or stream.", |ui| {
-                changed |= toggle(ui, &mut s.turtle_schedule)
-            });
-            if s.turtle_schedule {
-                row(ui, "From / to", "24-hour time, like 18:00. Overnight works too (22:00 to 06:00).", |ui| {
-                    changed |= ui.add(egui::TextEdit::singleline(&mut s.turtle_to).desired_width(60.0)).changed();
-                    ui.label("to");
-                    changed |= ui.add(egui::TextEdit::singleline(&mut s.turtle_from).desired_width(60.0)).changed();
-                });
-                row(ui, "Days", "", |ui| {
-                    for (i, d) in ["Sun", "Sat", "Fri", "Thu", "Wed", "Tue", "Mon"].iter().enumerate() {
-                        let idx = 6 - i;
-                        changed |= ui.checkbox(&mut s.turtle_days[idx], *d).changed();
-                    }
-                });
-            }
-
-            section(ui, "Queue");
-            row(ui, "Downloads at once", "Others wait their turn.", |ui| {
-                changed |= ui.add(egui::DragValue::new(&mut s.active_downloads).range(1..=50)).changed()
-            });
-            row(ui, "Seeds at once", "Finished torrents that keep sharing at the same time.", |ui| {
-                changed |= ui.add(egui::DragValue::new(&mut s.active_seeds).range(0..=100)).changed()
-            });
-            if adv {
-                section(ui, "Connections");
-                row(ui, "Max peers (all torrents)", "More isn't always faster; home routers can choke on too many.", |ui| {
-                    changed |= ui.add(egui::DragValue::new(&mut s.max_peers_global).range(20..=5000)).changed()
-                });
-                row(ui, "Max peers per torrent", "", |ui| {
-                    changed |= ui.add(egui::DragValue::new(&mut s.max_peers_torrent).range(5..=1000)).changed()
-                });
-                row(ui, "Upload slots per torrent", "How many peers each torrent uploads to at once.", |ui| {
-                    changed |= ui.add(egui::DragValue::new(&mut s.upload_slots_torrent).range(1..=200)).changed()
-                });
-                row(ui, "Upload slots (all torrents)", "", |ui| {
-                    changed |= ui.add(egui::DragValue::new(&mut s.upload_slots_global).range(1..=500)).changed()
-                });
-            }
-        });
-        if changed {
-            self.changed();
-        }
-    }
-
-    // ===================================================================== Network
-
-    pub(super) fn page_network(&mut self, ui: &mut egui::Ui) {
-        page_title(ui, "Network", "Which adapter torrents use, and what happens if your VPN drops.");
+    pub(super) fn page_connection(&mut self, ui: &mut egui::Ui) {
+        page_title(ui, "Connection", "Which network torrents use, and what happens if your VPN drops.");
         let (prot, title, detail) = self.protection();
         ui.horizontal(|ui| {
             ff::badge(ui, prot, 30.0);
@@ -1271,11 +1162,15 @@ impl App {
         self.refresh_adapters(false);
         let adv = self.settings.advanced_mode;
         let adapters = self.adapters.clone();
+        let restart = self.snap.restart_needed;
+        let anon_eff = self.snap.anonymous_effective;
+        let bl_status = self.snap.blocklist_status.clone();
         let mut changed = false;
         let mut refresh = false;
-        egui::ScrollArea::vertical().id_salt("net").auto_shrink([false, false]).show(ui, |ui| {
+        let mut update_bl = false;
+        egui::ScrollArea::vertical().id_salt("conn").auto_shrink([false, false]).show(ui, |ui| {
             let s = &mut self.settings;
-            row(ui, "Network adapter", "Pick your VPN here. Lifestream binds to it so torrent traffic can't use your normal connection.", |ui| {
+            row(ui, "Network adapter", "Pick your VPN. Torrents only use this adapter, so they can't fall back to your normal connection.", |ui| {
                 if ui.small_button("Refresh").clicked() {
                     refresh = true;
                 }
@@ -1294,66 +1189,24 @@ impl App {
             if s.adapter.is_empty() && s.kill_switch {
                 ui.colored_label(WARN(), "The kill switch needs an adapter to watch. Until you pick one, downloads stay paused.");
             }
-            row(ui, "Only use this adapter", "Torrent traffic can never fall back to your normal connection.", |ui| {
-                changed |= toggle(ui, &mut s.bind_only)
-            });
+            // One switch: only use the adapter, and pause everything if it drops.
             w::row_tagged(
                 ui,
                 "Kill switch",
                 Some(("ON BY DEFAULT", GOOD())),
-                "If the adapter goes down, pause everything and don't resume until it's back. Also holds downloads if Lifestream starts before your VPN connects.",
-                |ui| changed |= w::toggle_labeled(ui, &mut s.kill_switch, "ARMED", "OFF"),
+                "Torrents only use the adapter above. If it drops, everything pauses until it's back, including while your VPN is still connecting at startup.",
+                |ui| {
+                    let c = w::toggle_labeled(ui, &mut s.kill_switch, "ARMED", "OFF");
+                    if c {
+                        s.bind_only = s.kill_switch;
+                    }
+                    changed |= c;
+                },
             );
-            if adv {
-                row(ui, "Disable IPv6", "Many VPNs only tunnel IPv4, so IPv6 can leak your real address.", |ui| {
-                    changed |= toggle(ui, &mut s.disable_ipv6)
-                });
-            }
 
-            section(ui, "Port");
-            row(ui, "Listening port", "Peers connect to you on this port. A forwarded, open port means faster downloads.", |ui| {
-                if ui.button("Random").clicked() {
-                    s.listen_port = rand::random_range(49160..65000);
-                    changed = true;
-                }
-                changed |= ui.add(egui::DragValue::new(&mut s.listen_port).range(1024..=65535)).changed();
-            });
-            row(ui, "Get port from VPN (NAT-PMP)", "For VPNs with port forwarding, like ProtonVPN. Lifestream switches to the port your VPN gives it.", |ui| {
-                let c = toggle(ui, &mut s.natpmp);
-                if c {
-                    s.follow_vpn_port = s.natpmp;
-                }
-                changed |= c;
-            });
-            if adv {
-                row(ui, "UPnP on home router", "Leave off while on a VPN: it opens a port on your real connection.", |ui| {
-                    changed |= toggle(ui, &mut s.upnp)
-                });
-            }
+            w::section_help(ui, "Leak check", "Asks a lookup site where torrent traffic comes out, the same way the torrent engine connects. Runs when Lifestream opens, when the VPN reconnects, and every 30 minutes.");
             let sn = &self.snap;
-            ui.add_space(4.0);
-            ui.horizontal_wrapped(|ui| {
-                ff::stat_label(ui, "LISTENING");
-                if sn.listen_port > 0 {
-                    ff::title(ui, &sn.listen_port.to_string(), 15.0, GOOD());
-                } else {
-                    ff::title(ui, "—", 15.0, TEXT_DIM());
-                }
-                if sn.external_port > 0 {
-                    ff::stat_label(ui, "VPN PORT");
-                    ff::title(ui, &sn.external_port.to_string(), 15.0, GOOD());
-                }
-                ff::stat_label(ui, "INCOMING PEERS");
-                let (t, c) = if sn.incoming_seen { ("SEEN · PORT IS OPEN", GOOD()) } else { ("NONE YET", WARN()) };
-                ff::title(ui, t, 15.0, c).on_hover_text("Once a peer connects to you, your port is reachable. It can take a few minutes with active torrents.");
-            });
-            if !sn.listen_error.is_empty() {
-                ui.colored_label(BAD(), &sn.listen_error);
-            }
-
-            w::section_help(ui, "Leak check", "Asks a lookup site where your traffic comes out: once over your normal connection, and once from the adapter torrents use, exactly the way the torrent engine connects. Runs on its own when Lifestream opens, when the VPN reconnects, and every 30 minutes.");
-            let adapter_name = self.settings.adapter.clone();
-            let (prot, prot_title, _) = self.protection();
+            let adapter_name = s.adapter.clone();
             let summary = match sn.leak.as_ref().and_then(|l| l.torrent.as_ref()) {
                 Some(Ok(t)) if !t.org.is_empty() => format!("Torrents exit at {} ({})", t.ip, t.org),
                 Some(Ok(t)) => format!("Torrents exit at {}", t.ip),
@@ -1368,7 +1221,7 @@ impl App {
                     ff::Badge::Warn => WARN(),
                     ff::Badge::Bad => BAD(),
                 };
-                ff::title(ui, &prot_title, 15.0, color);
+                ff::title(ui, &title, 15.0, color);
                 ui.label(dim(&summary));
             }) {
                 self.leak_open = !self.leak_open;
@@ -1391,28 +1244,52 @@ impl App {
                     "This adapter is a private-network tool, not an internet VPN. Unless it's set to use an exit node, torrents bound to it can't reach peers at all.",
                 );
             }
-        });
-        if refresh {
-            self.refresh_adapters(true);
-        }
-        if changed {
-            self.changed();
-        }
-    }
 
-    // ===================================================================== Privacy
+            if !adv {
+                ui.add_space(10.0);
+                ui.label(dim("Port, encryption, proxy and other options are in Advanced mode (Settings › Mode)."));
+                return;
+            }
+            let s = &mut self.settings;
 
-    pub(super) fn page_privacy(&mut self, ui: &mut egui::Ui) {
-        page_title(ui, "Privacy", "Settings that make your connections harder to see or fingerprint.");
-        let adv = self.settings.advanced_mode;
-        let restart = self.snap.restart_needed;
-        let anon_eff = self.snap.anonymous_effective;
-        let bl_status = self.snap.blocklist_status.clone();
-        let s = &mut self.settings;
-        let mut changed = false;
-        let mut update_bl = false;
-        egui::ScrollArea::vertical().id_salt("privacy").auto_shrink([false, false]).show(ui, |ui| {
-            row(ui, "Encryption", "Hides torrent traffic from your ISP's throttling. It doesn't hide your IP; that's the VPN's job. Require can mean fewer peers.", |ui| {
+            section(ui, "Port");
+            row(ui, "Listening port", "Peers connect to you on this port. An open, forwarded port means faster downloads.", |ui| {
+                if ui.button("Random").clicked() {
+                    s.listen_port = rand::random_range(49160..65000);
+                    changed = true;
+                }
+                changed |= ui.add(egui::DragValue::new(&mut s.listen_port).range(1024..=65535)).changed();
+            });
+            row(ui, "Get port from VPN (NAT-PMP)", "For VPNs with port forwarding, like ProtonVPN.", |ui| {
+                let c = toggle(ui, &mut s.natpmp);
+                if c {
+                    s.follow_vpn_port = s.natpmp;
+                }
+                changed |= c;
+            });
+            row(ui, "UPnP on home router", "Leave off while on a VPN: it opens a port on your real connection.", |ui| changed |= toggle(ui, &mut s.upnp));
+            ui.add_space(4.0);
+            ui.horizontal_wrapped(|ui| {
+                ff::stat_label(ui, "LISTENING");
+                if sn.listen_port > 0 {
+                    ff::title(ui, &sn.listen_port.to_string(), 15.0, GOOD());
+                } else {
+                    ff::title(ui, "—", 15.0, TEXT_DIM());
+                }
+                if sn.external_port > 0 {
+                    ff::stat_label(ui, "VPN PORT");
+                    ff::title(ui, &sn.external_port.to_string(), 15.0, GOOD());
+                }
+                ff::stat_label(ui, "INCOMING PEERS");
+                let (t, c) = if sn.incoming_seen { ("SEEN · PORT IS OPEN", GOOD()) } else { ("NONE YET", WARN()) };
+                ff::title(ui, t, 15.0, c).on_hover_text("Once a peer connects to you, your port is reachable. It can take a few minutes.");
+            });
+            if !sn.listen_error.is_empty() {
+                ui.colored_label(BAD(), &sn.listen_error);
+            }
+
+            section(ui, "Privacy");
+            row(ui, "Encryption", "Hides torrent traffic from ISP throttling. It doesn't hide your IP; that's the VPN's job. Require can mean fewer peers.", |ui| {
                 let names = ["Allow (plain only)", "Prefer", "Require"];
                 egui::ComboBox::from_id_salt("enc").selected_text(names[s.encryption.clamp(0, 2) as usize]).show_ui(ui, |ui| {
                     for (i, n) in names.iter().enumerate() {
@@ -1422,64 +1299,66 @@ impl App {
             });
             row(ui, "Anonymous mode", "Hides the app's name and version from peers and trackers.", |ui| changed |= toggle(ui, &mut s.anonymous_mode));
             if s.anonymous_mode && !anon_eff {
-                ui.label(dim("Paused right now because a private torrent is active (see Private trackers)."));
+                ui.label(dim("Paused right now because a private torrent is active."));
             }
+            row(ui, "Disable IPv6", "Many VPNs only tunnel IPv4, so IPv6 can leak your real address.", |ui| changed |= toggle(ui, &mut s.disable_ipv6));
 
-            w::section_help(ui, "Private trackers", "Torrents marked private automatically skip DHT, peer exchange and local discovery, and only talk to their own tracker. They get a PRIVATE tag in your list.");
-            row(ui, "Honor tracker seeding rules", "Private torrents ignore your stop-seeding goal until they've seeded for the minimum time below.", |ui| {
+            w::section_help(ui, "Private trackers", "Private torrents automatically skip DHT, peer exchange and local discovery, and only talk to their own tracker.");
+            row(ui, "Honor tracker seeding rules", "Private torrents keep seeding until the minimum time below, whatever your stop-seeding goal.", |ui| {
                 changed |= toggle(ui, &mut s.private_honor_seed)
             });
             if s.private_honor_seed {
-                row(ui, "Minimum seed time", "Most private trackers ask for 72 hours or more. Check your tracker's rules.", |ui| {
+                row(ui, "Minimum seed time", "Most private trackers ask for 72 hours or more.", |ui| {
                     changed |= ui.add(egui::DragValue::new(&mut s.private_min_seed_hours).range(0.0..=2000.0).suffix(" h")).changed()
                 });
             }
-            row(ui, "Report real client name on private trackers", "Many private trackers ban apps they don't recognize, so anonymous mode turns off while a private torrent is active.", |ui| {
+            row(ui, "Report real client name on private trackers", "Many private trackers ban apps they don't recognize.", |ui| {
                 changed |= toggle(ui, &mut s.private_real_name)
             });
 
-            if adv {
-                section(ui, "Peer discovery");
-                row(ui, "DHT", "Finds peers without a tracker. Needed for most magnet links.", |ui| changed |= toggle(ui, &mut s.dht));
-                row(ui, "Peer exchange (PEX)", "Peers share other peers with you. Takes effect after a restart.", |ui| changed |= toggle(ui, &mut s.pex));
-                if restart {
-                    ui.colored_label(WARN(), "Restart Lifestream for the peer exchange change to apply.");
-                }
-                row(ui, "Local peer discovery", "Looks for peers on your home network. Keep off when using a VPN.", |ui| changed |= toggle(ui, &mut s.lsd));
-
-                section(ui, "Proxy");
-                row(ui, "Type", "Route connections through a proxy server, like a SOCKS5 proxy from your VPN provider.", |ui| {
-                    let names = ["None", "SOCKS5", "HTTP"];
-                    egui::ComboBox::from_id_salt("ptype").selected_text(names[s.proxy_type.clamp(0, 2) as usize]).show_ui(ui, |ui| {
-                        for (i, n) in names.iter().enumerate() {
-                            changed |= ui.selectable_value(&mut s.proxy_type, i as i32, *n).changed();
-                        }
-                    });
-                });
-                if s.proxy_type > 0 {
-                    row(ui, "Host and port", "", |ui| {
-                        changed |= ui.add(egui::DragValue::new(&mut s.proxy_port).range(1..=65535)).changed();
-                        changed |= ui.add(egui::TextEdit::singleline(&mut s.proxy_host).hint_text("proxy.example.net").desired_width(170.0)).changed();
-                    });
-                    row(ui, "Username and password", "Leave empty if the proxy doesn't need them.", |ui| {
-                        changed |= ui.add(egui::TextEdit::singleline(&mut s.proxy_pass).password(true).hint_text("password").desired_width(110.0)).changed();
-                        changed |= ui.add(egui::TextEdit::singleline(&mut s.proxy_user).hint_text("username").desired_width(110.0)).changed();
-                    });
-                    row(ui, "Send peer connections through proxy", "Without this, only tracker traffic uses the proxy.", |ui| changed |= toggle(ui, &mut s.proxy_peers));
-                    row(ui, "Send tracker traffic through proxy", "", |ui| changed |= toggle(ui, &mut s.proxy_trackers));
-                }
-
-                section(ui, "Blocklist");
-                row(ui, "Blocklist URL", "A list of IP ranges to refuse (P2P or DAT format, gzip is fine).", |ui| {
-                    if ui.button("Update").clicked() {
-                        update_bl = true;
-                    }
-                    changed |= ui.add(egui::TextEdit::singleline(&mut s.blocklist_url).hint_text("https://… (.p2p, .dat or .gz)").desired_width(230.0)).changed();
-                });
-                row(ui, "Update weekly", "", |ui| changed |= toggle(ui, &mut s.blocklist_auto));
-                ui.label(dim(if bl_status.is_empty() { "No blocklist loaded." } else { &bl_status }));
+            section(ui, "Peer discovery");
+            row(ui, "DHT", "Finds peers without a tracker. Needed for most magnet links.", |ui| changed |= toggle(ui, &mut s.dht));
+            row(ui, "Peer exchange (PEX)", "Peers share other peers with you. Takes effect after a restart.", |ui| changed |= toggle(ui, &mut s.pex));
+            if restart {
+                ui.colored_label(WARN(), "Restart Lifestream for the peer exchange change to apply.");
             }
+            row(ui, "Local peer discovery", "Looks for peers on your home network. Keep off on a VPN.", |ui| changed |= toggle(ui, &mut s.lsd));
+
+            section(ui, "Proxy");
+            row(ui, "Type", "Route connections through a proxy, like a SOCKS5 proxy from your VPN provider.", |ui| {
+                let names = ["None", "SOCKS5", "HTTP"];
+                egui::ComboBox::from_id_salt("ptype").selected_text(names[s.proxy_type.clamp(0, 2) as usize]).show_ui(ui, |ui| {
+                    for (i, n) in names.iter().enumerate() {
+                        changed |= ui.selectable_value(&mut s.proxy_type, i as i32, *n).changed();
+                    }
+                });
+            });
+            if s.proxy_type > 0 {
+                row(ui, "Host and port", "", |ui| {
+                    changed |= ui.add(egui::DragValue::new(&mut s.proxy_port).range(1..=65535)).changed();
+                    changed |= ui.add(egui::TextEdit::singleline(&mut s.proxy_host).hint_text("proxy.example.net").desired_width(170.0)).changed();
+                });
+                row(ui, "Username and password", "Leave empty if the proxy doesn't need them.", |ui| {
+                    changed |= ui.add(egui::TextEdit::singleline(&mut s.proxy_pass).password(true).hint_text("password").desired_width(110.0)).changed();
+                    changed |= ui.add(egui::TextEdit::singleline(&mut s.proxy_user).hint_text("username").desired_width(110.0)).changed();
+                });
+                row(ui, "Send peer connections through proxy", "Without this, only tracker traffic uses the proxy.", |ui| changed |= toggle(ui, &mut s.proxy_peers));
+                row(ui, "Send tracker traffic through proxy", "", |ui| changed |= toggle(ui, &mut s.proxy_trackers));
+            }
+
+            section(ui, "Blocklist");
+            row(ui, "Blocklist URL", "IP ranges to refuse (P2P or DAT format, gzip is fine).", |ui| {
+                if ui.button("Update").clicked() {
+                    update_bl = true;
+                }
+                changed |= ui.add(egui::TextEdit::singleline(&mut s.blocklist_url).hint_text("https://… (.p2p, .dat or .gz)").desired_width(230.0)).changed();
+            });
+            row(ui, "Update weekly", "", |ui| changed |= toggle(ui, &mut s.blocklist_auto));
+            ui.label(dim(if bl_status.is_empty() { "No blocklist loaded." } else { &bl_status }));
         });
+        if refresh {
+            self.refresh_adapters(true);
+        }
         if changed {
             self.changed();
         }
@@ -1494,72 +1373,25 @@ impl App {
         self.flush_settings(true);
     }
 
-    // ===================================================================== Seeding
+    // ===================================================================== Settings
 
-    pub(super) fn page_seeding(&mut self, ui: &mut egui::Ui) {
-        page_title(ui, "Seeding", "When to stop sharing, and how seeders and leechers are shown.");
-        let _adv = self.settings.advanced_mode;
-        let s = &mut self.settings;
-        let mut changed = false;
-        egui::ScrollArea::vertical().id_salt("seed").auto_shrink([false, false]).show(ui, |ui| {
-            row(ui, "Stop at ratio", "Ratio = uploaded ÷ downloaded. 2.0 means you've shared twice what you took. 0 = never stop.", |ui| {
-                changed |= ui.add(egui::DragValue::new(&mut s.ratio_limit).range(0.0..=100.0).speed(0.05).max_decimals(2)).changed()
-            });
-            row(ui, "Or after seeding for", "Whichever comes first. 0 = no time limit.", |ui| {
-                changed |= ui.add(egui::DragValue::new(&mut s.seed_hours).range(0.0..=10000.0).suffix(" h")).changed()
-            });
-            row(ui, "Then", "What happens when a torrent reaches its goal. If you resume it afterwards, it keeps seeding until you stop it.", |ui| {
-                let label = |a: SeedAction| match a {
-                    SeedAction::Pause => "Pause the torrent",
-                    SeedAction::Remove => "Remove it (keep files)",
-                    SeedAction::RemoveAndDelete => "Remove it and delete files",
-                };
-                egui::ComboBox::from_id_salt("then").selected_text(label(s.seed_action)).show_ui(ui, |ui| {
-                    for a in [SeedAction::Pause, SeedAction::Remove, SeedAction::RemoveAndDelete] {
-                        changed |= ui.selectable_value(&mut s.seed_action, a, label(a)).changed();
-                    }
-                });
-            });
-
-            section(ui, "Seeders vs. leechers");
-            row(ui, "Show as", "S 42 (180) means connected to 42 of 180 seeders in the swarm. Tip: sort the Torrents list by \"Seeders vs. leechers\" to spot torrents that are hard to find.", |ui| {
-                let label = |d: SeederDisplay| match d {
-                    SeederDisplay::Both => "Connected (swarm)",
-                    SeederDisplay::Connected => "Connected only",
-                    SeederDisplay::Swarm => "Swarm only",
-                };
-                egui::ComboBox::from_id_salt("sdisp").selected_text(label(s.seeder_display)).show_ui(ui, |ui| {
-                    for d in [SeederDisplay::Both, SeederDisplay::Connected, SeederDisplay::Swarm] {
-                        changed |= ui.selectable_value(&mut s.seeder_display, d, label(d)).changed();
-                    }
-                });
-            });
-            row(ui, "Swarm health bar", "Gold bar under each torrent: how many full copies exist among your peers.", |ui| {
-                changed |= toggle(ui, &mut s.health_bar)
-            });
-        });
-        if changed {
-            self.changed();
-        }
-    }
-
-    // ===================================================================== Config
-
-    pub(super) fn page_config(&mut self, ui: &mut egui::Ui) {
-        page_title(ui, "Settings", "Where files go and how the app starts.");
+    pub(super) fn page_settings(&mut self, ui: &mut egui::Ui) {
+        page_title(ui, "Settings", "How Lifestream looks, where files go, and how fast it runs.");
         let adv = self.settings.advanced_mode;
+        let ctx = ui.ctx().clone();
         let mut changed = false;
-        let mut export = false;
-        let mut restore = false;
         let mut theme_switched = false;
         let mut make_default = false;
-        egui::ScrollArea::vertical().id_salt("config").auto_shrink([false, false]).show(ui, |ui| {
+        let mut browse: Option<super::FolderSetting> = None;
+        let mut export = false;
+        let mut restore = false;
+        egui::ScrollArea::vertical().id_salt("settings").auto_shrink([false, false]).show(ui, |ui| {
             let s = &mut self.settings;
-            row(ui, "Mode", "Simple shows the settings most people need. Advanced shows everything, plus the Log.", |ui| {
+            row(ui, "Mode", "Simple shows what most people need. Advanced shows every option, plus the Log.", |ui| {
                 changed |= w::toggle_labeled(ui, &mut s.advanced_mode, "ADVANCED", "SIMPLE");
             });
-            row(ui, "Theme", "Switches the whole app's look right away. FFVII menu: blue windows and the pointing hand. Box of X: glowing grid, jelly orb and slanted tabs.", |ui| {
-                // Right-to-left row: list in reverse so they read FFVII, Green.
+            row(ui, "Theme", "", |ui| {
+                // Right-to-left row: list in reverse so they read FFVII, Box of X.
                 for theme in [ff::Theme::GreenDash, ff::Theme::FfMenu] {
                     let selected = ff::theme() == theme;
                     let mut text = RichText::new(theme.label()).strong();
@@ -1575,38 +1407,108 @@ impl App {
                         ff::apply_style(ui.ctx());
                         s.theme = theme.key().to_string();
                         changed = true;
-                        // Land on Config in the new layout (once; BACK still works).
                         theme_switched = true;
                     }
                 }
             });
-            row(
-                ui,
-                "Reduce motion",
-                "Turns off page transitions, click glows and sliding rows, so pages switch instantly.",
-                |ui| changed |= toggle(ui, &mut s.reduce_motion),
-            );
-            section(ui, "Folders");
-            w::label_help(ui, "Default download folder", "Where RSS downloads go, and the first folder offered when you add a torrent. After that, Lifestream offers the last folder you picked.");
-            ui.horizontal(|ui| changed |= w::folder_field(ui, &mut s.download_dir, (ui.available_width() - 90.0).max(200.0)));
-            ui.add_space(6.0);
+            row(ui, "Reduce motion", "No page transitions, click glows or sliding rows.", |ui| changed |= toggle(ui, &mut s.reduce_motion));
 
-            ui.add_space(6.0);
+            section(ui, "Downloads");
+            w::label_help(ui, "Default download folder", "The first folder offered when you add a torrent (after that, the last one you picked), and where RSS downloads go.");
+            ui.horizontal(|ui| {
+                if ui.button("Browse").clicked() {
+                    browse = Some(super::FolderSetting::Downloads);
+                }
+                changed |= ui.add(egui::TextEdit::singleline(&mut s.download_dir).desired_width((ui.available_width() - 10.0).max(200.0))).changed();
+            });
+            ui.add_space(4.0);
+            row(ui, "Download limit", "", |ui| changed |= rate(ui, &mut s.dl_limit_kb).changed());
+            row(ui, "Upload limit", "", |ui| changed |= rate(ui, &mut s.ul_limit_kb).changed());
+            row(ui, "Stop seeding at ratio", "Ratio = uploaded ÷ downloaded. 2.0 means you've shared twice what you took. 0 = never stop.", |ui| {
+                changed |= ui.add(egui::DragValue::new(&mut s.ratio_limit).range(0.0..=100.0).speed(0.05).max_decimals(2)).changed()
+            });
             if adv {
-                row(ui, "Keep unfinished files in a separate folder", "Finished downloads move to their real folder, so apps watching that folder (like Jenova) only see complete files.", |ui| {
+                row(ui, "Or after seeding for", "Whichever comes first. 0 = no time limit.", |ui| {
+                    changed |= ui.add(egui::DragValue::new(&mut s.seed_hours).range(0.0..=10000.0).suffix(" h")).changed()
+                });
+                row(ui, "Then", "What happens when a torrent reaches its goal.", |ui| {
+                    let label = |a: SeedAction| match a {
+                        SeedAction::Pause => "Pause the torrent",
+                        SeedAction::Remove => "Remove it (keep files)",
+                        SeedAction::RemoveAndDelete => "Remove it and delete files",
+                    };
+                    egui::ComboBox::from_id_salt("then").selected_text(label(s.seed_action)).show_ui(ui, |ui| {
+                        for a in [SeedAction::Pause, SeedAction::Remove, SeedAction::RemoveAndDelete] {
+                            changed |= ui.selectable_value(&mut s.seed_action, a, label(a)).changed();
+                        }
+                    });
+                });
+                row(ui, "Downloads at once", "Others wait their turn.", |ui| {
+                    changed |= ui.add(egui::DragValue::new(&mut s.active_downloads).range(1..=50)).changed()
+                });
+                row(ui, "Seeds at once", "Finished torrents sharing at the same time.", |ui| {
+                    changed |= ui.add(egui::DragValue::new(&mut s.active_seeds).range(0..=100)).changed()
+                });
+                row(ui, "Keep unfinished files in a separate folder", "Finished downloads move to their real folder, so apps watching it (like Jenova) only see complete files.", |ui| {
                     changed |= toggle(ui, &mut s.incomplete_enabled)
                 });
                 if s.incomplete_enabled {
-                    ui.horizontal(|ui| changed |= w::folder_field(ui, &mut s.incomplete_dir, (ui.available_width() - 90.0).max(200.0)));
+                    ui.horizontal(|ui| {
+                        if ui.button("Browse").clicked() {
+                            browse = Some(super::FolderSetting::Incomplete);
+                        }
+                        changed |= ui.add(egui::TextEdit::singleline(&mut s.incomplete_dir).desired_width((ui.available_width() - 10.0).max(200.0))).changed();
+                    });
                 }
-                section(ui, "Defaults for new torrents");
+
+                section(ui, "New torrents");
                 row(ui, "Add paused", "", |ui| changed |= toggle(ui, &mut s.start_paused));
-                row(ui, "Download in order", "", |ui| changed |= toggle(ui, &mut s.default_sequential));
-                row(ui, "First and last pieces first", "", |ui| changed |= toggle(ui, &mut s.default_first_last));
+                row(ui, "Download in order", "Lets you watch a video before it's done. A bit worse for the swarm.", |ui| changed |= toggle(ui, &mut s.default_sequential));
+                row(ui, "First and last pieces first", "Helps video players start sooner.", |ui| changed |= toggle(ui, &mut s.default_first_last));
+
+                section(ui, "Turtle mode");
+                row(ui, "Turtle download", "Slower limits for when you're gaming or streaming. Switch on from the Torrents page or the tray.", |ui| {
+                    changed |= rate(ui, &mut s.turtle_dl_kb).changed()
+                });
+                row(ui, "Turtle upload", "", |ui| changed |= rate(ui, &mut s.turtle_ul_kb).changed());
+                row(ui, "On a schedule", "", |ui| changed |= toggle(ui, &mut s.turtle_schedule));
+                if s.turtle_schedule {
+                    row(ui, "From / to", "24-hour time, like 18:00. Overnight works too (22:00 to 06:00).", |ui| {
+                        changed |= ui.add(egui::TextEdit::singleline(&mut s.turtle_to).desired_width(60.0)).changed();
+                        ui.label("to");
+                        changed |= ui.add(egui::TextEdit::singleline(&mut s.turtle_from).desired_width(60.0)).changed();
+                    });
+                    row(ui, "Days", "", |ui| {
+                        for (i, d) in ["Sun", "Sat", "Fri", "Thu", "Wed", "Tue", "Mon"].iter().enumerate() {
+                            let idx = 6 - i;
+                            changed |= ui.checkbox(&mut s.turtle_days[idx], *d).changed();
+                        }
+                    });
+                }
+
+                section(ui, "Peers");
+                row(ui, "Show seeders and leechers as", "S 42 (180): connected to 42 of the 180 seeders in the swarm.", |ui| {
+                    let label = |d: SeederDisplay| match d {
+                        SeederDisplay::Both => "Connected (swarm)",
+                        SeederDisplay::Connected => "Connected only",
+                        SeederDisplay::Swarm => "Swarm only",
+                    };
+                    egui::ComboBox::from_id_salt("sdisp").selected_text(label(s.seeder_display)).show_ui(ui, |ui| {
+                        for d in [SeederDisplay::Both, SeederDisplay::Connected, SeederDisplay::Swarm] {
+                            changed |= ui.selectable_value(&mut s.seeder_display, d, label(d)).changed();
+                        }
+                    });
+                });
+                row(ui, "Max peers (all torrents)", "More isn't always faster; home routers can choke on too many.", |ui| {
+                    changed |= ui.add(egui::DragValue::new(&mut s.max_peers_global).range(20..=5000)).changed()
+                });
+                row(ui, "Max peers per torrent", "", |ui| changed |= ui.add(egui::DragValue::new(&mut s.max_peers_torrent).range(5..=1000)).changed());
+                row(ui, "Upload slots per torrent", "", |ui| changed |= ui.add(egui::DragValue::new(&mut s.upload_slots_torrent).range(1..=200)).changed());
+                row(ui, "Upload slots (all torrents)", "", |ui| changed |= ui.add(egui::DragValue::new(&mut s.upload_slots_global).range(1..=500)).changed());
             }
 
-            section(ui, "App");
             if cfg!(windows) {
+                section(ui, "App");
                 // Re-check every few seconds while this page is open.
                 let stale = self.handler_check.as_ref().map(|c| c.1.elapsed() > std::time::Duration::from_secs(3)).unwrap_or(true);
                 if stale {
@@ -1617,74 +1519,56 @@ impl App {
                 }
                 let status = self.handler_check.as_ref().map(|c| c.0.clone());
                 let is_default = matches!(status, Some(Ok(())));
-                row(
-                    ui,
-                    "Open magnet links and .torrent files with Lifestream",
-                    "When on, clicking a magnet link in your browser or opening a .torrent file sends it straight here.",
-                    |ui| {
-                        if is_default {
-                            ui.label(RichText::new("DEFAULT").color(GOOD()).strong());
-                            ff::badge(ui, ff::Badge::Good, 20.0).on_hover_text("Lifestream opens magnet links and .torrent files.");
-                        } else if ui.button("Make default").clicked() {
-                            make_default = true;
-                        }
-                    },
-                );
+                row(ui, "Open magnet links and .torrent files with Lifestream", "", |ui| {
+                    if is_default {
+                        ui.label(RichText::new("DEFAULT").color(GOOD()).strong());
+                        ff::badge(ui, ff::Badge::Good, 20.0).on_hover_text("Lifestream opens magnet links and .torrent files.");
+                    } else if ui.button("Make default").clicked() {
+                        make_default = true;
+                    }
+                });
                 if let Some(Err(other)) = &status {
                     ui.horizontal_wrapped(|ui| {
-                        ui.colored_label(
-                            WARN(),
-                            format!("Right now Windows opens them with {other}. If Make default doesn't change that, pick Lifestream for MAGNET and .torrent in Default apps."),
-                        );
+                        ui.colored_label(WARN(), format!("Right now Windows opens them with {other}. If Make default doesn't change that, pick Lifestream for MAGNET and .torrent in Default apps."));
                         if ui.small_button("Open Default apps").clicked() {
                             #[cfg(windows)]
                             let _ = std::process::Command::new("explorer").arg("ms-settings:defaultapps").spawn();
                         }
                     });
                 }
-                row(ui, "Start with Windows", "Starts quietly in the tray.", |ui| changed |= toggle(ui, &mut s.start_with_windows));
-                row(
-                    ui,
-                    "Windows notifications",
-                    "Pops up a Windows notification when a download finishes, the kill switch trips, or the VPN comes back, while Lifestream is in the background or in the tray. (In-app messages always show.)",
-                    |ui| {
-                        changed |= toggle(ui, &mut s.system_notifications);
-                        if ui.button("Test").on_hover_text("Send a test notification now. If none appears, check Windows Settings › System › Notifications (Lifestream, and Do not disturb).").clicked() {
-                            #[cfg(windows)]
-                            crate::winint::notify("Lifestream", "Notifications are working.");
+                row(ui, "Start with Windows", "", |ui| changed |= toggle(ui, &mut s.start_with_windows));
+                row(ui, "Windows notifications", "When a download finishes, the kill switch trips, or the VPN comes back, while Lifestream is in the background.", |ui| {
+                    changed |= toggle(ui, &mut s.system_notifications);
+                    if ui.button("Test").on_hover_text("If nothing appears, check Windows Settings › System › Notifications.").clicked() {
+                        #[cfg(windows)]
+                        crate::winint::notify("Lifestream", "Notifications are working.");
+                    }
+                });
+                row(ui, "When I close the window", "Keep running: downloads continue from the tray (quit from its menu).", |ui| {
+                    // Right-to-left row, so list the options in reverse.
+                    for (tray, label) in [(false, "Quit"), (true, "Keep running in tray")] {
+                        let selected = s.close_to_tray == tray;
+                        let mut text = RichText::new(label);
+                        if selected {
+                            text = text.color(ff::pal().on_accent);
                         }
-                    },
-                );
-                row(
-                    ui,
-                    "When I close the window",
-                    "Keep running: the X button hides Lifestream in the taskbar tray and downloads keep going (quit from the tray icon's menu). Quit: the X button fully closes Lifestream and stops all transfers.",
-                    |ui| {
-                        // Right-to-left row, so list the options in reverse.
-                        for (tray, label) in [(false, "Quit"), (true, "Keep running in tray")] {
-                            let selected = s.close_to_tray == tray;
-                            let mut text = RichText::new(label);
-                            if selected {
-                                text = text.color(ff::pal().on_accent);
-                            }
-                            let mut button = egui::Button::new(text);
-                            if selected {
-                                button = button.fill(ff::pal().accent);
-                            }
-                            if ui.add(button).clicked() && !selected {
-                                s.close_to_tray = tray;
-                                changed = true;
-                            }
+                        let mut button = egui::Button::new(text);
+                        if selected {
+                            button = button.fill(ff::pal().accent);
                         }
-                    },
-                );
-            }
-            if adv {
-                row(ui, "Prevent sleep while downloading", "Keeps the PC awake until downloads finish.", |ui| changed |= toggle(ui, &mut s.prevent_sleep));
+                        if ui.add(button).clicked() && !selected {
+                            s.close_to_tray = tray;
+                            changed = true;
+                        }
+                    }
+                });
+                if adv {
+                    row(ui, "Prevent sleep while downloading", "", |ui| changed |= toggle(ui, &mut s.prevent_sleep));
+                }
             }
 
             section(ui, "Remote control");
-            row(ui, "Let Turks send downloads here", "Turns on a Transmission-compatible remote control, so Turks (or Radarr, Sonarr, Prowlarr) can add torrents and watch their progress. In Turks, add a 'Transmission / Lifestream' download client. Changes apply after a restart.", |ui| {
+            row(ui, "Let Turks send downloads here", "A Transmission-compatible remote control, so Turks, Midgar, Radarr or Sonarr can add torrents and watch progress. In those apps add a Transmission / Lifestream download client. Applies after a restart.", |ui| {
                 changed |= toggle(ui, &mut s.rpc_enabled)
             });
             if s.rpc_enabled {
@@ -1692,12 +1576,10 @@ impl App {
                     changed |= ui.add(egui::DragValue::new(&mut s.rpc_port).range(1024..=65535)).changed()
                 });
                 if adv {
-                    row(ui, "Allow other computers", "Off: only apps on this PC can connect. Turn on if Turks runs on another machine, and set a username and password.", |ui| {
+                    row(ui, "Allow other computers", "Turn on if Turks runs on another machine, and set a username and password.", |ui| {
                         changed |= toggle(ui, &mut s.rpc_allow_lan)
                     });
-                    row(ui, "Username", "Optional. Must match the download client settings in Turks.", |ui| {
-                        changed |= ui.add(egui::TextEdit::singleline(&mut s.rpc_username).desired_width(180.0)).changed()
-                    });
+                    row(ui, "Username", "", |ui| changed |= ui.add(egui::TextEdit::singleline(&mut s.rpc_username).desired_width(180.0)).changed());
                     row(ui, "Password", "", |ui| {
                         changed |= ui.add(egui::TextEdit::singleline(&mut s.rpc_password).password(true).desired_width(180.0)).changed()
                     });
@@ -1705,7 +1587,7 @@ impl App {
             }
 
             section(ui, "Backup");
-            row(ui, "Back up settings, RSS rules and torrent list", "One file. Includes download progress so nothing starts over after a restore.", |ui| {
+            row(ui, "Settings, RSS rules and torrent list", "One file, including download progress, so nothing starts over after a restore.", |ui| {
                 if ui.button("Restore").clicked() {
                     restore = true;
                 }
@@ -1713,17 +1595,24 @@ impl App {
                     export = true;
                 }
             });
-            row(ui, "Automatic weekly backup", "", |ui| changed |= toggle(ui, &mut s.auto_backup));
-            if adv && s.auto_backup {
-                ui.horizontal(|ui| changed |= w::folder_field(ui, &mut s.backup_dir, (ui.available_width() - 90.0).max(200.0)));
-                row(ui, "Keep the last", "", |ui| changed |= ui.add(egui::DragValue::new(&mut s.backup_keep).range(1..=52).suffix(" backups")).changed());
-            }
-            row(ui, "Data and logs", &crate::settings::data_dir().display().to_string(), |ui| {
-                if ui.button("Open folder").clicked() {
-                    open_path(&crate::settings::data_dir().display().to_string());
+            if adv {
+                row(ui, "Automatic weekly backup", "", |ui| changed |= toggle(ui, &mut s.auto_backup));
+                if s.auto_backup {
+                    ui.horizontal(|ui| {
+                        if ui.button("Browse").clicked() {
+                            browse = Some(super::FolderSetting::Backups);
+                        }
+                        changed |= ui.add(egui::TextEdit::singleline(&mut s.backup_dir).desired_width((ui.available_width() - 10.0).max(200.0))).changed();
+                    });
+                    row(ui, "Keep the last", "", |ui| changed |= ui.add(egui::DragValue::new(&mut s.backup_keep).range(1..=52).suffix(" backups")).changed());
                 }
-            });
-            row(ui, &format!("Lifestream v{}", crate::updater::APP_VERSION), "Lifestream checks for updates each time it opens and only says something when there's a new version.", |ui| {
+                row(ui, "Data and logs", "", |ui| {
+                    if ui.button("Open folder").clicked() {
+                        open_path(&crate::settings::data_dir().display().to_string());
+                    }
+                });
+            }
+            row(ui, &format!("Lifestream v{}", crate::updater::APP_VERSION), "", |ui| {
                 if ui.button("Check for updates").clicked() {
                     self.manual_update_check = true;
                     self.updater.dismissed.store(false, std::sync::atomic::Ordering::SeqCst);
@@ -1737,6 +1626,9 @@ impl App {
         if changed {
             self.changed();
         }
+        if let Some(which) = browse {
+            self.ask_folder_setting(&ctx, which);
+        }
         if make_default {
             #[cfg(windows)]
             match crate::winint::register_handlers() {
@@ -1749,26 +1641,14 @@ impl App {
         }
         if export {
             let name = format!("Lifestream-{}.{}", chrono::Local::now().format("%Y-%m-%d"), crate::backup::EXT);
-            if let Some(p) = rfd::FileDialog::new().set_file_name(&name).add_filter("Lifestream backup", &[crate::backup::EXT]).save_file() {
-                self.flush_settings_now();
-                self.core.send(Cmd::SaveNow);
-                std::thread::sleep(std::time::Duration::from_millis(600));
-                match crate::backup::export(&p) {
-                    Ok(n) => self.notify(format!("Backup saved ({n} files).")),
-                    Err(e) => self.notify(format!("Backup failed: {e}")),
-                }
-            }
+            self.start_pick(&ctx, super::Pick::ExportBackup, move || {
+                rfd::FileDialog::new().set_file_name(&name).add_filter("Lifestream backup", &[crate::backup::EXT]).save_file()
+            });
         }
         if restore {
-            if let Some(p) = rfd::FileDialog::new().add_filter("Lifestream backup", &[crate::backup::EXT, "zip"]).pick_file() {
-                match crate::backup::stage_restore(&p) {
-                    Ok(()) => {
-                        self.restore_pending = true;
-                        self.notify("Backup ready. Restart Lifestream to load it.");
-                    }
-                    Err(e) => self.notify(format!("Couldn't restore: {e}")),
-                }
-            }
+            self.start_pick(&ctx, super::Pick::RestoreBackup, || {
+                rfd::FileDialog::new().add_filter("Lifestream backup", &[crate::backup::EXT, "zip"]).pick_file()
+            });
         }
     }
 
@@ -1924,55 +1804,4 @@ fn leak_report(ui: &mut egui::Ui, r: &crate::core::LeakResult, adapter: &str) {
             }
         }
     });
-}
-
-#[derive(Clone, Copy)]
-enum Transport {
-    Start,
-    Pause,
-    Stop,
-}
-
-/// A media-style button with a drawn icon. The button for the torrent's
-/// current state is lit and does nothing when clicked.
-fn transport_button(ui: &mut egui::Ui, kind: Transport, current: bool, tip: &str) -> egui::Response {
-    let label = match kind {
-        Transport::Start => "Start",
-        Transport::Pause => "Pause",
-        Transport::Stop => "Stop",
-    };
-    let sense = if current { egui::Sense::hover() } else { egui::Sense::click() };
-    let (rect, resp) = ui.allocate_exact_size(egui::vec2(96.0, 30.0), sense);
-    let resp = resp.on_hover_text(tip);
-    if !ui.is_rect_visible(rect) {
-        return resp;
-    }
-    let vis = ui.style().interact(&resp);
-    let (fill, edge, fg) = if current {
-        (ff::pal().accent, ff::pal().accent, ff::pal().on_accent)
-    } else {
-        (vis.weak_bg_fill, vis.bg_stroke.color, vis.text_color())
-    };
-    let p = ui.painter();
-    p.rect(rect, vis.corner_radius, fill, egui::Stroke::new(1.0, edge), egui::StrokeKind::Inside);
-    let c = egui::pos2(rect.left() + 20.0, rect.center().y);
-    match kind {
-        Transport::Start => {
-            let pts = vec![c + egui::vec2(-5.0, -7.0), c + egui::vec2(7.0, 0.0), c + egui::vec2(-5.0, 7.0)];
-            p.add(egui::Shape::convex_polygon(pts, fg, egui::Stroke::NONE));
-        }
-        Transport::Pause => {
-            for dx in [-5.0, 1.5] {
-                p.rect_filled(egui::Rect::from_min_size(c + egui::vec2(dx, -7.0), egui::vec2(4.0, 14.0)), 1.0, fg);
-            }
-        }
-        Transport::Stop => {
-            p.rect_filled(egui::Rect::from_center_size(c, egui::vec2(12.0, 12.0)), 1.5, fg);
-        }
-    }
-    p.text(egui::pos2(rect.left() + 36.0, rect.center().y), egui::Align2::LEFT_CENTER, label, egui::FontId::proportional(15.0), fg);
-    if resp.hovered() && !current {
-        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
-    }
-    resp
 }

@@ -31,8 +31,6 @@ pub enum Cmd {
     SetCategory { hash: String, category: String },
     Pause(String),
     Resume(String),
-    /// Stop right away (not graceful) and mark it STOPPED.
-    Stop(String),
     /// Start a queued torrent now, past the active-torrent limit.
     ForceStart(String),
     Remove { hash: String, delete_files: bool },
@@ -145,6 +143,69 @@ pub enum OrgKind {
 
 /// Rough guess from the provider name whether an exit address is a VPN or
 /// datacenter (good) or a home internet provider (bad).
+/// What the kill switch should do, given the chosen adapter's state.
+#[derive(Debug, PartialEq)]
+pub struct KillDecision {
+    pub hold: bool,
+    pub reason: String,
+    /// The address to bind to, if any.
+    pub ip: Option<String>,
+}
+
+/// `found` is None when the adapter isn't there, else its (IPv4, IPv6).
+pub fn kill_decision(adapter: &str, found: Option<(Option<String>, Option<String>)>, kill_switch: bool, no_ipv6: bool) -> KillDecision {
+    let mut d = KillDecision { hold: false, reason: String::new(), ip: None };
+    if adapter.is_empty() {
+        if kill_switch {
+            d.hold = true;
+            d.reason = "Pick your VPN adapter on the Connection page. Downloads wait until you do, because the kill switch is on.".into();
+        }
+        return d;
+    }
+    match found {
+        Some((v4, v6)) => {
+            d.ip = v4.or(if no_ipv6 { None } else { v6 });
+            if d.ip.is_none() && kill_switch {
+                d.hold = true;
+                d.reason = format!("{adapter} has no usable address. Everything is paused until it does.");
+            }
+        }
+        None => {
+            if kill_switch {
+                d.hold = true;
+                d.reason = format!("{adapter} is down. Everything is paused until it comes back.");
+            }
+        }
+    }
+    d
+}
+
+/// Is `now` (weekday 0 = Monday, time of day) inside the turtle schedule?
+/// Overnight windows (22:00 to 06:00) belong to the day they start.
+pub fn in_window(from: &str, to: &str, days: &[bool; 7], weekday: usize, now: NaiveTime) -> bool {
+    let parse = |t: &str| NaiveTime::parse_from_str(t.trim(), "%H:%M").ok();
+    let (Some(from), Some(to)) = (parse(from), parse(to)) else {
+        return false;
+    };
+    if from <= to {
+        days[weekday] && now >= from && now < to
+    } else {
+        let yesterday = (weekday + 6) % 7;
+        (days[weekday] && now >= from) || (days[yesterday] && now < to)
+    }
+}
+
+/// Has a finished torrent reached its stop-seeding goal?
+pub fn goal_met(state: i32, is_private: bool, seeding_secs: i64, ratio: f64, s: &Settings) -> bool {
+    if state != 4 && state != 3 {
+        return false;
+    }
+    if is_private && s.private_honor_seed && (seeding_secs as f32) < s.private_min_seed_hours * 3600.0 {
+        return false;
+    }
+    (s.ratio_limit > 0.0 && ratio >= s.ratio_limit as f64) || (s.seed_hours > 0.0 && seeding_secs as f32 >= s.seed_hours * 3600.0)
+}
+
 pub fn org_kind(org: &str) -> OrgKind {
     let o = org.to_lowercase();
     const ISP: &[&str] = &[
@@ -176,7 +237,67 @@ pub fn org_kind(org: &str) -> OrgKind {
 
 #[cfg(test)]
 mod org_tests {
-    use super::{org_kind, OrgKind};
+    use super::{goal_met, in_window, kill_decision, org_kind, OrgKind, Settings};
+    use chrono::NaiveTime;
+    #[test]
+    fn kill_switch_decisions() {
+        let up = |v4: Option<&str>| Some((v4.map(String::from), None));
+        // No adapter picked: hold only with the kill switch on.
+        assert!(kill_decision("", None, true, true).hold);
+        assert!(!kill_decision("", None, false, true).hold);
+        // Adapter up with an address: run, bound to it.
+        let d = kill_decision("wg0", up(Some("10.2.0.2")), true, true);
+        assert_eq!((d.hold, d.ip.as_deref()), (false, Some("10.2.0.2")));
+        // Adapter gone: hold, and nothing to bind to.
+        let d = kill_decision("wg0", None, true, true);
+        assert!(d.hold && d.ip.is_none() && d.reason.contains("down"));
+        // Gone but kill switch off: don't hold.
+        assert!(!kill_decision("wg0", None, false, true).hold);
+        // Up but no IPv4, IPv6 disabled: no usable address, hold.
+        let d = kill_decision("wg0", Some((None, Some("fd00::2".into()))), true, true);
+        assert!(d.hold && d.ip.is_none());
+        // Same with IPv6 allowed: bind to IPv6.
+        let d = kill_decision("wg0", Some((None, Some("fd00::2".into()))), true, false);
+        assert_eq!((d.hold, d.ip.as_deref()), (false, Some("fd00::2")));
+    }
+
+    #[test]
+    fn turtle_windows() {
+        let t = |s: &str| NaiveTime::parse_from_str(s, "%H:%M").unwrap();
+        let weekdays = [true, true, true, true, true, false, false];
+        // Daytime window, Monday.
+        assert!(in_window("09:00", "17:00", &weekdays, 0, t("12:00")));
+        assert!(!in_window("09:00", "17:00", &weekdays, 0, t("17:00")));
+        assert!(!in_window("09:00", "17:00", &weekdays, 5, t("12:00"))); // Saturday off
+        // Overnight Friday 22:00 to Saturday 06:00 belongs to Friday.
+        assert!(in_window("22:00", "06:00", &weekdays, 4, t("23:30")));
+        assert!(in_window("22:00", "06:00", &weekdays, 5, t("03:00")));
+        // Saturday night isn't on, so Sunday early morning isn't either.
+        assert!(!in_window("22:00", "06:00", &weekdays, 6, t("03:00")));
+        // Bad times never match.
+        assert!(!in_window("late", "06:00", &weekdays, 0, t("23:00")));
+    }
+
+    #[test]
+    fn seeding_goals() {
+        let mut s = Settings::default();
+        s.ratio_limit = 2.0;
+        s.seed_hours = 0.0;
+        s.private_honor_seed = true;
+        s.private_min_seed_hours = 72.0;
+        assert!(!goal_met(2, false, 0, 5.0, &s)); // still downloading
+        assert!(goal_met(4, false, 10, 2.0, &s));
+        assert!(!goal_met(4, false, 10, 1.9, &s));
+        // Private: ratio met, but not seeded 72 h yet.
+        assert!(!goal_met(4, true, 3600, 3.0, &s));
+        assert!(goal_met(4, true, 73 * 3600, 3.0, &s));
+        // Time limit alone.
+        s.ratio_limit = 0.0;
+        s.seed_hours = 10.0;
+        assert!(goal_met(4, false, 10 * 3600, 0.1, &s));
+        assert!(!goal_met(4, false, 9 * 3600, 99.0, &s));
+    }
+
     #[test]
     fn orgs() {
         assert_eq!(org_kind("M247 Europe SRL"), OrgKind::Vpn);
@@ -411,34 +532,12 @@ impl Core {
     /// The adapter state decides whether we may touch the network at all.
     fn evaluate_adapter(&mut self) {
         let s = &self.settings;
-        let mut hold = false;
-        let mut reason = String::new();
-        let mut ip = None;
-        if s.adapter.is_empty() {
-            if s.kill_switch {
-                hold = true;
-                reason = "Pick your VPN adapter on the Network page. Downloads wait until you do, because the kill switch is on.".into();
-            }
+        let found = if s.adapter.is_empty() {
+            None
         } else {
-            match crate::netif::find(&s.adapter) {
-                Some(a) => {
-                    ip = a
-                        .ipv4
-                        .map(|v| v.to_string())
-                        .or_else(|| if s.disable_ipv6 { None } else { a.ipv6.map(|v| v.to_string()) });
-                    if ip.is_none() && s.kill_switch {
-                        hold = true;
-                        reason = format!("{} has no usable address. Everything is paused until it does.", s.adapter);
-                    }
-                }
-                None => {
-                    if s.kill_switch {
-                        hold = true;
-                        reason = format!("{} is down. Everything is paused until it comes back.", s.adapter);
-                    }
-                }
-            }
-        }
+            crate::netif::find(&s.adapter).map(|a| (a.ipv4.map(|v| v.to_string()), a.ipv6.map(|v| v.to_string())))
+        };
+        let KillDecision { hold, reason, ip } = kill_decision(&s.adapter, found, s.kill_switch, s.disable_ipv6);
         if hold != self.kill_hold {
             if hold {
                 applog::warn(format!("Kill switch: {reason}"));
@@ -461,19 +560,7 @@ impl Core {
             return false;
         }
         let now = Local::now();
-        let day = now.weekday().num_days_from_monday() as usize;
-        let parse = |t: &str| NaiveTime::parse_from_str(t.trim(), "%H:%M").ok();
-        let (Some(from), Some(to)) = (parse(&s.turtle_from), parse(&s.turtle_to)) else {
-            return false;
-        };
-        let t = now.time();
-        if from <= to {
-            s.turtle_days[day] && t >= from && t < to
-        } else {
-            // Overnight window, e.g. 22:00-06:00: belongs to the day it started.
-            let yesterday = (day + 6) % 7;
-            (s.turtle_days[day] && t >= from) || (s.turtle_days[yesterday] && t < to)
-        }
+        in_window(&s.turtle_from, &s.turtle_to, &s.turtle_days, now.weekday().num_days_from_monday() as usize, now.time())
     }
 
     fn any_private_active(&self) -> bool {
@@ -796,12 +883,6 @@ impl Core {
                     e.resume_torrent(&h)
                 }
                 self.set_stopped(&h, false);
-            }
-            Cmd::Stop(h) => {
-                if let Some(e) = self.engine() {
-                    e.stop_torrent(&h)
-                }
-                self.set_stopped(&h, true);
             }
             Cmd::ForceStart(h) => {
                 if let Some(e) = self.engine() {
@@ -1145,15 +1226,7 @@ impl Core {
     }
 
     fn seed_goal_met(&self, t: &TorrentInfo, ratio: f64) -> bool {
-        let s = &self.settings;
-        if t.state != 4 && t.state != 3 {
-            return false;
-        }
-        if t.is_private && s.private_honor_seed && (t.seeding_secs as f32) < s.private_min_seed_hours * 3600.0 {
-            return false;
-        }
-        (s.ratio_limit > 0.0 && ratio >= s.ratio_limit as f64)
-            || (s.seed_hours > 0.0 && t.seeding_secs as f32 >= s.seed_hours * 3600.0)
+        goal_met(t.state, t.is_private, t.seeding_secs as i64, ratio, &self.settings)
     }
 
     fn refresh_snapshot(&mut self) {

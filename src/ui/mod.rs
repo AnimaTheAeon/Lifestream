@@ -15,38 +15,54 @@ use crate::core::{human_rate, AddChoice, Cmd, CoreHandle, Snapshot};
 use crate::engine::ffi::TorrentPreview;
 use crate::instance::Incoming;
 use crate::settings::Settings;
-use theme::{self as ff, LABEL, TEXT, TEXT_DIM};
+use theme::{self as ff, TEXT, TEXT_DIM};
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Page {
     Torrents,
-    Add,
     Rss,
-    Speed,
-    Network,
-    Privacy,
-    Seeding,
-    Config,
+    Connection,
+    Settings,
     Log,
 }
 
+/// (page, label, advanced only)
 const MENU: &[(Page, &str, bool)] = &[
     (Page::Torrents, "Torrents", false),
-    (Page::Add, "Add", false),
     (Page::Rss, "RSS", false),
-    (Page::Speed, "Speed", false),
-    (Page::Network, "Network", false),
-    (Page::Privacy, "Privacy", false),
-    (Page::Seeding, "Seeding", false),
-    (Page::Config, "Settings", false),
+    (Page::Connection, "Connection", false),
+    (Page::Settings, "Settings", false),
     (Page::Log, "Log", true),
 ];
+
+/// What a file or folder dialog (running on its own thread) is for.
+pub enum Pick {
+    /// Save folder for what's in the Add window.
+    AddWindow,
+    /// Save folder for a magnet link opened from the browser.
+    Magnet(String),
+    /// Save folder for several dropped .torrent files.
+    Drops(Vec<std::path::PathBuf>),
+    /// A .torrent file to open in the Add window.
+    TorrentFile,
+    /// A folder setting.
+    Folder(FolderSetting),
+    ExportBackup,
+    RestoreBackup,
+}
+
+#[derive(Clone, Copy)]
+pub enum FolderSetting {
+    Downloads,
+    Incomplete,
+    Backups,
+}
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Filter {
     All,
     Downloading,
-    Seeding,
+    Finished,
     Paused,
 }
 
@@ -63,7 +79,6 @@ pub enum Sort {
 pub struct AddState {
     pub magnet: String,
     pub preview: Option<(Vec<u8>, TorrentPreview, Vec<bool>)>,
-    pub choice: AddChoice,
     pub error: Option<String>,
 }
 
@@ -104,6 +119,10 @@ pub struct App {
     /// Torrents ticked for bulk actions.
     pub selected: std::collections::BTreeSet<String>,
     pub add: AddState,
+    /// The Add window is open.
+    pub add_open: bool,
+    /// A file/folder dialog is open (it runs off the UI thread).
+    pub picking: Option<(Pick, Receiver<Option<std::path::PathBuf>>)>,
     incoming: Receiver<Incoming>,
     pub rss_rule: usize,
     pub new_feed: (String, String),
@@ -156,12 +175,6 @@ impl App {
         #[cfg(windows)]
         let tray = crate::tray::Tray::new(core.clone(), cc.egui_ctx.clone(), Arc::clone(&download_dir), incoming_tx);
 
-        let choice = AddChoice {
-            paused: settings.start_paused,
-            sequential: settings.default_sequential,
-            first_last: settings.default_first_last,
-            skip_check: false,
-        };
         Self {
             core,
             core_join: Some(core_join),
@@ -186,7 +199,9 @@ impl App {
             popup_tab: 0,
             confirm_remove: None,
             selected: Default::default(),
-            add: AddState { magnet: String::new(), preview: None, choice, error: None },
+            add: AddState { magnet: String::new(), preview: None, error: None },
+            add_open: false,
+            picking: None,
             incoming,
             rss_rule: 0,
             new_feed: (String::new(), String::new()),
@@ -306,51 +321,175 @@ impl App {
             ctx.request_repaint_after(Duration::from_millis(50));
             return;
         }
+        if self.picking.is_some() {
+            return; // wait for the open dialog first
+        }
         let uri = uri.clone();
         self.pending_magnet = None;
-        let Some(save_path) = self.ask_save_folder("") else {
-            self.notify("Magnet link not added (no folder picked).");
-            return;
-        };
-        let choice = AddChoice {
+        self.ask_save_folder(ctx, Pick::Magnet(uri));
+    }
+
+    /// The options new torrents get (set in Settings).
+    pub fn default_choice(&self) -> AddChoice {
+        AddChoice {
             paused: self.settings.start_paused,
             sequential: self.settings.default_sequential,
             first_last: self.settings.default_first_last,
             skip_check: false,
-        };
-        self.core.send(Cmd::AddMagnet { uri, category: String::new(), choice, save_path: Some(save_path) });
-        self.page = Page::Torrents;
-        self.menu_touched = true;
-        if ff::is_green() {
-            self.green_in_page = true;
         }
     }
 
-    /// Asks where to save, starting in the category's folder or the last folder
-    /// picked. Remembers the answer. None = cancelled.
-    pub fn ask_save_folder(&mut self, category: &str) -> Option<String> {
+    /// Runs a file or folder dialog on its own thread, so the window keeps
+    /// drawing while it's open. The answer arrives in `poll_pick`.
+    pub fn start_pick(&mut self, ctx: &egui::Context, what: Pick, dialog: impl FnOnce() -> Option<std::path::PathBuf> + Send + 'static) {
+        if self.picking.is_some() {
+            return;
+        }
+        let (tx, rx) = std::sync::mpsc::channel();
+        let ctx = ctx.clone();
+        std::thread::spawn(move || {
+            let _ = tx.send(dialog());
+            ctx.request_repaint();
+        });
+        self.picking = Some((what, rx));
+    }
+
+    /// Asks where to save, starting in the last folder picked (or the default
+    /// download folder). The answer is remembered for next time.
+    pub fn ask_save_folder(&mut self, ctx: &egui::Context, what: Pick) {
         let s = &self.settings;
-        let cat_dir = s.categories.iter().find(|c| c.name == category && !c.path.trim().is_empty()).map(|c| c.path.clone());
-        let start = cat_dir
-            .or_else(|| (!s.last_save_dir.trim().is_empty()).then(|| s.last_save_dir.clone()))
-            .unwrap_or_else(|| s.download_dir.clone());
+        let start = if s.last_save_dir.trim().is_empty() { s.download_dir.clone() } else { s.last_save_dir.clone() };
         let _ = std::fs::create_dir_all(&start);
         // Debug builds only: lets automated tests stand in for the dialog.
         #[cfg(debug_assertions)]
         if let Ok(dir) = std::env::var("LIFESTREAM_TEST_PICK_DIR") {
             crate::applog::info(format!("Test pick (dialog would start in {start})"));
-            self.settings.last_save_dir = dir.clone();
-            self.changed();
-            return Some(dir);
+            return self.start_pick(ctx, what, move || Some(dir.into()));
         }
-        let picked = rfd::FileDialog::new()
-            .set_title("Where should this download go?")
-            .set_directory(&start)
-            .pick_folder()?;
-        let picked = picked.display().to_string();
-        self.settings.last_save_dir = picked.clone();
-        self.changed();
-        Some(picked)
+        self.start_pick(ctx, what, move || rfd::FileDialog::new().set_title("Where should this download go?").set_directory(&start).pick_folder());
+    }
+
+    /// Opens the .torrent file picker for the Add window.
+    pub fn ask_torrent_file(&mut self, ctx: &egui::Context) {
+        self.start_pick(ctx, Pick::TorrentFile, || rfd::FileDialog::new().add_filter("Torrent", &["torrent"]).pick_file());
+    }
+
+    /// Opens a folder picker for one of the folder settings.
+    pub fn ask_folder_setting(&mut self, ctx: &egui::Context, which: FolderSetting) {
+        let current = match which {
+            FolderSetting::Downloads => self.settings.download_dir.clone(),
+            FolderSetting::Incomplete => self.settings.incomplete_dir.clone(),
+            FolderSetting::Backups => self.settings.backup_dir.clone(),
+        };
+        self.start_pick(ctx, Pick::Folder(which), move || rfd::FileDialog::new().set_directory(current).pick_folder());
+    }
+
+    /// Acts on a dialog's answer once it's closed.
+    fn poll_pick(&mut self) {
+        let Some((_, rx)) = self.picking.as_ref() else { return };
+        let answer = match rx.try_recv() {
+            Ok(a) => a,
+            Err(std::sync::mpsc::TryRecvError::Empty) => return,
+            Err(std::sync::mpsc::TryRecvError::Disconnected) => None,
+        };
+        let (what, _) = self.picking.take().unwrap();
+        let Some(path) = answer else {
+            if let Pick::Magnet(_) = what {
+                self.notify("Magnet link not added (no folder picked).");
+            }
+            return;
+        };
+        let folder = path.display().to_string();
+        match what {
+            Pick::AddWindow | Pick::Magnet(_) | Pick::Drops(_) => {
+                self.settings.last_save_dir = folder.clone();
+                self.changed();
+            }
+            _ => {}
+        }
+        match what {
+            Pick::AddWindow => self.add_now(folder),
+            Pick::Magnet(uri) => {
+                let choice = self.default_choice();
+                self.core.send(Cmd::AddMagnet { uri, category: String::new(), choice, save_path: Some(folder) });
+                self.page = Page::Torrents;
+                self.menu_touched = true;
+                if ff::is_green() {
+                    self.green_in_page = true;
+                }
+            }
+            Pick::Drops(paths) => {
+                let choice = self.default_choice();
+                let n = paths.len();
+                for p in paths {
+                    if let Ok(data) = std::fs::read(&p) {
+                        self.core.send(Cmd::AddTorrent { data, category: String::new(), choice, priorities: None, save_path: Some(folder.clone()) });
+                    }
+                }
+                self.notify(format!("Adding {n} torrents…"));
+            }
+            Pick::TorrentFile => match std::fs::read(&path) {
+                Ok(d) => self.preview_bytes(d),
+                Err(e) => self.add.error = Some(e.to_string()),
+            },
+            Pick::Folder(which) => {
+                match which {
+                    FolderSetting::Downloads => self.settings.download_dir = folder,
+                    FolderSetting::Incomplete => self.settings.incomplete_dir = folder,
+                    FolderSetting::Backups => self.settings.backup_dir = folder,
+                }
+                self.changed();
+            }
+            Pick::ExportBackup => {
+                self.dirty_since = Some(Instant::now() - Duration::from_secs(5));
+                self.flush_settings(true);
+                self.core.send(Cmd::SaveNow);
+                std::thread::sleep(Duration::from_millis(600));
+                match crate::backup::export(&path) {
+                    Ok(n) => self.notify(format!("Backup saved ({n} files).")),
+                    Err(e) => self.notify(format!("Backup failed: {e}")),
+                }
+            }
+            Pick::RestoreBackup => match crate::backup::stage_restore(&path) {
+                Ok(()) => {
+                    self.restore_pending = true;
+                    self.notify("Backup ready. Restart Lifestream to load it.");
+                }
+                Err(e) => self.notify(format!("Couldn't restore: {e}")),
+            },
+        }
+    }
+
+    /// Adds what's in the Add window, saving to `folder`.
+    fn add_now(&mut self, folder: String) {
+        let choice = self.default_choice();
+        let save_path = Some(folder);
+        let category = String::new();
+        if let Some((data, pv, wanted)) = self.add.preview.take() {
+            let priorities = if wanted.iter().all(|w| *w) {
+                None
+            } else {
+                // Indexed by the torrent's real file index (padding files are hidden).
+                let len = pv.files.iter().map(|f| f.index as usize + 1).max().unwrap_or(0);
+                let mut p = vec![4u8; len];
+                for (f, w) in pv.files.iter().zip(wanted.iter()) {
+                    if !*w {
+                        p[f.index as usize] = 0;
+                    }
+                }
+                Some(p)
+            };
+            self.core.send(Cmd::AddTorrent { data, category, choice, priorities, save_path });
+        } else {
+            let uri = self.add.magnet.trim().to_string();
+            if !uri.starts_with("magnet:") {
+                return;
+            }
+            self.core.send(Cmd::AddMagnet { uri, category, choice, save_path });
+            self.add.magnet.clear();
+        }
+        self.add.error = None;
+        self.add_open = false;
     }
 
     pub fn preview_bytes(&mut self, data: Vec<u8>) {
@@ -359,8 +498,7 @@ impl App {
                 let n = p.files.len();
                 self.add.preview = Some((data, p, vec![true; n]));
                 self.add.error = None;
-                self.page = Page::Add;
-                self.menu_touched = true;
+                self.add_open = true;
             }
             Err(e) => self.notify(e.what().to_string()),
         }
@@ -383,22 +521,9 @@ impl App {
                     self.preview_bytes(data);
                 }
             }
-            n => {
+            _ => {
                 // One question for the whole batch.
-                let Some(folder) = self.ask_save_folder("") else { return };
-                let choice = self.add.choice;
-                for p in paths {
-                    if let Ok(data) = std::fs::read(&p) {
-                        self.core.send(Cmd::AddTorrent {
-                            data,
-                            category: String::new(),
-                            choice,
-                            priorities: None,
-                            save_path: Some(folder.clone()),
-                        });
-                    }
-                }
-                self.notify(format!("Adding {n} torrents…"));
+                self.ask_save_folder(ctx, Pick::Drops(paths));
             }
         }
     }
@@ -414,7 +539,7 @@ impl App {
             return (Bad, "ENGINE ERROR".into(), "The torrent engine isn't running.".into());
         }
         if s.adapter.is_empty() || !s.bind_only {
-            return (Bad, "NOT LOCKED TO VPN".into(), "Pick your VPN adapter on the Network page and turn on \"Only use this adapter\".".into());
+            return (Bad, "NOT LOCKED TO VPN".into(), "Pick your VPN adapter on the Connection page and turn on the kill switch.".into());
         }
         if sn.kill_hold {
             return (Warn, "HELD: VPN DOWN".into(), "The kill switch is doing its job: nothing runs until your VPN adapter is back.".into());
@@ -480,13 +605,9 @@ impl App {
     pub(crate) fn render_page_body(&mut self, ui: &mut egui::Ui) {
         match self.page {
             Page::Torrents => self.page_torrents(ui),
-            Page::Add => self.page_add(ui),
             Page::Rss => self.page_rss(ui),
-            Page::Speed => self.page_speed(ui),
-            Page::Network => self.page_network(ui),
-            Page::Privacy => self.page_privacy(ui),
-            Page::Seeding => self.page_seeding(ui),
-            Page::Config => self.page_config(ui),
+            Page::Connection => self.page_connection(ui),
+            Page::Settings => self.page_settings(ui),
             Page::Log => self.page_log(ui),
         }
     }
@@ -536,16 +657,14 @@ impl App {
         let full = ui.max_rect();
         let gap = 12.0;
         let side_w = 210.0_f32.min(full.width() * 0.3);
-        let bar_h = 48.0;
         let advanced = self.settings.advanced_mode;
         let items: Vec<_> = MENU.iter().filter(|m| advanced || !m.2).collect();
 
-        let main = Rect::from_min_max(full.min, pos2(full.right() - side_w - gap, full.bottom() - bar_h - gap));
+        let main = Rect::from_min_max(full.min, pos2(full.right() - side_w - gap, full.bottom()));
         let menu_h = items.len() as f32 * (ff::MENU_ITEM_HEIGHT + 6.0) + ff::WINDOW_PADDING as f32 * 2.0;
         let menu = Rect::from_min_size(pos2(main.right() + gap, full.top()), Vec2::new(side_w, menu_h));
-        let info_h = 192.0;
+        let info_h = 150.0;
         let info = Rect::from_min_max(pos2(menu.left(), main.bottom() - info_h), pos2(full.right(), main.bottom()));
-        let bar = Rect::from_min_max(pos2(full.left(), full.bottom() - bar_h), full.max);
 
         ff::window_at(ui, menu, "menu", |ui| {
             for (page, label, _) in &items {
@@ -560,13 +679,14 @@ impl App {
             self.page = Page::Torrents;
         }
 
-        let secs = self.snap.started.elapsed().as_secs();
-        let time = format!("{:02}:{:02}:{:02}", secs / 3600, (secs / 60) % 60, secs % 60);
         let held = self.snap.kill_hold || self.snap.user_paused;
         let (dl, ul) = if held { (human_rate(0), human_rate(0)) } else { (human_rate(self.snap.dl_rate), human_rate(self.snap.ul_rate)) };
-        let mut mode_clicked = false;
+        let ts = &self.snap.torrents;
+        let n_dl = ts.iter().filter(|t| t.info.state <= 2 && !t.info.paused).count();
+        let n_seed = ts.iter().filter(|t| t.info.state >= 3 && !t.info.paused).count();
         let (prot, prot_title, prot_detail) = self.protection();
-        let mut go_network = false;
+        let mut go_connection = false;
+        // The one status box: VPN protection, speeds and what's running.
         ff::window_at(ui, info, "info", |ui| {
             let r = ui
                 .horizontal(|ui| {
@@ -580,45 +700,26 @@ impl App {
                 })
                 .response
                 .interact(egui::Sense::click())
-                .on_hover_text(format!("{prot_detail}\n\nClick for the Network page."));
+                .on_hover_text(format!("{prot_detail}\n\nClick for the Connection page."));
             if r.clicked() {
-                go_network = true;
+                go_connection = true;
             }
             ui.add_space(2.0);
-            info_row(ui, "Time", &time);
             info_row(ui, "DL", &dl);
             info_row(ui, "UL", &ul);
-            ui.add_space(4.0);
-            let label = if advanced { "MODE: ADVANCED" } else { "MODE: SIMPLE" };
-            mode_clicked = ui
-                .add_sized([ui.available_width(), 26.0], egui::Button::new(RichText::new(label).color(LABEL()).strong()))
-                .on_hover_text("Simple shows the settings most people need. Advanced shows everything, plus the Log.")
-                .clicked();
+            ui.add_space(2.0);
+            ui.label(RichText::new(format!("{n_dl} downloading · {n_seed} seeding")).size(12.0).color(TEXT_DIM()));
         });
-        if go_network {
-            self.page = Page::Network;
+        if go_connection {
+            self.page = Page::Connection;
             self.menu_touched = true;
         }
-        if mode_clicked {
-            self.settings.advanced_mode = !advanced;
-            self.changed();
-        }
-
-        let status = self.status_line();
-        let warn = self.snap.kill_hold || self.snap.engine_error.is_some();
-        ff::window_at(ui, bar, "status", |ui| {
-            ui.add_space(-4.0);
-            ui.horizontal_centered(|ui| {
-                ff::badge(ui, prot, 18.0).on_hover_text(&prot_detail);
-                ui.add_space(4.0);
-                ff::title(ui, &status, 16.0, if warn { ff::WARN() } else { TEXT() });
-            });
-        });
 
         ff::window_at(ui, main, "main", |ui| self.render_page_body(ui));
 
         self.update_prompt(ui.ctx());
         self.files_popup(ui.ctx(), main);
+        self.add_dialog(ui.ctx());
         self.remove_dialog(ui.ctx());
         self.toasts(ui.ctx(), pos2(main.right() - 14.0, main.top() + 14.0));
     }
@@ -735,6 +836,7 @@ impl eframe::App for App {
 
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         let ctx = ui.ctx().clone();
+        self.poll_pick();
         self.handle_drops(&ctx);
         self.quick_add_magnet(&ctx);
         egui::CentralPanel::default()
