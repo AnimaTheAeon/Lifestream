@@ -420,10 +420,6 @@ impl App {
                         let size = egui::vec2(76.0, 24.0);
                         egui::containers::menu::MenuButton::from_button(egui::Button::new("More").min_size(size))
                             .ui(ui, |ui| self.torrent_menu(ui, t));
-                        let (label, tip) = if i.paused { ("Resume", "Start this torrent") } else { ("Pause", "Pause this torrent") };
-                        if ui.add(egui::Button::new(label).min_size(size)).on_hover_text(tip).clicked() {
-                            self.core.send(if i.paused { Cmd::Resume(i.hash.clone()) } else { Cmd::Pause(i.hash.clone()) });
-                        }
                         ui.label(dim(&human_bytes(i.total_wanted)));
                     });
                 });
@@ -539,9 +535,7 @@ impl App {
                 }
             }
             let n = self.selected.len();
-            if n == 0 {
-                ui.label(dim("Tick torrents to act on several at once."));
-            } else {
+            if n > 0 {
                 ui.label(RichText::new(format!("{n} selected")).color(TEXT()).strong());
             }
             let finished: Vec<String> = list.iter().filter(|t| t.info.state >= 4 && t.info.error.is_empty()).map(|t| t.info.hash.clone()).collect();

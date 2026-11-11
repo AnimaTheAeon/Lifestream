@@ -171,6 +171,45 @@ pub fn paint_tab(painter: &egui::Painter, rect: Rect, label: &str, lit: bool, si
     }
 }
 
+/// A small chamfered tab for the page bar along the bottom, label centered.
+fn paint_nav_tab(painter: &egui::Painter, rect: Rect, label: &str, lit: bool, hover: bool) {
+    let cut = 9.0;
+    let edge = if lit {
+        Color32::from_rgb(242, 255, 154)
+    } else if hover {
+        Color32::from_rgb(200, 255, 110)
+    } else {
+        rgba(150, 240, 70, 140)
+    };
+    painter.add(Shape::convex_polygon(ff::chamfer_points(rect, cut), edge, Stroke::NONE));
+    let inner = ff::chamfer_points(rect.shrink(1.5), cut - 0.5);
+    let (top, bottom) = if lit {
+        (Color32::from_rgb(226, 255, 106), Color32::from_rgb(140, 200, 28))
+    } else if hover {
+        (Color32::from_rgb(52, 140, 20), Color32::from_rgb(18, 70, 8))
+    } else {
+        (Color32::from_rgb(30, 96, 12), Color32::from_rgb(10, 44, 5))
+    };
+    let mut mesh = egui::Mesh::default();
+    for p in &inner {
+        let v = ((p.y - rect.top()) / rect.height()).clamp(0.0, 1.0);
+        let mix = |a: u8, b: u8| (a as f32 + (b as f32 - a as f32) * v) as u8;
+        mesh.colored_vertex(*p, Color32::from_rgb(mix(top.r(), bottom.r()), mix(top.g(), bottom.g()), mix(top.b(), bottom.b())));
+    }
+    for i in 1..inner.len() as u32 - 1 {
+        mesh.add_triangle(0, i, i + 1);
+    }
+    painter.add(Shape::mesh(mesh));
+    let text = label.to_uppercase();
+    let font = ff::display_font(12.0);
+    if lit {
+        painter.text(rect.center(), egui::Align2::CENTER_CENTER, &text, font, pal().on_accent);
+    } else {
+        painter.text(rect.center() + Vec2::new(0.0, 1.2), egui::Align2::CENTER_CENTER, &text, font.clone(), rgba(0, 0, 0, 160));
+        painter.text(rect.center(), egui::Align2::CENTER_CENTER, &text, font, Color32::from_rgb(190, 242, 126));
+    }
+}
+
 /// A round hint button like "ENTER  SELECT". Returns its response.
 fn hint(ui: &mut egui::Ui, at: Pos2, key: &str, label: &str) -> egui::Response {
     let r = 24.0;
@@ -455,6 +494,41 @@ impl App {
         if hint(ui, pos2(full.right() - 190.0, full.bottom() - 30.0), "ESC", "BACK").clicked() {
             self.green_back();
         }
+        self.green_page_bar(ui, Rect::from_min_max(pos2(full.left(), full.bottom() - 46.0), pos2(full.right() - 210.0, full.bottom() - 14.0)));
         frame
+    }
+
+    /// Small tabs along the bottom of a page: jump straight to another page
+    /// without going back to the dashboard.
+    fn green_page_bar(&mut self, ui: &mut egui::Ui, area: Rect) {
+        let menu = self.green_menu();
+        if menu.is_empty() || area.width() < 200.0 {
+            return;
+        }
+        let gap = 6.0;
+        let w = ((area.width() - gap * (menu.len() as f32 - 1.0)) / menu.len() as f32).min(118.0);
+        if w < 60.0 {
+            return;
+        }
+        let busy = self.green_leave.is_some() || self.green_zoom.is_some();
+        for (i, (page, label)) in menu.iter().enumerate() {
+            let rect = Rect::from_min_size(pos2(area.left() + i as f32 * (w + gap), area.top()), Vec2::new(w, area.height()));
+            let resp = ui.interact(rect, ui.id().with(("page_bar", i)), Sense::click());
+            let lit = *page == self.page;
+            paint_nav_tab(ui.painter(), rect, label, lit, resp.hovered());
+            if resp.hovered() && !lit {
+                ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+            }
+            if resp.clicked() && !lit && !busy {
+                // Close anything open on the old page, then flash into the new one.
+                self.popup = None;
+                self.confirm_remove = None;
+                self.core.send(Cmd::WatchFiles(None));
+                self.page = *page;
+                self.menu_touched = true;
+                self.green_cursor = i;
+                self.green_reveal = Some(std::time::Instant::now());
+            }
+        }
     }
 }
