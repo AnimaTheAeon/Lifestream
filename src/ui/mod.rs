@@ -125,6 +125,8 @@ pub struct App {
     pub picking: Option<(Pick, Receiver<Option<std::path::PathBuf>>)>,
     incoming: Receiver<Incoming>,
     pub rss_rule: usize,
+    /// Which RSS feed is expanded (by position).
+    pub rss_feed_open: Option<usize>,
     pub new_feed: (String, String),
     pub tracker_input: String,
     pub adapters: Vec<crate::netif::Adapter>,
@@ -204,6 +206,7 @@ impl App {
             picking: None,
             incoming,
             rss_rule: 0,
+            rss_feed_open: None,
             new_feed: (String::new(), String::new()),
             tracker_input: String::new(),
             adapters: Vec::new(),
