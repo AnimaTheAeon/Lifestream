@@ -282,11 +282,15 @@ impl App {
         }
         self.alert_seen = Some(at);
         let in_front = ctx.input(|i| i.viewport().focused).unwrap_or(false);
-        if self.settings.system_notifications && !in_front {
+        if !self.settings.system_notifications {
+            crate::applog::info(format!("Notification skipped (turned off in Settings): {title}"));
+        } else if in_front {
+            crate::applog::info(format!("Notification skipped (Lifestream is in front): {title}"));
+        } else {
             #[cfg(windows)]
             crate::winint::notify(&title, &body);
             #[cfg(not(windows))]
-            let _ = (title, body);
+            crate::applog::info(format!("Notification (shown on Windows only): {title}: {body}"));
         }
     }
 

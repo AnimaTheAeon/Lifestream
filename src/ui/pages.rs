@@ -1493,7 +1493,13 @@ impl App {
                     ui,
                     "Windows notifications",
                     "Pops up a Windows notification when a download finishes, the kill switch trips, or the VPN comes back, while Lifestream is in the background or in the tray. (In-app messages always show.)",
-                    |ui| changed |= toggle(ui, &mut s.system_notifications),
+                    |ui| {
+                        changed |= toggle(ui, &mut s.system_notifications);
+                        if ui.button("Test").on_hover_text("Send a test notification now. If none appears, check Windows Settings › System › Notifications (Lifestream, and Do not disturb).").clicked() {
+                            #[cfg(windows)]
+                            crate::winint::notify("Lifestream", "Notifications are working.");
+                        }
+                    },
                 );
                 row(
                     ui,
