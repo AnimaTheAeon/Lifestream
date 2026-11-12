@@ -42,6 +42,24 @@ fn main() {
         settings.incomplete_dir = "/volume1/downloads/Lifestream/Incomplete".into();
         settings.save();
     }
+    // First run in Docker: the compose file can preset the folder and the
+    // VPN adapter, so it starts locked to the tunnel with nothing to pick.
+    if fresh {
+        if let Ok(dir) = std::env::var("LIFESTREAM_DOWNLOAD_DIR") {
+            if !dir.trim().is_empty() {
+                settings.download_dir = dir.trim().into();
+                settings.incomplete_dir = format!("{}/Incomplete", dir.trim().trim_end_matches('/'));
+            }
+        }
+        if let Ok(adapter) = std::env::var("LIFESTREAM_ADAPTER") {
+            if !adapter.trim().is_empty() {
+                settings.adapter = adapter.trim().into();
+                settings.kill_switch = true;
+                settings.bind_only = true;
+            }
+        }
+        settings.save();
+    }
     // The web page is the only way in, so it must answer on the network.
     if !settings.rpc_enabled || !settings.rpc_allow_lan {
         settings.rpc_enabled = true;

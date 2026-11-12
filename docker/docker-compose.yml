@@ -1,0 +1,17 @@
+# Lifestream, sending all its traffic through the NAS VPN container.
+# Start NAS VPN first. Open http://<your-NAS-IP>:9091 after this starts.
+services:
+  lifestream:
+    build: .
+    container_name: lifestream
+    restart: unless-stopped
+    # Use NAS VPN's network: no internet except through the VPN.
+    network_mode: "container:nas-vpn"
+    environment:
+      - TZ=America/New_York
+      # Inside the VPN's network the tunnel is tun0. Lifestream starts locked to it.
+      - LIFESTREAM_ADAPTER=tun0
+      - LIFESTREAM_DOWNLOAD_DIR=/downloads/Lifestream
+    volumes:
+      - ./config:/config                 # settings, torrent list and progress
+      - /volume1/downloads:/downloads    # where downloads go
