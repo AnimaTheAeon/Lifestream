@@ -149,6 +149,13 @@ pub fn handle(core: &CoreHandle, mut req: Request, setup_only: bool) {
 
 fn same_origin(req: &Request) -> bool {
     let get = |name: &'static str| req.headers().iter().find(|h| h.field.equiv(name)).map(|h| h.value.to_string());
+    // The page marks its own requests. Another site can't add this header:
+    // the browser would ask first (a CORS preflight), and Lifestream never says yes.
+    // This keeps working behind reverse proxies and odd host names, where
+    // Origin and Host don't match.
+    if get("X-Lifestream").is_some() || get("Sec-Fetch-Site").as_deref() == Some("same-origin") {
+        return true;
+    }
     let host = get("Host").unwrap_or_default();
     match get("Origin") {
         // Browsers send Origin on POST/PUT; it must be this server.

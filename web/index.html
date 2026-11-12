@@ -77,6 +77,12 @@ input:focus, select:focus { outline: none; border-color: var(--light); box-shado
 .drop.over { border-color: var(--light); background: rgba(255,255,255,.05); }
 .log { font: 13px/1.5 ui-monospace, Consolas, monospace; text-shadow: none; white-space: pre-wrap; }
 .setup { max-width: 380px; margin: 10vh auto; padding: 24px 26px; }
+.segs { display: inline-flex; border: 1px solid var(--line, #d6d8e4); border-radius: 6px; overflow: hidden; }
+.seg { border: 0; background: none; color: var(--dim); font: inherit; font-weight: 800; padding: 6px 14px; cursor: pointer; }
+.seg[aria-pressed="true"] { background: rgba(255,255,255,.14); color: var(--text); }
+.scroll.simple .adv { display: none; }
+.logbox { max-height: 320px; overflow: auto; padding: 8px; border-radius: 6px; background: rgba(0,0,0,.25); font-size: 13px; }
+.toast.bad { color: #ffb4b4; }
 .toast { position: fixed; right: 20px; bottom: 76px; padding: 10px 16px; display: none; }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 @media (max-width: 820px) {
@@ -120,7 +126,6 @@ input:focus, select:focus { outline: none; border-color: var(--light); box-shado
         <button class="mi" data-page="torrents"><svg class="hand"><use href="#glove"/></svg>Torrents</button>
         <button class="mi" data-page="add"><svg class="hand"><use href="#glove"/></svg>Add</button>
         <button class="mi" data-page="settings"><svg class="hand"><use href="#glove"/></svg>Settings</button>
-        <button class="mi" data-page="log"><svg class="hand"><use href="#glove"/></svg>Log</button>
       </nav>
       <section class="win info" aria-label="Status">
         <div class="row" style="justify-content:flex-start;gap:8px"><span id="badge"></span><span id="headline" class="val" style="font-size:14px"></span></div>
@@ -163,14 +168,18 @@ function badge(kind) {
   s.innerHTML = `<circle cx="10" cy="10" r="9" fill="${fill}" stroke="#d6d8e4" stroke-width="1.5"/>${mark}`;
   return s;
 }
-function toast(text) { const t = $('#toast'); t.textContent = text; t.style.display = 'block'; clearTimeout(toast.t); toast.t = setTimeout(() => t.style.display = 'none', 3500); }
+function toast(text, bad) { const t = $('#toast'); t.textContent = text; t.classList.toggle('bad', !!bad); t.style.display = 'block'; clearTimeout(toast.t); toast.t = setTimeout(() => t.style.display = 'none', bad ? 8000 : 3500); }
+// Run an action; say so when it works, and always say why when it doesn't.
+const doAction = (action, done) => api('action', 'POST', { action }).then(() => done && toast(done)).catch((e) => toast(e.message, true));
 
 // ---- Transmission RPC (same API Midgar uses)
 let sessionId = '';
 async function rpc(method, args = {}) {
   for (let attempt = 0; attempt < 2; attempt++) {
-    const r = await fetch('/transmission/rpc', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Transmission-Session-Id': sessionId }, body: JSON.stringify({ method, arguments: args }) });
+    const r = await fetch('/transmission/rpc', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Transmission-Session-Id': sessionId, 'X-Lifestream': '1' }, body: JSON.stringify({ method, arguments: args }) });
     if (r.status === 409) { sessionId = r.headers.get('X-Transmission-Session-Id') || ''; continue; }
+    if (r.status === 401) throw new Error('Not signed in. Reload the page and sign in again.');
+    if (!r.ok) throw new Error('Lifestream answered with error ' + r.status);
     const j = await r.json();
     if (j.result !== 'success') throw new Error(j.result);
     return j.arguments;
@@ -178,9 +187,13 @@ async function rpc(method, args = {}) {
   throw new Error('No session');
 }
 async function api(path, method = 'GET', body) {
-  const r = await fetch('/lifestream/api/' + path, { method, headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined });
+  const headers = { 'X-Lifestream': '1' };
+  if (body) headers['Content-Type'] = 'application/json';
+  let r;
+  try { r = await fetch('/lifestream/api/' + path, { method, headers, body: body ? JSON.stringify(body) : undefined }); }
+  catch (e) { throw new Error("Can't reach Lifestream"); }
   const j = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+  if (!r.ok) throw new Error(j.error || (r.status === 401 ? 'Not signed in. Reload the page and sign in again.' : r.status === 403 ? 'Lifestream refused this request (403).' : 'Error ' + r.status));
   return j;
 }
 
@@ -244,7 +257,7 @@ function torrentRow(t) {
   // The kill switch or Pause all holds everything at the session level.
   if (state && (state.killHold || state.userPaused) && t.status !== 0) [word, cls, fill] = ['HELD', 'warn', 'f-wait'];
   const paused = t.status === 0;
-  const act = (method) => async () => { try { await rpc(method, { ids: [t.hashString] }); refresh(); } catch (e) { toast(e.message); } };
+  const act = (method) => async () => { try { await rpc(method, { ids: [t.hashString] }); refresh(); } catch (e) { toast(e.message, true); } };
   return el('div', { class: 't' },
     el('div', { class: 'sq', title: t.isPrivate ? 'Private tracker' : '' }, pct >= 100 ? '✓' : Math.floor(pct) + '%'),
     el('div', { style: 'min-width:0' },
@@ -267,7 +280,7 @@ function torrentRow(t) {
 async function removeDialog(t) {
   if (!confirm(`Remove "${t.name}" from Lifestream?`)) return;
   const del = confirm('Also delete its downloaded files?\n\nOK = delete files, Cancel = keep files');
-  try { await rpc('torrent-remove', { ids: [t.hashString], 'delete-local-data': del }); toast('Removed'); refresh(); } catch (e) { toast(e.message); }
+  try { await rpc('torrent-remove', { ids: [t.hashString], 'delete-local-data': del }); toast('Removed'); refresh(); } catch (e) { toast(e.message, true); }
 }
 
 let filter = '';
@@ -312,7 +325,7 @@ function drawAdd() {
     el('div', { class: 'field' }, el('label', { class: 'lbl', for: 'apause' }, 'ADD PAUSED'), el('div', {}, paused)),
     el('div', { style: 'display:flex;gap:8px;margin:10px 0' }, el('button', { class: 'btn primary', onclick: async () => {
       const v = magnet.value.trim(); if (!v) return magnet.focus();
-      try { const r = await rpc('torrent-add', { filename: v, ...opts() }); toast(r['torrent-duplicate'] ? 'Already in the list' : 'Added'); go('torrents'); } catch (e) { toast(e.message); }
+      try { const r = await rpc('torrent-add', { filename: v, ...opts() }); toast(r['torrent-duplicate'] ? 'Already in the list' : 'Added'); go('torrents'); } catch (e) { toast(e.message, true); }
     } }, 'Add link')),
     el('h2', {}, '.TORRENT FILES'), fileIn, drop));
 }
@@ -330,7 +343,6 @@ async function drawSettings() {
   const seedSel = (v.seed_action = el('select', { id: 'f-seed_action' }, ...[['pause', 'Pause it'], ['remove', 'Remove it (keep files)'], ['remove-delete', 'Remove it and delete files']].map(([val, t]) => el('option', { value: val, selected: s.seed_action === val }, t))));
   const encSel = (v.encryption = el('select', { id: 'f-encryption' }, ...[[0, 'Allow'], [1, 'Prefer'], [2, 'Require']].map(([val, t]) => el('option', { value: val, selected: s.encryption === val }, t))));
   const pass = el('input', { type: 'password', id: 'f-rpc_password', placeholder: s.rpc_password_set ? '(unchanged)' : '', autocomplete: 'new-password' });
-  const err = el('p', { class: 'bad', role: 'alert' });
 
   async function save() {
     const body = {};
@@ -341,75 +353,96 @@ async function drawSettings() {
       else body[k] = c.value;
     }
     if (pass.value) body.rpc_password = pass.value;
-    try { await api('settings', 'PUT', body); err.textContent = ''; toast('Settings saved'); pass.value = ''; refresh(); }
-    catch (e) { err.textContent = e.message; }
+    body.advanced_mode = advanced;
+    try { await api('settings', 'PUT', body); toast('Settings saved'); pass.value = ''; refresh(); }
+    catch (e) { toast("Didn't save: " + e.message, true); }
   }
 
-  $('#page').replaceChildren(
-    el('div', { class: 'toolbar' }, el('h1', { style: 'margin:0;flex:1' }, 'Settings'), el('button', { class: 'btn primary', onclick: save }, 'Save')),
-    el('div', { class: 'scroll' }, err,
+  // Simple shows what most people touch; Advanced adds the rest, the tools and the log.
+  let advanced = !!s.advanced_mode;
+  const adv = (...kids) => el('div', { class: 'adv' }, ...kids);
+  const modeBtn = (on, label) => el('button', { class: 'seg', 'aria-pressed': String(advanced === on), onclick: () => setMode(on) }, label);
+  const modes = el('div', { class: 'segs', role: 'group', 'aria-label': 'Settings detail' });
+  const body = el('div', { class: 'scroll' });
+  function setMode(on) {
+    advanced = on;
+    body.classList.toggle('simple', !on);
+    modes.replaceChildren(modeBtn(false, 'Simple'), modeBtn(true, 'Advanced'));
+    if (on) loadLog();
+    // Remember the choice without making the user press Save.
+    api('settings', 'PUT', { advanced_mode: on }).catch(() => {});
+  }
+  const logBox = el('div', { class: 'log logbox' });
+  async function loadLog() {
+    try { const { lines } = await api('log'); logBox.replaceChildren(...(lines.length ? lines.map((l) => el('div', { class: l.level === 'error' ? 'bad' : l.level === 'warn' ? 'warn' : '' }, `${l.time}  ${l.text}`)) : [el('div', { class: 'dimc' }, 'Nothing logged yet.')])); logBox.scrollTop = logBox.scrollHeight; }
+    catch (e) { toast(e.message, true); }
+  }
+
+  body.append(
       el('h2', {}, 'FOLDERS'),
       field('download_dir', 'DOWNLOAD FOLDER', text('download_dir', { style: 'width:100%' }), 'Where downloads are saved. In Docker this is a folder inside a mounted volume, like /downloads/Lifestream.'),
-      field('incomplete_enabled', 'KEEP UNFINISHED SEPARATE', check('incomplete_enabled')),
-      field('incomplete_dir', 'UNFINISHED FOLDER', text('incomplete_dir', { style: 'width:100%' })),
-      el('h2', {}, 'VPN AND NETWORK'),
-      field('adapter', 'VPN ADAPTER', adapterSel, 'Torrent traffic only uses this connection.'),
+      adv(field('incomplete_enabled', 'KEEP UNFINISHED SEPARATE', check('incomplete_enabled')),
+        field('incomplete_dir', 'UNFINISHED FOLDER', text('incomplete_dir', { style: 'width:100%' }))),
+      el('h2', {}, 'VPN'),
+      field('adapter', 'VPN ADAPTER', adapterSel, 'Torrent traffic only uses this connection. In Docker behind NAS VPN, pick tun0.'),
       field('kill_switch', 'KILL SWITCH', check('kill_switch'), 'If the adapter drops (or none is picked), everything pauses until it is back.'),
-      field('listen_port', 'LISTENING PORT', num('listen_port')),
-      field('follow_vpn_port', 'USE VPN PORT FORWARDING', check('follow_vpn_port')),
-      field('natpmp', 'NAT-PMP', check('natpmp')),
-      field('upnp', 'UPNP', check('upnp')),
+      adv(field('listen_port', 'LISTENING PORT', num('listen_port')),
+        field('follow_vpn_port', 'USE VPN PORT FORWARDING', check('follow_vpn_port')),
+        field('natpmp', 'NAT-PMP', check('natpmp')),
+        field('upnp', 'UPNP', check('upnp'))),
       el('h2', {}, 'SPEED (KB/S, 0 = NO LIMIT)'),
       field('dl_limit_kb', 'DOWNLOAD', num('dl_limit_kb')),
       field('ul_limit_kb', 'UPLOAD', num('ul_limit_kb')),
-      field('turtle_dl_kb', 'TURTLE DOWNLOAD', num('turtle_dl_kb')),
-      field('turtle_ul_kb', 'TURTLE UPLOAD', num('turtle_ul_kb')),
-      field('active_downloads', 'ACTIVE DOWNLOADS', num('active_downloads')),
-      field('active_seeds', 'ACTIVE SEEDS', num('active_seeds')),
+      adv(field('turtle_dl_kb', 'TURTLE DOWNLOAD', num('turtle_dl_kb')),
+        field('turtle_ul_kb', 'TURTLE UPLOAD', num('turtle_ul_kb')),
+        field('active_downloads', 'ACTIVE DOWNLOADS', num('active_downloads')),
+        field('active_seeds', 'ACTIVE SEEDS', num('active_seeds'))),
       el('h2', {}, 'SEEDING'),
       field('ratio_limit', 'STOP AT RATIO', num('ratio_limit', { step: '0.1' }), '0 = no limit'),
-      field('seed_hours', 'OR AFTER HOURS', num('seed_hours', { step: '0.5' }), '0 = no limit'),
+      adv(field('seed_hours', 'OR AFTER HOURS', num('seed_hours', { step: '0.5' }), '0 = no limit')),
       field('seed_action', 'THEN', seedSel),
-      el('h2', {}, 'PRIVACY'),
-      field('encryption', 'ENCRYPTION', encSel),
-      field('anonymous_mode', 'ANONYMOUS MODE', check('anonymous_mode')),
-      field('dht', 'DHT', check('dht')),
-      field('pex', 'PEER EXCHANGE', check('pex'), 'Takes effect after a restart.'),
-      field('lsd', 'LOCAL PEER DISCOVERY', check('lsd')),
-      field('blocklist_url', 'BLOCKLIST URL', text('blocklist_url', { style: 'width:100%' })),
-      el('h2', {}, 'SIGN-IN AND REMOTE CONTROL'),
+      adv(el('h2', {}, 'PRIVACY'),
+        field('encryption', 'ENCRYPTION', encSel),
+        field('anonymous_mode', 'ANONYMOUS MODE', check('anonymous_mode')),
+        field('dht', 'DHT', check('dht')),
+        field('pex', 'PEER EXCHANGE', check('pex'), 'Takes effect after a restart.'),
+        field('lsd', 'LOCAL PEER DISCOVERY', check('lsd')),
+        field('blocklist_url', 'BLOCKLIST URL', text('blocklist_url', { style: 'width:100%' }))),
+      el('h2', {}, 'SIGN-IN'),
       field('rpc_username', 'USERNAME', text('rpc_username')),
       el('div', { class: 'field' }, el('label', { class: 'lbl', for: 'f-rpc_password' }, 'NEW PASSWORD'), pass, el('div', { class: 'help' }, 'In Midgar/Turks/Sonarr add a Transmission client: this NAS or PC, port 9091, URL base /transmission/, and these details.')),
-      el('h2', {}, 'TOOLS'),
-      el('div', { style: 'display:flex;gap:8px;flex-wrap:wrap' },
-        el('button', { class: 'btn', onclick: () => api('action', 'POST', { action: 'leak-check' }).then(() => toast('Checking…')) }, 'Leak check'),
-        el('button', { class: 'btn', onclick: () => api('action', 'POST', { action: 'update-blocklist' }).then(() => toast('Updating blocklist…')) }, 'Update blocklist'),
-        el('button', { class: 'btn', onclick: () => api('action', 'POST', { action: 'rss-check' }).then(() => toast('Checking feeds…')) }, 'Check RSS now')),
-      el('p', { class: 'dimc' }, `Lifestream ${state ? state.version : ''}${state && state.headless ? ' for Synology' : ''}`)));
-}
+      adv(el('h2', {}, 'TOOLS'),
+        el('div', { style: 'display:flex;gap:8px;flex-wrap:wrap' },
+          el('button', { class: 'btn', onclick: () => doAction('leak-check', 'Leak check started. The result shows up here and in the log.') }, 'Leak check'),
+          el('button', { class: 'btn', onclick: () => doAction('update-blocklist', 'Updating blocklist…') }, 'Update blocklist'),
+          el('button', { class: 'btn', onclick: () => doAction('rss-check', 'Checking feeds…') }, 'Check RSS now')),
+        el('div', { class: 'toolbar', style: 'margin-top:18px' }, el('h2', { style: 'margin:0;flex:1' }, 'LOG'), el('button', { class: 'btn', onclick: loadLog }, 'Refresh')),
+        logBox),
+      el('p', { class: 'dimc' }, `Lifestream ${state ? state.version : ''}${state && state.headless ? ' for Synology' : ''}`));
 
-async function drawLog() {
-  const { lines } = await api('log');
   $('#page').replaceChildren(
-    el('div', { class: 'toolbar' }, el('h1', { style: 'margin:0;flex:1' }, 'Log'), el('button', { class: 'btn', onclick: drawLog }, 'Refresh')),
-    el('div', { class: 'scroll log' }, ...lines.map((l) => el('div', { class: l.level === 'error' ? 'bad' : l.level === 'warn' ? 'warn' : '' }, `${l.time}  ${l.text}`))));
+    el('div', { class: 'toolbar' }, el('h1', { style: 'margin:0;flex:1' }, 'Settings'), modes, el('button', { class: 'btn primary', onclick: save }, 'Save')),
+    body);
+  body.classList.toggle('simple', !advanced);
+  modes.replaceChildren(modeBtn(false, 'Simple'), modeBtn(true, 'Advanced'));
+  if (advanced) loadLog();
 }
 
 function go(p) {
   page = p; history.replaceState(null, '', '#' + p);
   document.querySelectorAll('.mi').forEach((b) => b.setAttribute('aria-current', b.dataset.page === p ? 'page' : 'false'));
-  ({ torrents: drawTorrents, add: drawAdd, settings: drawSettings, log: drawLog })[p]();
+  ({ torrents: drawTorrents, add: drawAdd, settings: drawSettings })[p]();
 }
 
 document.querySelectorAll('.mi').forEach((b) => b.addEventListener('click', () => go(b.dataset.page)));
-$('#pause-all').addEventListener('click', async () => { await api('action', 'POST', { action: state.userPaused ? 'resume-all' : 'pause-all' }); refresh(); });
+$('#pause-all').addEventListener('click', async () => { await doAction(state && state.userPaused ? 'resume-all' : 'pause-all'); refresh(); });
 $('#setup-form').addEventListener('submit', async (e) => {
   e.preventDefault();
   try { await api('setup', 'POST', { user: $('#su').value, pass: $('#sp').value }); location.reload(); }
   catch (err) { $('#setup-error').textContent = err.message; }
 });
 
-refresh().then(() => { if (state && !state.setup) go(['torrents', 'add', 'settings', 'log'].includes(page) ? page : 'torrents'); });
+refresh().then(() => { if (state && !state.setup) go(['torrents', 'add', 'settings'].includes(page) ? page : 'torrents'); });
 setInterval(refresh, 2000);
 </script>
 </body>
