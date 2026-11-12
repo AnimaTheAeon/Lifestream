@@ -85,6 +85,128 @@ input:focus, select:focus { outline: none; border-color: var(--light); box-shado
 .toast.bad { color: #ffb4b4; }
 .toast { position: fixed; right: 20px; bottom: 76px; padding: 10px 16px; display: none; }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+
+/* =====================================================================
+   Box of X: the green console-dashboard theme (project doc
+   claude/themes/green-dashboard.md). Everything hangs off body.green.
+   ===================================================================== */
+@font-face { font-family: Orbitron; font-weight: 800; src: url('/fonts/orbitron-800.ttf') format('truetype'); }
+#gbg, #ghome, #gbar, #gfoot, .gonly { display: none; }
+html:has(body.green) { background: #020c02; }
+body.green {
+  --text: #e4ffc4; --dim: #a6dc80; --label: #c8ff4a; --good: #8cff6e; --warn: #ffe14a; --bad: #ff7a5a; --well: #021002;
+  --light: #a0ff50; --mid: #50a028; --dark: #082206; --accent: #dcff64; --on-accent: #1c3504;
+  --shadow: 0 1.5px 0 rgba(0, 0, 0, .6); --cut: 22px;
+  background: transparent;
+}
+body.green #gbg { display: block; position: fixed; left: 0; top: 0; width: 100vw; height: 100vh; z-index: -1; pointer-events: none; }
+body.green .gonly { display: inline-flex; align-items: center; }
+body.green .side, body.green footer.status { display: none; }
+body.green #gbar { display: flex; gap: 20px; align-items: center; flex: none; }
+body.green #gfoot { display: flex; gap: 14px; align-items: center; flex: none; min-height: 46px; }
+body.green.ghome-on #app { display: none; }
+body.green.ghome-on #ghome { display: block; }
+body.green h2, body.green .toolbar h1, body.green .gtitle, body.green .seg { font-family: Orbitron, Nunito, sans-serif; text-transform: uppercase; }
+body.green h2 { font-size: 15px; letter-spacing: .04em; color: var(--accent); }
+/* The title bar already names the page. */
+body.green .toolbar h1, body.green .scroll > h1 { visibility: hidden; font-size: 1px; }
+body.green .scroll > h1 { display: none; }
+body.green .lbl { color: var(--label); }
+
+/* Panels: corner-cut glass with a lime outline and a soft glow. */
+body.green .win { position: relative; background: none; border: 0; border-radius: 0; box-shadow: none; isolation: isolate; filter: drop-shadow(0 0 5px rgba(150, 255, 60, .18)); }
+body.green .win::before, body.green .win::after { content: ""; position: absolute; pointer-events: none; }
+body.green .win::before { inset: 0; z-index: -2; background: rgba(160, 255, 80, .75); clip-path: polygon(var(--cut) 0, 100% 0, 100% calc(100% - var(--cut)), calc(100% - var(--cut)) 100%, 0 100%, 0 var(--cut)); }
+body.green .win::after { inset: 2px; z-index: -1; background: linear-gradient(160deg, rgba(26, 86, 12, .94) 0%, rgba(14, 60, 8, .94) 40%, rgba(10, 48, 6, .95) 70%, rgba(3, 22, 3, .97) 100%); clip-path: polygon(calc(var(--cut) - 1px) 0, 100% 0, 100% calc(100% - var(--cut) + 1px), calc(100% - var(--cut) + 1px) 100%, 0 100%, 0 calc(var(--cut) - 1px)); }
+body.green .toast { --cut: 12px; }
+body.green .toast.bad::before { background: var(--bad); }
+body.green .toolbar { border-bottom-color: rgba(150, 255, 70, .2); padding-left: 30px; }
+body.green .content .scroll { padding-left: 30px; }
+
+/* Controls: square corners, green fills. */
+body.green .btn, body.green input[type=text], body.green input[type=password], body.green input[type=number], body.green select, body.green .segs, body.green .tag, body.green .sq, body.green .bar, body.green .logbox, body.green .drop { border-radius: 1px; }
+body.green .btn { background: #103c08; border-color: var(--mid); text-shadow: none; }
+body.green .btn:hover, body.green .btn:focus-visible { background: #286e10; border-color: var(--light); }
+body.green .btn:active:not(:disabled) { background: #96dc28; color: var(--on-accent); }
+body.green .btn.primary { background: linear-gradient(#e2ff6a, #8cc81c); border-color: #f2ff9a; color: var(--on-accent); }
+body.green .btn.primary:hover { background: linear-gradient(#f0ff9a, #a6e030); }
+body.green input[type=text], body.green input[type=password], body.green input[type=number], body.green select { border-color: var(--mid); }
+body.green input:focus, body.green select:focus { border-color: var(--light); box-shadow: 0 0 0 2px rgba(170, 255, 60, .35); }
+body.green .field input[type=checkbox] { accent-color: #96dc28; }
+body.green .segs { border-color: var(--mid); }
+body.green .seg { font-size: 12px; padding: 7px 14px; }
+body.green .seg[aria-pressed="true"] { background: linear-gradient(#e2ff6a, #8cc81c); color: var(--on-accent); }
+body.green .t:hover { background: rgba(40, 110, 16, .35); }
+body.green .sq { border-color: var(--mid); background: radial-gradient(circle at 34% 28%, rgba(255,255,255,.18), rgba(255,255,255,0) 40%), #062a04; }
+body.green .bar { background: #000e00; border-color: #0c3406; }
+body.green .f-dl { background: linear-gradient(90deg, #4fb51a, #e2ff6a); }
+body.green .f-done { background: linear-gradient(90deg, #2c8a12, #8cff6e); }
+body.green .f-off { background: #4a5a42; }
+body.green .logbox { background: rgba(0, 10, 0, .55); }
+body.green .content .scroll::-webkit-scrollbar-thumb, body.green .logbox::-webkit-scrollbar-thumb { background: rgba(160, 255, 80, .45); }
+body.green .toast { position: fixed; right: 30px; bottom: 80px; max-width: min(560px, calc(100vw - 60px)); }
+
+/* Page chrome: title bar, status box, page tabs, BACK hint. */
+.gtitle { flex: none; width: min(42%, 520px); min-width: 240px; height: 56px; display: flex; align-items: center; padding: 0 40px 0 34px; background: var(--accent); color: var(--on-accent); text-shadow: none; clip-path: polygon(22px 0, 100% 0, calc(100% - 22px) 100%, 0 100%); font: 800 26px Orbitron, sans-serif; white-space: nowrap; overflow: hidden; }
+.gstatus { margin-left: auto; width: min(560px, 52%); height: 52px; min-width: 0; display: flex; align-items: center; gap: 12px; padding: 0 12px; background: rgba(0, 10, 0, .8); border: 1px solid rgba(170, 255, 90, .55); text-shadow: none; cursor: pointer; color: var(--text); font: inherit; text-align: left; }
+.gstatus:hover { border-color: rgba(200, 255, 120, .9); }
+.gstatus .lines { min-width: 0; flex: 1; }
+.gstatus .l1, .gstatus .l2 { font-family: Orbitron, sans-serif; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gstatus .l1 { font-size: 10.5px; color: #a8e070; }
+.gstatus .l2 { font-size: 12.5px; color: #f0ffd8; margin-top: 3px; }
+.gstatus .l2.warn { color: var(--warn); } .gstatus .l2.bad { color: var(--bad); }
+.gchip { flex: none; padding: 4px 8px; background: var(--accent); color: var(--on-accent); font: 800 10.5px Orbitron, sans-serif; text-decoration: none; clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px); }
+.orb { width: 24px; height: 24px; border-radius: 50%; flex: none; background: radial-gradient(circle at 34% 28%, rgba(255,255,255,.85) 0, rgba(255,255,255,0) 30%), radial-gradient(circle, #f4ff9c 0%, #9ee82c 35%, #4fb51a 72%, #1c5a0a 100%); box-shadow: 0 0 10px rgba(170, 255, 60, .6); }
+.orb.warn { background: radial-gradient(circle at 34% 28%, rgba(255,255,255,.8) 0, rgba(255,255,255,0) 30%), radial-gradient(circle, #fff3a0, #e8c22c 40%, #a07a10 80%, #4a3606); box-shadow: 0 0 10px rgba(255, 220, 60, .6); }
+.orb.bad { background: radial-gradient(circle at 34% 28%, rgba(255,255,255,.8) 0, rgba(255,255,255,0) 30%), radial-gradient(circle, #ffc0a8, #ff7a5a 40%, #b03a20 80%, #4a1006); box-shadow: 0 0 10px rgba(255, 110, 70, .6); }
+#gtabs { display: flex; gap: 8px; flex: 1; min-width: 0; flex-wrap: wrap; }
+.gnav { position: relative; isolation: isolate; border: 0; padding: 7px 16px; min-width: 110px; font: 800 12px Orbitron, sans-serif; text-transform: uppercase; color: #bef27e; background: rgba(150, 240, 70, .5); cursor: pointer; clip-path: polygon(9px 0, 100% 0, 100% calc(100% - 9px), calc(100% - 9px) 100%, 0 100%, 0 9px); }
+.gnav::before { content: ""; position: absolute; inset: 1px; z-index: -1; background: linear-gradient(#24700e, #0c3406); clip-path: polygon(8.5px 0, 100% 0, 100% calc(100% - 8.5px), calc(100% - 8.5px) 100%, 0 100%, 0 8.5px); }
+.gnav:hover, .gnav:focus-visible { color: #e6ffb4; background: rgba(170, 255, 90, .85); outline: none; }
+.gnav[aria-current="page"] { color: var(--on-accent); background: #f2ff9a; }
+.gnav[aria-current="page"]::before { background: linear-gradient(#e2ff6a, #8cc81c); }
+.ghint { display: inline-flex; align-items: center; gap: 12px; background: none; border: 0; padding: 0; font: 800 17px Orbitron, sans-serif; color: #bef27e; text-transform: uppercase; text-shadow: none; cursor: pointer; }
+.ghint .node { width: 46px; height: 46px; font-size: 9.5px; color: #d8ff9a; }
+.ghint:hover, .ghint:focus-visible { color: #e6ffb4; outline: none; }
+.ghint:hover .node, .ghint:focus-visible .node { --lit: 1; }
+.node { position: relative; border-radius: 50%; flex: none; display: grid; place-items: center; font-family: Orbitron, sans-serif; background: radial-gradient(circle, #041403 0%, #0a2806 48%, #2c8a12 76%, #8de83a 86%, #1c5a0a 100%); box-shadow: 0 0 calc(8px + 10px * var(--lit, 0)) rgba(150, 255, 60, calc(.35 + .4 * var(--lit, 0))); transition: box-shadow .4s ease; }
+.node::after { content: ""; position: absolute; inset: 32%; border-radius: 50%; border: 1.5px solid rgba(160, 255, 80, .4); }
+.node.lit { --lit: 1; background: radial-gradient(circle, #041403 0%, #0a2806 48%, #2c8a12 76%, #dcff6e 86%, #1c5a0a 100%); }
+
+/* Home screen: the big orb with the menu on an arc around it. */
+#ghome { position: fixed; inset: 0; overflow: hidden; }
+.bigorb { position: absolute; transform: translate(-50%, -50%); }
+.bigorb .shell { position: absolute; inset: -11%; border-radius: 50%; border: 2px solid rgba(120, 220, 50, .35); }
+.bigorb .spin { position: absolute; inset: -6%; border-radius: 50%; border: calc(var(--r) * .07) solid transparent; border-top-color: rgba(140, 240, 60, .3); border-right-color: rgba(140, 240, 60, .18); animation: orbspin 18s linear infinite; }
+.bigorb .jelly { position: absolute; inset: -2%; border-radius: 50%; background: rgba(60, 170, 24, .28); border: 3px solid rgba(160, 255, 80, .43); animation: jelly 9s ease-in-out infinite alternate; }
+.bigorb .core { position: absolute; inset: 8%; border-radius: 50%; background: radial-gradient(circle at 32% 26%, rgba(255,255,255,.75) 0, rgba(255,255,255,0) 22%), radial-gradient(circle, #f4ff9c 0%, #9ee82c 35%, #4fb51a 72%, #1c5a0a 100%); animation: breathe 9s ease-in-out infinite alternate; }
+.bigorb .lobe { position: absolute; border-radius: 50%; background: rgba(140, 240, 60, .18); border: 1.5px solid rgba(200, 255, 120, .27); animation: drift 7s ease-in-out infinite alternate; }
+.bigorb canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+@keyframes orbspin { to { transform: rotate(360deg); } }
+@keyframes jelly { 0% { transform: translate(-1%, 1%) scale(1.03, .97); } 100% { transform: translate(1.5%, -1%) scale(.98, 1.02); } }
+@keyframes drift { to { transform: translate(6%, -5%); } }
+@keyframes breathe { 0% { box-shadow: 0 0 calc(var(--r) * .36) rgba(170, 255, 60, .42); } 100% { box-shadow: 0 0 calc(var(--r) * .46) rgba(170, 255, 60, .52); } }
+body.calm .bigorb * { animation: none !important; }
+.gmenu-item { position: absolute; display: flex; align-items: center; cursor: pointer; }
+.gmenu-item .wire { width: 26px; height: 2px; background: rgba(150, 255, 70, .55); flex: none; }
+.gmenu-item.lit .wire { background: rgba(150, 255, 70, .9); }
+.gtab { flex: none; height: 100%; display: flex; align-items: center; padding-left: 26px; font: 800 22px Orbitron, sans-serif; text-transform: uppercase; color: #bef27e; text-shadow: 0 1.5px 0 rgba(0, 0, 0, .6); position: relative; isolation: isolate; background: rgba(150, 240, 70, .6); clip-path: polygon(16px 0, 100% 0, 100% calc(100% - 16px), calc(100% - 16px) 100%, 0 100%, 0 16px); }
+.gtab::before { content: ""; position: absolute; inset: 2px; z-index: -1; background: linear-gradient(#24700e, #0c3406); clip-path: polygon(15px 0, 100% 0, 100% calc(100% - 15px), calc(100% - 15px) 100%, 0 100%, 0 15px); }
+.gmenu-item.lit .gtab { background: #f2ff9a; color: #1c3504; text-shadow: none; }
+.gmenu-item.lit .gtab::before { background: linear-gradient(#e2ff6a, #8cc81c); }
+#ghome .gstatus { position: absolute; left: 22px; bottom: 22px; width: min(600px, 46vw); }
+#ghome .ghint { position: absolute; bottom: 26px; }
+/* The soft dark veil the orb zoom eases into (no bright flash). */
+#gveil { position: fixed; inset: 0; background: rgb(3, 18, 3); opacity: 0; pointer-events: none; z-index: 50; }
+@media (max-width: 820px) {
+  .gtitle { width: auto; min-width: 0; flex: 1; font-size: 18px; height: 44px; padding: 0 30px 0 24px; }
+  #gbar .gstatus { width: 52px; flex: none; height: 44px; }
+  #gbar .gstatus .lines, #gbar .gstatus .gchip { display: none; }
+  #ghome .gstatus { width: auto; right: 22px; bottom: 90px; }
+  #gtabs { flex-wrap: nowrap; gap: 5px; }
+  .gnav { min-width: 0; padding: 7px 9px; font-size: 10.5px; }
+  .ghint { font-size: 14px; }
+}
 @media (max-width: 820px) {
   .main { flex-direction: column-reverse; }
   .side { width: auto; }
@@ -105,6 +227,18 @@ input:focus, select:focus { outline: none; border-color: var(--light); box-shado
   <symbol id="glove" viewBox="0 0 30 20"><rect x="2" y="8" width="22" height="11" rx="4" fill="#000" fill-opacity=".35"/><rect x="1" y="5" width="6" height="11" rx="2" fill="#c4c8d6" stroke="#1e1e28" stroke-width="1.2"/><rect x="6" y="4" width="12" height="13" rx="4" fill="#fafafc" stroke="#1e1e28" stroke-width="1.2"/><rect x="14" y="4" width="15" height="5" rx="2.5" fill="#fafafc" stroke="#1e1e28" stroke-width="1.2"/><path d="M9 10h7M9 13h7" stroke="#c4c8d6"/></symbol>
 </svg>
 
+
+<!-- Box of X: background grid and the home screen. -->
+<svg id="gbg" preserveAspectRatio="none" aria-hidden="true"></svg>
+<div id="ghome">
+  <div class="bigorb" id="bigorb" aria-hidden="true"></div>
+  <nav id="gmenu" aria-label="Menu"></nav>
+  <button class="gstatus" id="ghome-status" title="Open Settings"></button>
+  <button class="ghint" id="gmode" title="Simple shows the settings most people need. Advanced shows everything, plus the tools and the log."><span class="node">MODE</span><span id="gmode-label">SIMPLE</span></button>
+  <button class="ghint" id="genter" style="right:50px"><span class="node">ENTER</span>SELECT</button>
+</div>
+<div id="gveil"></div>
+
 <div id="setup" class="win setup" hidden>
   <h1>Lifestream</h1>
   <p>Choose a username and password. You'll use them to open this page, and in Midgar, Turks or Sonarr when you add Lifestream as a Transmission download client.</p>
@@ -117,6 +251,7 @@ input:focus, select:focus { outline: none; border-color: var(--light); box-shado
 </div>
 
 <div id="app" class="app" hidden>
+  <div id="gbar"><div class="gtitle" id="gtitle"></div><button class="gstatus" id="gstatus" title="Open Settings"></button></div>
   <div class="main">
     <section class="win content" aria-live="polite">
       <div id="page"></div>
@@ -137,6 +272,7 @@ input:focus, select:focus { outline: none; border-color: var(--light); box-shado
       </section>
     </aside>
   </div>
+  <div id="gfoot"><nav id="gtabs" aria-label="Pages"></nav><button class="ghint" id="gback"><span class="node">ESC</span>BACK</button></div>
   <footer class="win status"><span id="s-badge" class="badge"></span><span id="s-text"></span><a id="s-update" class="tag warn" style="margin-left:auto;min-width:0;text-decoration:none" target="_blank" rel="noreferrer" hidden></a></footer>
 </div>
 <div id="toast" class="win toast" role="status"></div>
@@ -170,6 +306,25 @@ function badge(kind) {
 }
 function toast(text, bad) { const t = $('#toast'); t.textContent = text; t.classList.toggle('bad', !!bad); t.style.display = 'block'; clearTimeout(toast.t); toast.t = setTimeout(() => t.style.display = 'none', bad ? 8000 : 3500); }
 // Run an action; say so when it works, and always say why when it doesn't.
+// The UPDATE link in the status bar (FFVII menu) or status box (Box of X).
+function fillUpdateLink(link, long) {
+  const u = (state && state.update) || {};
+  if (u.busy) {
+    link.hidden = false; link.textContent = u.busy.toUpperCase(); link.removeAttribute('href'); link.onclick = (e) => e.stopPropagation(); link.title = 'Lifestream is updating itself. This page reloads when it is back.';
+  } else if (u.version) {
+    link.hidden = false;
+    if (u.canInstall) {
+      link.textContent = long ? `UPDATE TO ${u.version}` : `UPDATE ${u.version}`;
+      link.href = '#'; link.removeAttribute('target');
+      link.title = 'Install it now. Downloads pause for a few seconds while Lifestream restarts.';
+      link.onclick = (e) => { e.preventDefault(); e.stopPropagation(); installUpdate(u.version); };
+    } else {
+      link.textContent = long ? `UPDATE ${u.version} READY` : `UPDATE ${u.version}`;
+      link.href = (state.headless ? u.spk : u.installer) || u.page; link.target = '_blank'; link.onclick = (e) => e.stopPropagation();
+      link.title = state.headless ? 'Download the new package, then in Package Center choose Manual Install. Your torrents and settings are kept.' : 'Lifestream offers this update in its own window too.';
+    }
+  } else link.hidden = true;
+}
 function installUpdate(v) {
   if (!confirm(`Update Lifestream to ${v} now?\n\nDownloads pause for a few seconds while it restarts. Your torrents and settings are kept.`)) return;
   doAction('update-install', 'Downloading the update. This page reloads when Lifestream is back.');
@@ -212,6 +367,7 @@ async function refresh() {
     refresh.version = state.version || refresh.version;
     if (state.setup) { $('#setup').hidden = false; $('#app').hidden = true; return; }
     $('#setup').hidden = true; $('#app').hidden = false;
+    applyTheme();
     torrents = (await rpc('torrent-get', { fields: FIELDS })).torrents;
     drawInfo();
     if (page === 'torrents') drawTorrents();
@@ -242,22 +398,9 @@ function drawInfo() {
   if (state.listenPort) bits.push(`Port ${state.externalPort || state.listenPort}${state.incomingSeen ? ' (open)' : ''}`);
   $('#s-text').textContent = bits.filter(Boolean).join(' · ');
   $('#s-text').className = kind === 'good' ? '' : kind;
-  const u = state.update || {}, link = $('#s-update');
-  if (u.busy) {
-    link.hidden = false; link.textContent = u.busy.toUpperCase(); link.removeAttribute('href'); link.onclick = null; link.title = 'Lifestream is updating itself. This page reloads when it is back.';
-  } else if (u.version) {
-    link.hidden = false;
-    if (u.canInstall) {
-      link.textContent = `UPDATE TO ${u.version}`;
-      link.href = '#'; link.removeAttribute('target');
-      link.title = 'Install it now. Downloads pause for a few seconds while Lifestream restarts.';
-      link.onclick = (e) => { e.preventDefault(); installUpdate(u.version); };
-    } else {
-      link.textContent = `UPDATE ${u.version} READY`;
-      link.href = (state.headless ? u.spk : u.installer) || u.page; link.target = '_blank'; link.onclick = null;
-      link.title = state.headless ? 'Download the new package, then in Package Center choose Manual Install. Your torrents and settings are kept.' : 'Lifestream offers this update in its own window too.';
-    }
-  } else link.hidden = true;
+  fillUpdateLink($('#s-update'), true);
+  if ($('#t-pause')) $('#t-pause').textContent = state.userPaused ? 'Resume all' : 'Pause all';
+  drawGreenStatus(kind, title, detail);
   if (page === 'settings' && drawSettings.drawUpdates) drawSettings.drawUpdates();
   if (state.toast && state.toast !== drawInfo.lastToast) { drawInfo.lastToast = state.toast; toast(state.toast); }
 }
@@ -309,6 +452,7 @@ function drawTorrents() {
         el('h1', { style: 'margin:0;flex:1' }, 'Torrents'),
         el('label', { class: 'sr', for: 'flt' }, 'Filter torrents'),
         el('input', { id: 'flt', type: 'text', placeholder: 'Filter…', value: filter, oninput: (e) => { filter = e.target.value.toLowerCase(); drawTorrents(); } }),
+        el('button', { class: 'btn gonly', id: 't-pause', onclick: togglePauseAll }, state && state.userPaused ? 'Resume all' : 'Pause all'),
         el('button', { class: 'btn', onclick: () => go('add') }, 'Add torrent')),
       el('div', { class: 'scroll', id: 'tlist' }));
     list = root.querySelector('#tlist');
@@ -386,9 +530,19 @@ async function drawSettings() {
     modes.replaceChildren(modeBtn(false, 'Simple'), modeBtn(true, 'Advanced'));
     if (on) loadLog();
     // Remember the choice without making the user press Save.
+    if (state) state.advanced = on;
     api('settings', 'PUT', { advanced_mode: on }).catch(() => {});
   }
   const logBox = el('div', { class: 'log logbox' });
+  // The theme switches and saves at once.
+  const themeSegs = el('div', { class: 'segs', role: 'group', 'aria-label': 'Theme' });
+  const drawThemeSegs = () => themeSegs.replaceChildren(...[['ff', 'FFVII menu'], ['green', 'Box of X']].map(([val, label]) =>
+    el('button', { class: 'seg', 'aria-pressed': String((state && state.theme) === val), onclick: async () => {
+      if (state.theme === val) return;
+      try { await api('settings', 'PUT', { theme: val }); state.theme = val; applyTheme(true); drawThemeSegs(); }
+      catch (e) { toast("Couldn't switch: " + e.message, true); }
+    } }, label)));
+  drawThemeSegs();
   const updBox = el('div', { class: 'field' });
   drawSettings.drawUpdates = () => {
     const u = (state && state.update) || {};
@@ -445,6 +599,9 @@ async function drawSettings() {
         field('pex', 'PEER EXCHANGE', check('pex'), 'Takes effect after a restart.'),
         field('lsd', 'LOCAL PEER DISCOVERY', check('lsd')),
         field('blocklist_url', 'BLOCKLIST URL', text('blocklist_url', { style: 'width:100%' }))),
+      el('h2', {}, 'LOOK'),
+      el('div', { class: 'field' }, el('span', { class: 'lbl' }, 'THEME'), el('div', {}, themeSegs)),
+      field('reduce_motion', 'CALMER MOTION', check('reduce_motion'), 'Pages switch with no zoom, and the orb on the Box of X home screen holds still.'),
       el('h2', {}, 'UPDATES'),
       updBox,
       (state && state.update && state.update.canInstall) ? field('auto_update', 'UPDATE AUTOMATICALLY', check('auto_update'), 'Checks every 6 hours and installs new versions by itself. Downloads pause for a few seconds while it restarts.') : null,
@@ -469,21 +626,261 @@ async function drawSettings() {
   if (advanced) loadLog();
 }
 
-function go(p) {
+// ---- Box of X (green console-dashboard theme)
+const MENU = [['torrents', 'Torrents'], ['add', 'Add'], ['settings', 'Settings']];
+const isGreen = () => !!(state && state.theme === 'green');
+let home = false, cursor = 0, themeShown = null, zooming = false;
+const calm = () => !!(state && state.reduceMotion) || matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/** Match the page to the saved theme. `stay` keeps the current page open (switching from Settings). */
+function applyTheme(stay) {
+  document.body.classList.toggle('calm', calm());
+  const theme = isGreen() ? 'green' : 'ff';
+  if (theme === themeShown && !stay) return;
+  themeShown = theme;
+  document.body.classList.toggle('green', theme === 'green');
+  $('meta[name=theme-color]').content = theme === 'green' ? '#0a3608' : '#121e78';
+  if (theme !== 'green') { document.body.classList.remove('ghome-on'); home = false; stopHelix(); return; }
+  drawGreenTabs();
+  if (state) { const [k, t, d] = overall(); drawGreenStatus(k, t, d); }
+  // Box of X opens on its home screen.
+  if (stay) leaveHome(page); else goHome();
+}
+
+function setGreenTitle(text) {
+  const t = $('#gtitle'); t.textContent = text;
+  let size = innerWidth <= 820 ? 18 : 26; t.style.fontSize = size + 'px';
+  while (size > 12 && t.scrollWidth > t.clientWidth) { size--; t.style.fontSize = size + 'px'; }
+}
+
+/** Showing a page (called by go). */
+function leaveHome(p) {
+  home = false;
+  document.body.classList.remove('ghome-on');
+  stopHelix();
+  setGreenTitle((MENU.find((m) => m[0] === p) || [, p])[1]);
+  drawGreenTabs();
+  drawGrid();
+}
+
+function goHome() {
+  home = true;
+  const i = MENU.findIndex((m) => m[0] === page);
+  cursor = i < 0 ? 0 : i;
+  document.body.classList.add('ghome-on');
+  renderHome();
+}
+
+function drawGreenTabs() {
+  $('#gtabs').replaceChildren(...MENU.map(([key, label]) => el('button', { class: 'gnav', 'aria-current': key === page && !home ? 'page' : 'false', onclick: () => { if (key !== page) switchPage(key); } }, label)));
+}
+
+// Status box: the VPN light, speeds, what's going on, and the UPDATE chip.
+function drawGreenStatus(kind, title, detail) {
+  if (!isGreen()) return;
+  const held = state.killHold || state.userPaused;
+  const top = `${title} · Down ${rate(held ? 0 : state.dlRate)} · Up ${rate(held ? 0 : state.ulRate)}`;
+  const level = kind === 'good' ? '' : kind;
+  for (const id of ['#gstatus', '#ghome-status']) {
+    const box = $(id);
+    let chip = box.querySelector('.gchip');
+    if (!chip) {
+      box.replaceChildren(el('span', { class: 'orb' }), el('span', { class: 'lines' }, el('span', { class: 'l1', style: 'display:block' }), el('span', { class: 'l2', style: 'display:block' })), el('a', { class: 'gchip', hidden: true }));
+      chip = box.querySelector('.gchip');
+    }
+    box.querySelector('.orb').className = 'orb ' + level;
+    box.querySelector('.l1').textContent = top;
+    const l2 = box.querySelector('.l2'); l2.textContent = detail || 'Running'; l2.className = 'l2 ' + level;
+    fillUpdateLink(chip, false);
+  }
+  $('#gmode-label').textContent = state.advanced ? 'ADVANCED' : 'SIMPLE';
+}
+
+// Opening a page from home: the orb drifts closer while everything eases into
+// a dark veil, then the page fades in out of it. Back plays it reversed.
+// Slow and soft on purpose: no bright frames.
+const ZOOM_MS = 600, REVEAL_MS = 500;
+const veil = () => $('#gveil');
+const fade = (from, to, ms) => veil().animate([{ opacity: from }, { opacity: to }], { duration: ms, easing: 'ease-in-out', fill: 'forwards' }).finished;
+const orbFrames = (a, b) => [{ transform: `translate(-50%, -50%) scale(${a})` }, { transform: `translate(-50%, -50%) scale(${b})` }];
+
+async function openFromHome(key) {
+  if (zooming) return;
+  if (calm()) return go(key);
+  zooming = true;
+  const orb = $('#bigorb');
+  orb.animate(orbFrames(1, 1.6), { duration: ZOOM_MS, easing: 'ease-in-out', fill: 'forwards' });
+  await fade(0, 0.96, ZOOM_MS);
+  orb.getAnimations().forEach((a) => a.cancel());
+  go(key);
+  await fade(0.96, 0, REVEAL_MS);
+  zooming = false;
+}
+
+async function zoomHome() {
+  if (zooming || home) return;
+  if (calm()) return goHome();
+  zooming = true;
+  await fade(0, 0.96, REVEAL_MS);
+  goHome();
+  $('#bigorb').animate(orbFrames(1.6, 1), { duration: ZOOM_MS, easing: 'ease-in-out' });
+  await fade(0.96, 0, ZOOM_MS);
+  zooming = false;
+}
+
+/** Page tabs: a short soft fade between pages. */
+async function switchPage(key) {
+  if (zooming) return;
+  if (calm()) return go(key);
+  zooming = true;
+  await fade(0, 0.7, 200);
+  go(key);
+  await fade(0.7, 0, 300);
+  zooming = false;
+}
+
+function markCursor() {
+  document.querySelectorAll('.gmenu-item').forEach((x, i) => { x.classList.toggle('lit', i === cursor); x.querySelector('.node').classList.toggle('lit', i === cursor); });
+}
+
+// Keys: arrows and Enter on home; Esc goes back home from a page.
+document.addEventListener('keydown', (e) => {
+  if (!isGreen() || $('#app').hidden && !home) return;
+  const typing = /^(INPUT|TEXTAREA|SELECT)$/.test((document.activeElement || {}).tagName || '');
+  if (typing) return;
+  if (home) {
+    const n = MENU.length;
+    if (e.key === 'ArrowDown') cursor = (cursor + 1) % n;
+    else if (e.key === 'ArrowUp') cursor = (cursor + n - 1) % n;
+    else if (e.key === 'Enter') { e.preventDefault(); return openFromHome(MENU[cursor][0]); }
+    else return;
+    e.preventDefault(); markCursor();
+  } else if (e.key === 'Escape') { e.preventDefault(); zoomHome(); }
+});
+// The mouse's side "back" button.
+for (const type of ['mousedown', 'mouseup']) {
+  window.addEventListener(type, (e) => {
+    if (e.button !== 3 || !isGreen()) return;
+    e.preventDefault();
+    if (type === 'mouseup') zoomHome();
+  });
+}
+
+function renderHome() {
+  const W = innerWidth, H = innerHeight, narrow = W < 700;
+  const r = narrow ? Math.max(70, Math.min(W * 0.26, H * 0.16)) : Math.max(90, Math.min(H * 0.24, W * 0.16));
+  const ox = narrow ? W / 2 : W * 0.3, oy = narrow ? H * 0.26 : H / 2 - 24;
+  const orb = $('#bigorb');
+  orb.style.cssText = `left:${ox}px;top:${oy}px;width:${2 * r}px;height:${2 * r}px;--r:${r}px`;
+  orb.innerHTML = `<div class="shell"></div><div class="spin"></div><div class="jelly"></div><div class="core"></div>
+    <div class="lobe" style="left:4%;top:47%;width:42%;height:30%"></div>
+    <div class="lobe" style="left:61%;top:23%;width:32%;height:45%;animation-duration:9s"></div>
+    <div class="lobe" style="left:30%;top:70%;width:50%;height:22%;animation-duration:11s"></div>`;
+  const canvas = el('canvas', {}); orb.append(canvas);
+  const n = MENU.length;
+  const rowH = narrow ? 56 : Math.max(44, Math.min(66, (H - 160) / n));
+  const nodeR = Math.min(rowH * 0.42, 28);
+  const arcR = Math.max(r * 1.5, n * rowH * 0.62);
+  const tabW = narrow ? Math.min(W - 120, 320) : Math.max(220, Math.min(460, W - ox - arcR - 140));
+  $('#gmenu').replaceChildren(...MENU.map(([key, label], i) => {
+    const dy = (i - (n - 1) / 2) * rowH;
+    const left = narrow ? (W - tabW - 2 * nodeR - 26) / 2 : ox + Math.sqrt(Math.max(0, arcR * arcR - dy * dy)) - nodeR;
+    const top = narrow ? oy + r * 1.35 + i * rowH : oy + dy - rowH * 0.38;
+    return el('div', { class: 'gmenu-item', role: 'button', tabindex: '-1', 'aria-label': label, style: `left:${left}px;top:${top}px;height:${rowH * 0.76}px`,
+      onmousemove: () => { if (cursor !== i) { cursor = i; markCursor(); } }, onclick: () => openFromHome(key) },
+      el('span', { class: 'node', style: `width:${2 * nodeR}px;height:${2 * nodeR}px` }),
+      el('span', { class: 'wire' }),
+      el('span', { class: 'gtab', style: `width:${tabW}px;font-size:${Math.min(rowH * 0.42, 25)}px` }, label));
+  }));
+  markCursor();
+  $('#gmode').style.left = narrow ? '22px' : Math.min(W * 0.46, 600) + 50 + 'px';
+  if (narrow) { $('#gmode').style.bottom = '26px'; }
+  drawGrid(ox, oy);
+  startHelix(canvas, r);
+  if (state) { const [k, t, d] = overall(); drawGreenStatus(k, t, d); }
+}
+
+// The orb's emblem: a slowly twisting double helix (the Lifestream) in pale
+// light, with motes drifting along it. Drawn about 30 times a second, only
+// while the home screen shows; held still with calmer motion on.
+let helixTimer = 0;
+function stopHelix() { cancelAnimationFrame(helixTimer); helixTimer = 0; }
+function startHelix(canvas, r) {
+  stopHelix();
+  const dpr = devicePixelRatio || 1;
+  canvas.width = Math.round(2 * r * dpr); canvas.height = Math.round(2 * r * dpr);
+  const g = canvas.getContext('2d');
+  let last = 0;
+  const frame = (now) => {
+    if (!home || !isGreen()) return;
+    if (!calm()) helixTimer = requestAnimationFrame(frame);
+    if (now - last < 33 && !calm()) return;
+    last = now;
+    const t = calm() ? 2 : now / 1000;
+    g.setTransform(dpr, 0, 0, dpr, r * dpr, r * dpr);
+    g.clearRect(-r, -r, 2 * r, 2 * r);
+    const h = r * 0.44, amp = r * 0.24, turn = (Math.PI * 2) / (h * 1.3), phase = t * 0.7;
+    const at = (y, strand) => { const a = (y + h) * turn + phase + strand * Math.PI; return [amp * Math.sin(a), Math.cos(a)]; };
+    const ink = (d, a) => `rgba(255,255,230,${(a * (0.45 + 0.55 * (d + 1) / 2)).toFixed(3)})`;
+    g.lineCap = 'round';
+    g.strokeStyle = 'rgba(255,255,230,.33)'; g.lineWidth = Math.max(1.5, r * 0.025);
+    for (let y = -h + h * 0.08; y < h * 0.96; y += h * 0.16) { g.beginPath(); g.moveTo(at(y, 0)[0], y); g.lineTo(at(y, 1)[0], y); g.stroke(); }
+    const step = h / 28;
+    for (const strand of [0, 1]) for (let y = -h; y < h; y += step) {
+      const [x0, d0] = at(y, strand), [x1, d1] = at(y + step, strand), d = (d0 + d1) / 2;
+      g.strokeStyle = ink(d, 0.95); g.lineWidth = Math.max(1.5, r * (0.03 + 0.028 * (d + 1) / 2));
+      g.beginPath(); g.moveTo(x0, y); g.lineTo(x1, y + step); g.stroke();
+    }
+    for (let i = 0; i < 5; i++) {
+      const f = ((t * 0.12 + i * 0.2) % 1) * 2 - 1, y = f * h, [x, d] = at(y, i % 2);
+      g.fillStyle = ink(d, 1); g.beginPath(); g.arc(x, y, Math.max(1.5, r * 0.03) * (0.8 + 0.4 * (d + 1) / 2), 0, Math.PI * 2); g.fill();
+    }
+  };
+  helixTimer = requestAnimationFrame(frame);
+}
+
+/** Background: dark green fade with faint rings and spokes around a hub. */
+function drawGrid(hx, hy) {
+  if (!isGreen()) return;
+  const W = innerWidth, H = innerHeight;
+  if (hx === undefined) { hx = W * 0.2; hy = H * 0.15; }
+  const far = Math.max(W, H) * 1.1;
+  let rings = '', spokes = '';
+  for (let k = 1; k <= 6; k++) { const rx = 230 * k * 0.85 + 60; rings += `<ellipse cx="${hx}" cy="${hy}" rx="${rx}" ry="${rx * 0.92}"/>`; }
+  for (let i = 0; i < 12; i++) { const a = (i / 12) * Math.PI * 2 + 0.2; spokes += `<line x1="${hx}" y1="${hy}" x2="${hx + Math.cos(a) * far}" y2="${hy + Math.sin(a) * far}"/>`; }
+  const g = $('#gbg');
+  g.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  g.innerHTML = `<defs><radialGradient id="gfade" gradientUnits="userSpaceOnUse" cx="${hx}" cy="${hy}" r="${far}"><stop offset="0" stop-color="#165c10"/><stop offset=".25" stop-color="#0a3608"/><stop offset=".55" stop-color="#041c04"/><stop offset="1" stop-color="#010a01"/></radialGradient></defs>
+    <rect width="${W}" height="${H}" fill="url(#gfade)"/><g fill="none" stroke="rgba(120,220,60,0.13)" stroke-width="1.4">${rings}${spokes}</g>`;
+}
+addEventListener('resize', () => { if (!isGreen()) return; if (home) renderHome(); else { drawGrid(); setGreenTitle($('#gtitle').textContent); } });
+
+$('#gback').addEventListener('click', () => zoomHome());
+$('#genter').addEventListener('click', () => openFromHome(MENU[cursor][0]));
+$('#gstatus').addEventListener('click', () => { if (page !== 'settings') switchPage('settings'); });
+$('#ghome-status').addEventListener('click', () => openFromHome('settings'));
+$('#gmode').addEventListener('click', async () => {
+  try { await api('settings', 'PUT', { advanced_mode: !state.advanced }); state.advanced = !state.advanced; $('#gmode-label').textContent = state.advanced ? 'ADVANCED' : 'SIMPLE'; toast(state.advanced ? 'Advanced: every setting, the tools and the log.' : 'Simple: just the settings most people need.'); }
+  catch (e) { toast(e.message, true); }
+});
+
+function go(p, keepHome) {
   page = p; history.replaceState(null, '', '#' + p);
+  if (isGreen() && !(keepHome && home)) leaveHome(p);
   document.querySelectorAll('.mi').forEach((b) => b.setAttribute('aria-current', b.dataset.page === p ? 'page' : 'false'));
   ({ torrents: drawTorrents, add: drawAdd, settings: drawSettings })[p]();
 }
 
 document.querySelectorAll('.mi').forEach((b) => b.addEventListener('click', () => go(b.dataset.page)));
-$('#pause-all').addEventListener('click', async () => { await doAction(state && state.userPaused ? 'resume-all' : 'pause-all'); refresh(); });
+async function togglePauseAll() { await doAction(state && state.userPaused ? 'resume-all' : 'pause-all'); refresh(); }
+$('#pause-all').addEventListener('click', togglePauseAll);
 $('#setup-form').addEventListener('submit', async (e) => {
   e.preventDefault();
   try { await api('setup', 'POST', { user: $('#su').value, pass: $('#sp').value }); location.reload(); }
   catch (err) { $('#setup-error').textContent = err.message; }
 });
 
-refresh().then(() => { if (state && !state.setup) go(['torrents', 'add', 'settings'].includes(page) ? page : 'torrents'); });
+refresh().then(() => { if (state && !state.setup) go(['torrents', 'add', 'settings'].includes(page) ? page : 'torrents', true); });
 setInterval(refresh, 2000);
 </script>
 </body>
