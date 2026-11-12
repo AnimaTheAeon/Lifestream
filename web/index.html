@@ -170,6 +170,10 @@ function badge(kind) {
 }
 function toast(text, bad) { const t = $('#toast'); t.textContent = text; t.classList.toggle('bad', !!bad); t.style.display = 'block'; clearTimeout(toast.t); toast.t = setTimeout(() => t.style.display = 'none', bad ? 8000 : 3500); }
 // Run an action; say so when it works, and always say why when it doesn't.
+function installUpdate(v) {
+  if (!confirm(`Update Lifestream to ${v} now?\n\nDownloads pause for a few seconds while it restarts. Your torrents and settings are kept.`)) return;
+  doAction('update-install', 'Downloading the update. This page reloads when Lifestream is back.');
+}
 const doAction = (action, done) => api('action', 'POST', { action }).then(() => done && toast(done)).catch((e) => toast(e.message, true));
 
 // ---- Transmission RPC (same API Midgar uses)
@@ -204,6 +208,8 @@ const FIELDS = ['id','hashString','name','status','percentDone','totalSize','lef
 async function refresh() {
   try {
     state = await api('state');
+    if (refresh.version && state.version && state.version !== refresh.version) { location.reload(); return; }
+    refresh.version = state.version || refresh.version;
     if (state.setup) { $('#setup').hidden = false; $('#app').hidden = true; return; }
     $('#setup').hidden = true; $('#app').hidden = false;
     torrents = (await rpc('torrent-get', { fields: FIELDS })).torrents;
@@ -236,13 +242,23 @@ function drawInfo() {
   if (state.listenPort) bits.push(`Port ${state.externalPort || state.listenPort}${state.incomingSeen ? ' (open)' : ''}`);
   $('#s-text').textContent = bits.filter(Boolean).join(' · ');
   $('#s-text').className = kind === 'good' ? '' : kind;
-  const u = state.update, link = $('#s-update');
-  if (u && u.version) {
+  const u = state.update || {}, link = $('#s-update');
+  if (u.busy) {
+    link.hidden = false; link.textContent = u.busy.toUpperCase(); link.removeAttribute('href'); link.onclick = null; link.title = 'Lifestream is updating itself. This page reloads when it is back.';
+  } else if (u.version) {
     link.hidden = false;
-    link.textContent = `UPDATE ${u.version} READY`;
-    link.href = (state.headless ? u.spk : u.installer) || u.page;
-    link.title = state.headless ? 'Download the new package, then in Package Center choose Manual Install. Your torrents and settings are kept.' : 'Lifestream offers this update in its own window too.';
+    if (u.canInstall) {
+      link.textContent = `UPDATE TO ${u.version}`;
+      link.href = '#'; link.removeAttribute('target');
+      link.title = 'Install it now. Downloads pause for a few seconds while Lifestream restarts.';
+      link.onclick = (e) => { e.preventDefault(); installUpdate(u.version); };
+    } else {
+      link.textContent = `UPDATE ${u.version} READY`;
+      link.href = (state.headless ? u.spk : u.installer) || u.page; link.target = '_blank'; link.onclick = null;
+      link.title = state.headless ? 'Download the new package, then in Package Center choose Manual Install. Your torrents and settings are kept.' : 'Lifestream offers this update in its own window too.';
+    }
   } else link.hidden = true;
+  if (page === 'settings' && drawSettings.drawUpdates) drawSettings.drawUpdates();
   if (state.toast && state.toast !== drawInfo.lastToast) { drawInfo.lastToast = state.toast; toast(state.toast); }
 }
 
@@ -373,6 +389,27 @@ async function drawSettings() {
     api('settings', 'PUT', { advanced_mode: on }).catch(() => {});
   }
   const logBox = el('div', { class: 'log logbox' });
+  const updBox = el('div', { class: 'field' });
+  drawSettings.drawUpdates = () => {
+    const u = (state && state.update) || {};
+    let line;
+    if (u.busy) line = u.busy;
+    else if (u.version) line = `Lifestream ${u.version} is available (you have ${u.current}).`;
+    else if (u.checking) line = 'Checking…';
+    else if (u.error) line = u.error;
+    else if (u.checkedMinsAgo !== null && u.checkedMinsAgo !== undefined) line = `You have the newest version (${u.current}). Checked ${u.checkedMinsAgo < 1 ? 'just now' : u.checkedMinsAgo + ' min ago'}.`;
+    else line = `You have ${u.current || (state && state.version) || ''}. Not checked yet.`;
+    const key = line + '|' + !!u.version + '|' + !!u.busy;
+    if (updBox.dataset.key === key) return;
+    updBox.dataset.key = key;
+    const buttons = el('div', { style: 'display:flex;gap:8px;flex-wrap:wrap' },
+      el('button', { class: 'btn', disabled: !!(u.busy || u.checking), onclick: () => doAction('update-check', 'Checking for updates…') }, 'Check now'),
+      u.version && !u.busy ? (u.canInstall
+        ? el('button', { class: 'btn primary', onclick: () => installUpdate(u.version) }, 'Update now')
+        : el('a', { class: 'btn', href: u.spk || u.page, target: '_blank', rel: 'noreferrer' }, 'Download package')) : null);
+    updBox.replaceChildren(el('span', { class: 'lbl' }, 'VERSION'), el('div', {}, el('div', { class: u.error && !u.version ? 'warn' : '', style: 'margin-bottom:8px' }, line), buttons));
+  };
+  drawSettings.drawUpdates();
   async function loadLog() {
     try { const { lines } = await api('log'); logBox.replaceChildren(...(lines.length ? lines.map((l) => el('div', { class: l.level === 'error' ? 'bad' : l.level === 'warn' ? 'warn' : '' }, `${l.time}  ${l.text}`)) : [el('div', { class: 'dimc' }, 'Nothing logged yet.')])); logBox.scrollTop = logBox.scrollHeight; }
     catch (e) { toast(e.message, true); }
@@ -408,6 +445,9 @@ async function drawSettings() {
         field('pex', 'PEER EXCHANGE', check('pex'), 'Takes effect after a restart.'),
         field('lsd', 'LOCAL PEER DISCOVERY', check('lsd')),
         field('blocklist_url', 'BLOCKLIST URL', text('blocklist_url', { style: 'width:100%' }))),
+      el('h2', {}, 'UPDATES'),
+      updBox,
+      (state && state.update && state.update.canInstall) ? field('auto_update', 'UPDATE AUTOMATICALLY', check('auto_update'), 'Checks every 6 hours and installs new versions by itself. Downloads pause for a few seconds while it restarts.') : null,
       el('h2', {}, 'SIGN-IN'),
       field('rpc_username', 'USERNAME', text('rpc_username')),
       el('div', { class: 'field' }, el('label', { class: 'lbl', for: 'f-rpc_password' }, 'NEW PASSWORD'), pass, el('div', { class: 'help' }, 'In Midgar/Turks/Sonarr add a Transmission client: this NAS or PC, port 9091, URL base /transmission/, and these details.')),
@@ -419,6 +459,7 @@ async function drawSettings() {
         el('div', { class: 'toolbar', style: 'margin-top:18px' }, el('h2', { style: 'margin:0;flex:1' }, 'LOG'), el('button', { class: 'btn', onclick: loadLog }, 'Refresh')),
         logBox),
       el('p', { class: 'dimc' }, `Lifestream ${state ? state.version : ''}${state && state.headless ? ' for Synology' : ''}`));
+
 
   $('#page').replaceChildren(
     el('div', { class: 'toolbar' }, el('h1', { style: 'margin:0;flex:1' }, 'Settings'), modes, el('button', { class: 'btn primary', onclick: save }, 'Save')),

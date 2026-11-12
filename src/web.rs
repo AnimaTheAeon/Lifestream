@@ -4,8 +4,6 @@
 //! serves the page plus a few Lifestream-specific endpoints.
 
 use std::io::Read;
-use std::sync::Mutex;
-use std::time::{Duration, Instant};
 
 use serde_json::{json, Value};
 use tiny_http::{Header, Method, Request, Response};
@@ -107,6 +105,19 @@ pub fn handle(core: &CoreHandle, mut req: Request, setup_only: bool) {
         }
         (Method::Post, "/lifestream/api/action") => {
             let body = read_json(&mut req).unwrap_or_default();
+            match body["action"].as_str().unwrap_or("") {
+                "update-check" => {
+                    crate::nasupdate::check_in_background();
+                    return send_json(req, 200, json!({ "ok": true }));
+                }
+                "update-install" => {
+                    return match crate::nasupdate::install_in_background() {
+                        Ok(()) => send_json(req, 200, json!({ "ok": true })),
+                        Err(e) => send_json(req, 400, json!({ "error": e })),
+                    };
+                }
+                _ => {}
+            }
             let cmd = match body["action"].as_str().unwrap_or("") {
                 "pause-all" => Some(Cmd::PauseAll),
                 "resume-all" => Some(Cmd::ResumeAll),
@@ -209,39 +220,8 @@ fn state(core: &CoreHandle, setup_only: bool) -> Value {
         "toast": s.toast.as_ref().map(|t| t.0.clone()),
         "categories": settings.categories.iter().map(|c| c.name.clone()).collect::<Vec<_>>(),
         "adapters": adapters,
-        "update": latest_update(),
+        "update": crate::nasupdate::status_json(settings.auto_update),
     })
-}
-
-/// Newer release, checked at most every 6 hours.
-fn latest_update() -> Value {
-    static CACHE: Mutex<Option<(Instant, Value)>> = Mutex::new(None);
-    if let Ok(c) = CACHE.lock() {
-        if let Some((at, v)) = c.as_ref() {
-            if at.elapsed() < Duration::from_secs(6 * 3600) {
-                return v.clone();
-            }
-        }
-    }
-    // Mark as checked first so concurrent page loads don't all hit GitHub.
-    if let Ok(mut c) = CACHE.lock() {
-        *c = Some((Instant::now(), Value::Null));
-    }
-    std::thread::spawn(|| {
-        let v = match crate::updater::fetch_latest() {
-            Ok(Some(r)) => json!({
-                "version": r.version,
-                "page": r.page_url,
-                "spk": r.nas.map(|a| a.url),
-                "installer": r.installer.map(|a| a.url),
-            }),
-            _ => Value::Null,
-        };
-        if let Ok(mut c) = CACHE.lock() {
-            *c = Some((Instant::now(), v));
-        }
-    });
-    Value::Null
 }
 
 /// The settings the web page edits. The password is never sent back.
@@ -283,6 +263,7 @@ fn settings_json(s: &Settings) -> Value {
         "rpc_username": s.rpc_username,
         "rpc_password_set": !s.rpc_password.is_empty(),
         "advanced_mode": s.advanced_mode,
+        "auto_update": s.auto_update,
     })
 }
 
@@ -359,6 +340,7 @@ fn apply_settings(b: &Value) -> Result<Settings, String> {
         ("lsd", &mut s.lsd),
         ("rss_enabled", &mut s.rss_enabled),
         ("advanced_mode", &mut s.advanced_mode),
+        ("auto_update", &mut s.auto_update),
     ] {
         if let Some(v) = b.get(k).and_then(Value::as_bool) {
             *field = v;

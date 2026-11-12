@@ -186,6 +186,8 @@ pub struct Settings {
     pub rpc_allow_lan: bool,
     pub rpc_username: String,
     pub rpc_password: String,
+    /// Docker: install new versions by itself (checked every 6 hours).
+    pub auto_update: bool,
 }
 
 impl Default for Settings {
@@ -266,6 +268,7 @@ impl Default for Settings {
             rpc_allow_lan: false,
             rpc_username: String::new(),
             rpc_password: String::new(),
+            auto_update: true,
         }
     }
 }

@@ -48,7 +48,12 @@ line in `docker-compose.yml` first.
 - **Start order:** NAS VPN first, then Lifestream. If NAS VPN is ever rebuilt
   or recreated (not just restarted), restart the lifestream project after.
   Until then it has no internet: safe, but nothing moves.
-- **Updating Lifestream:** Project › lifestream › Action › Build. It pulls the
-  newest release. Your settings and torrents stay (they're in `config`).
+- **Updating Lifestream:** it updates itself. Every 6 hours it checks GitHub
+  and installs new versions (Settings › Updates, where you can also press
+  Check now / Update now, or turn automatic updates off). Updates are kept in
+  `config/app-update`, so they survive the container being recreated. If an
+  update won't start, it goes back to the version the image was built with.
+  Rebuilding (Project › lifestream › Action › Build) still works and is only
+  needed to pick up changes to this folder's files.
 - **Other apps** go through the VPN the same way: `network_mode:
   "container:nas-vpn"`, and their web port moves onto NAS VPN's `ports:` list.

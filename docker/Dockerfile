@@ -1,5 +1,6 @@
 # Lifestream for Docker (headless; controlled from its web page on port 9091).
 # Building downloads the newest Synology release from GitHub and runs it.
+# After that it keeps itself up to date (Settings → Updates).
 FROM debian:bookworm-slim
 
 ARG VERSION=latest
@@ -18,12 +19,16 @@ RUN apt-get update \
     curl -fsSL -o /tmp/l.spk "https://github.com/AnimaTheAeon/Lifestream/releases/download/v${VERSION}/Lifestream-${VERSION}-x86_64.spk"; \
     tar -xf /tmp/l.spk -C /tmp/spk package.tgz; \
     tar -xzf /tmp/spk/package.tgz -C /opt/lifestream app; \
+    echo "$VERSION" > /opt/lifestream/app/VERSION; \
     rm -rf /tmp/spk /tmp/l.spk /tmp/latest.json
 
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod 755 /entrypoint.sh
 
 ENV HOME=/config XDG_CONFIG_HOME=/config
+# Lifestream installs its own updates here (inside the config volume, so they
+# survive the container being recreated). The start script runs whichever is newer.
+ENV LIFESTREAM_UPDATE_DIR=/config/app-update
 VOLUME ["/config"]
 EXPOSE 9091
 ENTRYPOINT ["/usr/bin/tini", "--", "/entrypoint.sh"]
