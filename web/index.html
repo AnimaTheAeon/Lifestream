@@ -83,6 +83,11 @@ input:focus, select:focus { outline: none; border-color: var(--light); box-shado
 .scroll.simple .adv { display: none; }
 .logbox { max-height: 320px; overflow: auto; padding: 8px; border-radius: 6px; background: rgba(0,0,0,.25); font-size: 13px; }
 .toast.bad { color: #ffb4b4; }
+.saved-note { color: var(--dim); font-size: 13px; white-space: nowrap; }
+.saved-note.pending { color: var(--warn); }
+.btn.saved, .btn.saved:hover { background: linear-gradient(#5ccf6a, #2e8a3a); border-color: #9cf0a6; color: #fff; }
+body.green .btn.saved, body.green .btn.saved:hover { background: linear-gradient(#b4ff8a, #5cc81c); border-color: #e6ffb4; color: var(--on-accent); }
+@media (max-width: 820px) { .saved-note { display: none; } }
 .toast { position: fixed; right: 20px; bottom: 76px; padding: 10px 16px; display: none; }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 
@@ -504,6 +509,26 @@ async function drawSettings() {
   const encSel = (v.encryption = el('select', { id: 'f-encryption' }, ...[[0, 'Allow'], [1, 'Prefer'], [2, 'Require']].map(([val, t]) => el('option', { value: val, selected: s.encryption === val }, t))));
   const pass = el('input', { type: 'password', id: 'f-rpc_password', placeholder: s.rpc_password_set ? '(unchanged)' : '', autocomplete: 'new-password' });
 
+  // The Save button says what happened: "Unsaved changes" once something is
+  // edited, then "Saved ✓" with the time for a few seconds after saving.
+  let dirty = false;
+  const saveBtn = el('button', { class: 'btn primary', onclick: () => save() }, 'Save');
+  const savedNote = el('span', { class: 'saved-note', 'aria-live': 'polite' });
+  function showSaved() {
+    clearTimeout(showSaved.t);
+    saveBtn.textContent = 'Saved ✓'; saveBtn.className = 'btn primary saved';
+    savedNote.textContent = 'Saved at ' + new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    savedNote.className = 'saved-note';
+    showSaved.t = setTimeout(() => { if (!dirty) { saveBtn.textContent = 'Save'; saveBtn.className = 'btn primary'; } }, 3000);
+  }
+  function markDirty(e) {
+    if (e.target.closest('.segs')) return; // theme and Simple/Advanced save by themselves
+    if (dirty) return;
+    dirty = true;
+    clearTimeout(showSaved.t);
+    saveBtn.textContent = 'Save'; saveBtn.className = 'btn primary';
+    savedNote.textContent = 'Unsaved changes'; savedNote.className = 'saved-note pending';
+  }
   async function save() {
     const body = {};
     for (const [k, c] of Object.entries(v)) {
@@ -514,8 +539,18 @@ async function drawSettings() {
     }
     if (pass.value) body.rpc_password = pass.value;
     body.advanced_mode = advanced;
-    try { await api('settings', 'PUT', body); toast('Settings saved'); pass.value = ''; refresh(); }
-    catch (e) { toast("Didn't save: " + e.message, true); }
+    saveBtn.disabled = true; saveBtn.textContent = 'Saving…';
+    try {
+      await api('settings', 'PUT', body);
+      pass.value = '';
+      dirty = false;
+      showSaved();
+      toast('Settings saved');
+      refresh();
+    } catch (e) {
+      saveBtn.textContent = 'Save'; saveBtn.className = 'btn primary';
+      toast("Didn't save: " + e.message, true);
+    } finally { saveBtn.disabled = false; }
   }
 
   // Simple shows what most people touch; Advanced adds the rest, the tools and the log.
@@ -619,8 +654,10 @@ async function drawSettings() {
 
 
   $('#page').replaceChildren(
-    el('div', { class: 'toolbar' }, el('h1', { style: 'margin:0;flex:1' }, 'Settings'), modes, el('button', { class: 'btn primary', onclick: save }, 'Save')),
+    el('div', { class: 'toolbar' }, el('h1', { style: 'margin:0;flex:1' }, 'Settings'), modes, savedNote, saveBtn),
     body);
+  body.addEventListener('input', markDirty);
+  body.addEventListener('change', markDirty);
   body.classList.toggle('simple', !advanced);
   modes.replaceChildren(modeBtn(false, 'Simple'), modeBtn(true, 'Advanced'));
   if (advanced) loadLog();
