@@ -9,6 +9,25 @@ STOP=/config/Lifestream/stop-request
 BUILT=/opt/lifestream/app
 UPD=${LIFESTREAM_UPDATE_DIR:-/config/app-update}
 mkdir -p /config/Lifestream "$UPD"
+umask "${UMASK:-000}"
+
+# Package install: the NAS's shared folders are mounted at /volume1. If this
+# is a fresh install and the Container Manager project from before left its
+# settings and torrents behind, bring them over once.
+OLD=/volume1/docker/lifestream/config
+if [ -d /volume1 ] && [ ! -e /config/Lifestream/settings.json ] && [ -e "$OLD/Lifestream/settings.json" ]; then
+	echo "Bringing over settings and torrents from $OLD"
+	cp -a "$OLD/." /config/ && touch /config/Lifestream/.imported
+fi
+# /downloads: the download folder the earlier Docker setup used. Point it at
+# the Downloads shared folder so those paths keep working; with no such
+# folder, keep downloads in the config folder (never inside the container).
+if [ ! -e /downloads ]; then
+	if [ -d /volume1/Downloads ]; then ln -s /volume1/Downloads /downloads
+	elif [ -d /volume1/downloads ]; then ln -s /volume1/downloads /downloads
+	elif [ -d /volume1 ]; then mkdir -p /config/Downloads && ln -s /config/Downloads /downloads
+	fi
+fi
 
 version() { cat "$1/VERSION" 2>/dev/null || echo 0; }
 # True when version $1 is newer than version $2.

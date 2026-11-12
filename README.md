@@ -66,16 +66,24 @@ Each [release](https://github.com/AnimaTheAeon/Lifestream/releases) has two file
 Both keep settings in the same place, so you can switch between them.
 Lifestream updates itself: it checks for a new release each time it opens.
 
-- **Lifestream-x.y.z-x86_64.spk**: Synology version (DSM 7, x86_64 models
-  such as the DS923+). In Package Center choose **Manual Install**. It has no
-  window; open **Lifestream** from the DSM main menu (or port 9091) for the
-  same FFVII-style controls in your browser, phone included. The first visit
-  asks you to choose a username and password. Give the **Lifestream** system
-  user Read/Write on your downloads folder (Control Panel → Shared Folder →
-  Edit → Permissions → System internal user). When a new version is out, the
-  page shows **UPDATE … READY**: download the new `.spk` and install it the
-  same way; torrents and settings are kept. (DSM doesn't let packages replace
-  themselves.)
+- **Lifestream-x.y.z-x86_64.spk**: Synology version (DSM 7.2.1+, x86_64
+  models such as the DS923+). It runs Lifestream in Container Manager inside
+  **Barrier**'s network (the VPN container `nas-vpn`), so every byte goes
+  through the VPN, and Lifestream can't run at all while Barrier is stopped.
+  1. In Barrier's compose file, add `"9091:9091"` under `ports:` and rebuild
+     Barrier (Lifestream's page is published through Barrier).
+  2. Package Center → **Manual Install** → the `.spk`. It installs Container
+     Manager if needed and builds the project **lifestream** (a minute or two).
+  3. Open **Lifestream** from the DSM main menu (or port 9091). The first
+     visit asks for a username and password.
+
+  Shared folders are at their DSM paths inside it (`/volume1/Downloads/...`),
+  so Midgar and Turks see the same paths. Lifestream updates itself (Settings
+  → Updates). If you rebuild or recreate Barrier, then in Container Manager
+  choose Project → lifestream → Action → **Build** so Lifestream rejoins it.
+  Coming from the hand-made Container Manager project (`docker/`): delete that
+  project first (keep its folder). The package brings over its settings and
+  torrents from `/volume1/docker/lifestream/config` on first start.
 
 The desktop app serves the same web page on its remote-control port, so you
 can check on downloads from your phone too.

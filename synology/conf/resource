@@ -1,0 +1,15 @@
+{
+	"docker-project": {
+		"projects": [
+			{
+				"name": "lifestream",
+				"path": "compose",
+				"build_params": {
+					"force_pull": true,
+					"force_recreate": true,
+					"build": true
+				}
+			}
+		]
+	}
+}

@@ -2,12 +2,13 @@
 mkdir -p "$SYNOPKG_PKGVAR"
 {
 cat << 'NOTE'
-<p style="font-weight:bold;">Two quick steps</p>
+<p style="font-weight:bold;">Lifestream runs behind Barrier</p>
+<p>It lives inside Barrier's network (the container <b>nas-vpn</b>), so every byte goes through the VPN. If Barrier is stopped, Lifestream can't run.</p>
 <ol style="list-style-type:decimal;list-style-position:inside;">
-<li>Let Lifestream save files: <b>Control Panel</b> &rarr; <b>Shared Folder</b> &rarr; select your downloads folder (and your TV/Movies folders if categories point there) &rarr; <b>Edit</b> &rarr; <b>Permissions</b> &rarr; <b>System internal user</b> &rarr; tick <b>Read/Write</b> for <b>Lifestream</b>.</li>
-<li>Open <b>Lifestream</b> from the main menu (or port <b>9091</b> on this NAS) and choose a username and password. Then pick your VPN adapter in Settings; downloads wait until you do while the kill switch is on.</li>
+<li>Barrier must publish Lifestream's port: <b>9091:9091</b> under <b>ports:</b> in Barrier's compose file.</li>
+<li>Open <b>Lifestream</b> from the main menu (or port <b>9091</b> on this NAS). Your shared folders are at their usual paths, like <b>/volume1/Downloads</b>.</li>
 </ol>
-<p>In Midgar or Turks add a <b>Transmission</b> download client: this NAS, port 9091, URL base /transmission/, and that username and password.</p>
+<p>In Midgar or Turks add a <b>Transmission</b> download client: this NAS, port 9091, URL base /transmission/, and your Lifestream username and password.</p>
 NOTE
 } >> "$SYNOPKG_TEMP_LOGFILE"
 exit 0
