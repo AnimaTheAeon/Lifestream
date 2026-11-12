@@ -1,13 +1,14 @@
 {
 	"docker-project": {
+		"preload-image": "image.tar.gz",
 		"projects": [
 			{
 				"name": "lifestream",
 				"path": "compose",
 				"build_params": {
-					"force_pull": true,
+					"force_pull": false,
 					"force_recreate": true,
-					"build": true
+					"build": false
 				}
 			}
 		]

@@ -107,4 +107,6 @@ On Linux: `sudo apt install libtorrent-rasterbar-dev libgtk-3-dev` then `cargo b
 
 Headless (Synology) build: `cargo build --release --no-default-features`
 (no GUI libraries needed); `synology/build-spk.sh` packages it. CI builds it on
-Ubuntu 22.04 with libtorrent bundled.
+Ubuntu 22.04 with libtorrent bundled. The .spk also carries a Docker image of
+Lifestream (built by `build-spk.sh`, so it needs Docker), which Container Manager
+loads on install.

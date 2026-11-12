@@ -4,11 +4,9 @@
 # If Barrier isn't running, Lifestream can't start: it never goes around it.
 services:
   lifestream:
-    build:
-      # The package folder: the app is in ../app, this file's folder is compose/.
-      context: ..
-      dockerfile: compose/Dockerfile
-    image: lifestream-package:latest
+    # Comes inside the package (image.tar.gz); nothing is downloaded or built.
+    image: lifestream-package:@VERSION@
+    pull_policy: never
     container_name: lifestream
     restart: unless-stopped
     network_mode: "container:nas-vpn"
