@@ -25,7 +25,8 @@ button, input, select { font: inherit; }
 .main { display: flex; gap: 12px; flex: 1; min-height: 0; }
 .win { background: var(--win); border: 2px solid var(--light); border-radius: 8px; box-shadow: 0 0 0 1px var(--dark), inset 0 0 0 1px var(--mid), 0 6px 14px rgba(0,0,0,.6); }
 .content { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; }
-.content > .scroll { flex: 1; overflow: auto; padding: 16px 20px; }
+#page { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.content .scroll { flex: 1; min-height: 0; overflow: auto; padding: 16px 24px 28px; }
 .side { width: 240px; flex: none; display: flex; flex-direction: column; justify-content: space-between; gap: 12px; }
 nav.win { padding: 10px 8px; display: flex; flex-direction: column; gap: 2px; }
 .mi { position: relative; display: flex; align-items: center; min-height: 40px; padding: 0 10px 0 44px; border: 0; border-radius: 4px; background: none; color: var(--text); font-weight: 800; font-size: 20px; text-shadow: var(--shadow); text-align: left; cursor: pointer; }
@@ -288,12 +289,10 @@ function drawTorrents() {
 }
 
 function drawAdd() {
-  const cats = (state && state.categories) || [];
-  const catSel = el('select', { id: 'acat' }, el('option', { value: '' }, 'No category'), ...cats.map((c) => el('option', { value: c }, c)));
   const paused = el('input', { type: 'checkbox', id: 'apause' });
   const magnet = el('input', { type: 'text', id: 'amag', placeholder: 'magnet:?xt=… or https://…/file.torrent', style: 'width:100%' });
   const fileIn = el('input', { type: 'file', accept: '.torrent', multiple: true, id: 'afile', class: 'sr' });
-  const opts = () => ({ labels: catSel.value ? [catSel.value] : [], paused: paused.checked });
+  const opts = () => ({ paused: paused.checked });
   async function addFiles(files) {
     for (const f of files) {
       const buf = new Uint8Array(await f.arrayBuffer());
@@ -310,7 +309,6 @@ function drawAdd() {
   $('#page').replaceChildren(el('div', { class: 'scroll' },
     el('h1', {}, 'Add'),
     el('div', { class: 'field' }, el('label', { class: 'lbl', for: 'amag' }, 'MAGNET LINK OR URL'), magnet),
-    el('div', { class: 'field' }, el('label', { class: 'lbl', for: 'acat' }, 'CATEGORY'), catSel, el('div', { class: 'help' }, 'Categories and their folders are set in Settings.')),
     el('div', { class: 'field' }, el('label', { class: 'lbl', for: 'apause' }, 'ADD PAUSED'), el('div', {}, paused)),
     el('div', { style: 'display:flex;gap:8px;margin:10px 0' }, el('button', { class: 'btn primary', onclick: async () => {
       const v = magnet.value.trim(); if (!v) return magnet.focus();
@@ -331,15 +329,6 @@ async function drawSettings() {
   const adapterSel = (v.adapter = el('select', { id: 'f-adapter' }, el('option', { value: '' }, 'Any (not bound)'), ...adapters.map((a) => el('option', { value: a.name, selected: a.name === s.adapter }, a.label + (a.vpn ? '  (VPN)' : '')))));
   const seedSel = (v.seed_action = el('select', { id: 'f-seed_action' }, ...[['pause', 'Pause it'], ['remove', 'Remove it (keep files)'], ['remove-delete', 'Remove it and delete files']].map(([val, t]) => el('option', { value: val, selected: s.seed_action === val }, t))));
   const encSel = (v.encryption = el('select', { id: 'f-encryption' }, ...[[0, 'Allow'], [1, 'Prefer'], [2, 'Require']].map(([val, t]) => el('option', { value: val, selected: s.encryption === val }, t))));
-  const catBox = el('div', { id: 'cats' });
-  const catRow = (c = { name: '', path: '' }) => {
-    const row = el('div', { class: 'cat' },
-      el('input', { type: 'text', value: c.name, placeholder: 'Name (e.g. tv)', 'aria-label': 'Category name', style: 'width:140px' }),
-      el('input', { type: 'text', value: c.path, placeholder: '/volume1/video/TV', 'aria-label': 'Category folder', style: 'flex:1' }),
-      el('button', { class: 'btn danger', onclick: () => row.remove() }, 'Remove'));
-    catBox.append(row);
-  };
-  (s.categories || []).forEach(catRow);
   const pass = el('input', { type: 'password', id: 'f-rpc_password', placeholder: s.rpc_password_set ? '(unchanged)' : '', autocomplete: 'new-password' });
   const err = el('p', { class: 'bad', role: 'alert' });
 
@@ -351,7 +340,6 @@ async function drawSettings() {
       else if (k === 'encryption') body[k] = Number(c.value);
       else body[k] = c.value;
     }
-    body.categories = [...catBox.children].map((r) => { const [n, p] = r.querySelectorAll('input'); return { name: n.value, path: p.value }; }).filter((c) => c.name.trim());
     if (pass.value) body.rpc_password = pass.value;
     try { await api('settings', 'PUT', body); err.textContent = ''; toast('Settings saved'); pass.value = ''; refresh(); }
     catch (e) { err.textContent = e.message; }
@@ -361,8 +349,7 @@ async function drawSettings() {
     el('div', { class: 'toolbar' }, el('h1', { style: 'margin:0;flex:1' }, 'Settings'), el('button', { class: 'btn primary', onclick: save }, 'Save')),
     el('div', { class: 'scroll' }, err,
       el('h2', {}, 'FOLDERS'),
-      field('download_dir', 'DOWNLOAD FOLDER', text('download_dir', { style: 'width:100%' }), 'On a Synology use a shared folder, e.g. /volume1/downloads. The Lifestream user needs Read/Write on it.'),
-      el('div', { class: 'field' }, el('span', { class: 'lbl' }, 'CATEGORIES'), el('div', {}, catBox, el('button', { class: 'btn', onclick: () => catRow() }, 'Add category')), el('div', { class: 'help' }, 'Midgar and Turks send their category (like "tv"). Give it a folder here; point TV/Movies at folders Jenova watches for subtitles.')),
+      field('download_dir', 'DOWNLOAD FOLDER', text('download_dir', { style: 'width:100%' }), 'Where downloads are saved. In Docker this is a folder inside a mounted volume, like /downloads/Lifestream.'),
       field('incomplete_enabled', 'KEEP UNFINISHED SEPARATE', check('incomplete_enabled')),
       field('incomplete_dir', 'UNFINISHED FOLDER', text('incomplete_dir', { style: 'width:100%' })),
       el('h2', {}, 'VPN AND NETWORK'),

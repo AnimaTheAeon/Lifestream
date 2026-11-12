@@ -158,7 +158,8 @@ pub fn kill_decision(adapter: &str, found: Option<(Option<String>, Option<String
     if adapter.is_empty() {
         if kill_switch {
             d.hold = true;
-            d.reason = "Pick your VPN adapter on the Connection page. Downloads wait until you do, because the kill switch is on.".into();
+            let place = if cfg!(feature = "gui") { "on the Connection page" } else { "in Settings" };
+            d.reason = format!("Pick your VPN adapter {place}. Downloads wait until you do, because the kill switch is on.");
         }
         return d;
     }
