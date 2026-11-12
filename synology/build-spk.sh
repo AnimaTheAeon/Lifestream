@@ -1,5 +1,6 @@
 #!/bin/sh
 # Assemble Lifestream-<version>-x86_64.spk from a headless build.
+# The package runs Lifestream in Container Manager, inside Barrier's network.
 # Usage: synology/build-spk.sh <app folder> <version> [outdir]
 #   <app folder>  holds the `lifestream` binary and a lib/ folder with its
 #                 bundled shared libraries
@@ -11,11 +12,15 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 
-mkdir -p "$WORK/pkg/app" "$WORK/pkg/ui"
+mkdir -p "$WORK/pkg/app" "$WORK/pkg/ui" "$WORK/pkg/compose"
 cp -R "$APP/." "$WORK/pkg/app/"
 chmod 755 "$WORK/pkg/app/lifestream"
+echo "$VERSION" > "$WORK/pkg/app/VERSION"
 cp -R "$HERE/ui/." "$WORK/pkg/ui/"
-(cd "$WORK/pkg" && tar --owner=0 --group=0 -czf "$WORK/package.tgz" app ui)
+# Container Manager builds and runs Lifestream from these (conf/resource).
+cp "$HERE/compose/compose.yaml" "$HERE/compose/Dockerfile" "$WORK/pkg/compose/"
+cp "$HERE/../docker/entrypoint.sh" "$WORK/pkg/compose/entrypoint.sh"
+(cd "$WORK/pkg" && tar --owner=0 --group=0 -czf "$WORK/package.tgz" app ui compose)
 
 mkdir -p "$WORK/spk"
 sed "s/@VERSION@/$VERSION/" "$HERE/INFO.in" > "$WORK/spk/INFO"

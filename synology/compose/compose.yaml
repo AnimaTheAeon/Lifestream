@@ -1,0 +1,25 @@
+# Lifestream, created by its Package Center package. Container Manager shows
+# it as the project "lifestream". It lives inside Barrier's network
+# (the container nas-vpn), so it can only reach the internet through the VPN.
+# If Barrier isn't running, Lifestream can't start: it never goes around it.
+services:
+  lifestream:
+    build:
+      # The package folder: the app is in ../app, this file's folder is compose/.
+      context: ..
+      dockerfile: compose/Dockerfile
+    image: lifestream-package:latest
+    container_name: lifestream
+    restart: unless-stopped
+    network_mode: "container:nas-vpn"
+    environment:
+      # Inside Barrier's network the tunnel is tun0. A new install starts locked to it.
+      - LIFESTREAM_ADAPTER=tun0
+      - LIFESTREAM_DOWNLOAD_DIR=/downloads/Lifestream
+    volumes:
+      # Settings, torrent list and progress. Kept when the package is updated.
+      - /var/packages/Lifestream/var:/config
+      # The NAS's shared folders, at the same paths as in DSM
+      # (/volume1/Downloads/...), so Midgar and Turks see the same paths.
+      - /volume1:/volume1
+      - /etc/localtime:/etc/localtime:ro

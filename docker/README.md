@@ -1,5 +1,9 @@
 # Lifestream in Docker, through NAS VPN
 
+> **Easier way:** the Package Center `.spk` (1.2.0 and newer) sets all of this
+> up by itself: it runs Lifestream in Container Manager inside Barrier's
+> network. This folder is the hand-made version of the same thing.
+
 Lifestream runs inside NAS VPN's network, so it can only reach the internet
 through ExpressVPN. If the VPN drops, NAS VPN's kill switch cuts it off, and
 Lifestream's own kill switch (locked to the tunnel, `tun0`) pauses everything.
