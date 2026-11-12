@@ -15,6 +15,7 @@ const PAGE: &str = include_str!("../web/index.html");
 const ICON: &[u8] = include_bytes!("../resources/icon_256.png");
 const NUNITO_700: &[u8] = include_bytes!("../resources/Nunito-700.ttf");
 const NUNITO_800: &[u8] = include_bytes!("../resources/Nunito-800.ttf");
+const ORBITRON_800: &[u8] = include_bytes!("../resources/Orbitron-800.ttf");
 
 fn header(name: &str, value: &str) -> Header {
     Header::from_bytes(name.as_bytes(), value.as_bytes()).unwrap()
@@ -55,10 +56,11 @@ pub fn handle(core: &CoreHandle, mut req: Request, setup_only: bool) {
 
     match (method, path.as_str()) {
         (Method::Get, "" | "/web" | "/transmission/web") => send_page(req),
-        (Method::Get, "/icon.png" | "/fonts/nunito-700.ttf" | "/fonts/nunito-800.ttf") => {
+        (Method::Get, "/icon.png" | "/fonts/nunito-700.ttf" | "/fonts/nunito-800.ttf" | "/fonts/orbitron-800.ttf") => {
             let (data, kind) = match path.as_str() {
                 "/icon.png" => (ICON, "image/png"),
                 "/fonts/nunito-700.ttf" => (NUNITO_700, "font/ttf"),
+                "/fonts/orbitron-800.ttf" => (ORBITRON_800, "font/ttf"),
                 _ => (NUNITO_800, "font/ttf"),
             };
             let resp = Response::from_data(data)
@@ -202,6 +204,9 @@ fn state(core: &CoreHandle, setup_only: bool) -> Value {
         "ulRate": s.ul_rate,
         "torrentCount": s.torrents.len(),
         "userPaused": s.user_paused,
+        "theme": if settings.theme == "green" { "green" } else { "ff" },
+        "advanced": settings.advanced_mode,
+        "reduceMotion": settings.reduce_motion,
         "killHold": s.kill_hold,
         "killReason": s.kill_reason,
         "adapter": settings.adapter,
@@ -264,6 +269,8 @@ fn settings_json(s: &Settings) -> Value {
         "rpc_password_set": !s.rpc_password.is_empty(),
         "advanced_mode": s.advanced_mode,
         "auto_update": s.auto_update,
+        "theme": s.theme,
+        "reduce_motion": s.reduce_motion,
     })
 }
 
@@ -321,6 +328,9 @@ fn apply_settings(b: &Value) -> Result<Settings, String> {
     if let Some(v) = int_of("max_peers_global") {
         s.max_peers_global = clamp(v, 10, 10_000);
     }
+    if let Some(v) = str_of("theme") {
+        s.theme = if v == "green" { "green".into() } else { "ff".into() };
+    }
     if let Some(v) = str_of("adapter") {
         s.adapter = v;
     }
@@ -341,6 +351,7 @@ fn apply_settings(b: &Value) -> Result<Settings, String> {
         ("rss_enabled", &mut s.rss_enabled),
         ("advanced_mode", &mut s.advanced_mode),
         ("auto_update", &mut s.auto_update),
+        ("reduce_motion", &mut s.reduce_motion),
     ] {
         if let Some(v) = b.get(k).and_then(Value::as_bool) {
             *field = v;
