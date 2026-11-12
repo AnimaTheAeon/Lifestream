@@ -107,7 +107,7 @@ pub fn check_in_background(updater: Arc<Updater>, ctx: eframe::egui::Context) {
     });
 }
 
-fn client() -> Result<reqwest::blocking::Client, String> {
+pub(crate) fn client() -> Result<reqwest::blocking::Client, String> {
     reqwest::blocking::Client::builder()
         .connect_timeout(Duration::from_secs(10))
         .timeout(Duration::from_secs(600))

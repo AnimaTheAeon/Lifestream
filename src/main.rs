@@ -8,6 +8,7 @@ mod blocklist;
 mod core;
 mod engine;
 mod instance;
+mod nasupdate;
 mod netif;
 mod rpc;
 mod rss;
@@ -68,6 +69,7 @@ fn main() {
     }
     let (core, join) = core::start(settings.clone());
     rpc::start(core.clone(), &settings);
+    nasupdate::start_background();
 
     // DSM stops the package by creating this file (see the package's
     // start-stop-status script), so progress is saved before exiting.
@@ -79,9 +81,19 @@ fn main() {
             core.send(core::Cmd::Shutdown);
             break;
         }
+        // An update is unpacked: save progress, then let the start script
+        // switch to the new version.
+        if nasupdate::restart_requested() {
+            core.send(core::Cmd::Shutdown);
+            break;
+        }
         std::thread::sleep(Duration::from_millis(500));
     }
     let _ = join.join();
+    if nasupdate::restart_requested() {
+        applog::info("Lifestream stopped for the update.");
+        std::process::exit(nasupdate::RESTART_CODE);
+    }
     applog::info("Lifestream stopped.");
 }
 
