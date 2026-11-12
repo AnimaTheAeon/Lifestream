@@ -158,6 +158,27 @@ jobs:
           ls -la stage/lib
           # Newest glibc symbol it needs (must be older than DSM's).
           for f in stage/lifestream stage/lib/*; do objdump -T "$f" | grep -o 'GLIBC_[0-9.]*'; done | sort -uV | tail -1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lifestream-synology-app
+          path: stage/
+
+  # The .spk carries a ready-made Docker image of Lifestream (built here, where
+  # Docker can pull its base), so the NAS never builds or downloads anything to
+  # install it. Container Manager loads the image and runs it inside Barrier.
+  synology-package:
+    needs: synology
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: lifestream-synology-app
+          path: stage
+      - name: Image and package
+        run: |
+          v=$(grep -m1 '^version = ' Cargo.toml | cut -d'"' -f2)
+          chmod 755 stage/lifestream
           sh synology/build-spk.sh stage "$v" dist
       - uses: actions/upload-artifact@v4
         with:
@@ -166,7 +187,7 @@ jobs:
 
   # A push to main with a new version number publishes a release.
   release:
-    needs: [build, synology]
+    needs: [build, synology-package]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.build.outputs.exists == 'false'
     runs-on: ubuntu-latest
     steps:

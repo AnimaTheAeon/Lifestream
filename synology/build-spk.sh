@@ -4,6 +4,7 @@
 # Usage: synology/build-spk.sh <app folder> <version> [outdir]
 #   <app folder>  holds the `lifestream` binary and a lib/ folder with its
 #                 bundled shared libraries
+# Needs Docker (to build the image that goes inside the package).
 set -eu
 APP="$1"
 VERSION="$2"
@@ -17,10 +18,17 @@ cp -R "$APP/." "$WORK/pkg/app/"
 chmod 755 "$WORK/pkg/app/lifestream"
 echo "$VERSION" > "$WORK/pkg/app/VERSION"
 cp -R "$HERE/ui/." "$WORK/pkg/ui/"
-# Container Manager builds and runs Lifestream from these (conf/resource).
-cp "$HERE/compose/compose.yaml" "$HERE/compose/Dockerfile" "$WORK/pkg/compose/"
-cp "$HERE/../docker/entrypoint.sh" "$WORK/pkg/compose/entrypoint.sh"
-(cd "$WORK/pkg" && tar --owner=0 --group=0 -czf "$WORK/package.tgz" app ui compose)
+# The Docker image Container Manager runs (conf/resource loads image.tar.gz
+# and starts compose/compose.yaml). Built here so the NAS doesn't have to.
+IMG="lifestream-package:$VERSION"
+mkdir -p "$WORK/ctx"
+cp -R "$WORK/pkg/app" "$WORK/ctx/app"
+cp "$HERE/compose/Dockerfile" "$WORK/ctx/Dockerfile"
+cp "$HERE/../docker/entrypoint.sh" "$WORK/ctx/entrypoint.sh"
+docker build -t "$IMG" "$WORK/ctx"
+docker save "$IMG" | gzip -9 > "$WORK/pkg/image.tar.gz"
+sed "s/@VERSION@/$VERSION/" "$HERE/compose/compose.yaml" > "$WORK/pkg/compose/compose.yaml"
+(cd "$WORK/pkg" && tar --owner=0 --group=0 -czf "$WORK/package.tgz" app ui compose image.tar.gz)
 
 mkdir -p "$WORK/spk"
 sed "s/@VERSION@/$VERSION/" "$HERE/INFO.in" > "$WORK/spk/INFO"
