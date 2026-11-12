@@ -16,11 +16,36 @@ case "$1" in
 		export XDG_CONFIG_HOME="$DATA"
 		mkdir -p "$DATA/Lifestream"
 		rm -f "$STOP_FILE"
-		cd "$APP" || exit 1
+		# A copy left over from before (lost PID file) would hold the port and files.
+		for p in $(pidof lifestream 2>/dev/null); do
+			if [ "$(readlink "/proc/$p/exe" 2>/dev/null)" = "$APP/lifestream" ]; then
+				kill -TERM "$p" 2>/dev/null
+				sleep 2
+				kill -KILL "$p" 2>/dev/null
+			fi
+		done
+		cd "$APP" || { echo "Lifestream's program folder is missing ($APP)." >> "$SYNOPKG_TEMP_LOGFILE"; exit 1; }
+		echo "--- start $(date) ---" >> "$DATA/service.out"
 		nohup "$APP/lifestream" >> "$DATA/service.out" 2>&1 < /dev/null &
 		echo $! > "$PID_FILE"
-		sleep 1
+		# Give it a few seconds: it must still be alive to count as started.
+		i=0
+		while [ $i -lt 3 ]; do
+			sleep 1
+			is_running || break
+			i=$((i + 1))
+		done
 		is_running && exit 0
+		# Say why in the Package Center message, not just "failed".
+		if [ -n "$SYNOPKG_TEMP_LOGFILE" ]; then
+			{
+				echo "<p><b>Lifestream stopped right after starting.</b> What it said:</p><pre>"
+				tail -n 12 "$DATA/service.out" 2>/dev/null | sed 's/&/\&amp;/g; s/</\&lt;/g'
+				tail -n 8 "$DATA/Lifestream/lifestream.log" 2>/dev/null | sed 's/&/\&amp;/g; s/</\&lt;/g'
+				echo "</pre>"
+			} >> "$SYNOPKG_TEMP_LOGFILE"
+		fi
+		rm -f "$PID_FILE"
 		exit 1
 		;;
 	stop)
