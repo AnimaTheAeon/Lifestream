@@ -1684,7 +1684,7 @@ impl App {
             }
 
             section(ui, "Remote control");
-            row(ui, "Let Turks send downloads here", "A Transmission-compatible remote control, so Turks, Midgar, Radarr or Sonarr can add torrents and watch progress. In those apps add a Transmission / Lifestream download client. Applies after a restart.", |ui| {
+            row(ui, "Let Midgar, Turks and Materia send downloads here", "A Transmission-compatible remote control, so Midgar, Turks, Materia, Sonarr or Radarr can add torrents and watch progress. In those apps add a Transmission / Lifestream download client. Applies after a restart.", |ui| {
                 changed |= toggle(ui, &mut s.rpc_enabled)
             });
             if s.rpc_enabled {
@@ -1692,7 +1692,7 @@ impl App {
                     changed |= ui.add(egui::DragValue::new(&mut s.rpc_port).range(1024..=65535)).changed()
                 });
                 if adv {
-                    row(ui, "Allow other computers", "Turn on if Turks runs on another machine, and set a username and password.", |ui| {
+                    row(ui, "Allow other computers", "Turn on if Midgar, Turks or Materia runs on another machine (like the NAS), and set a username and password.", |ui| {
                         changed |= toggle(ui, &mut s.rpc_allow_lan)
                     });
                     row(ui, "Username", "", |ui| changed |= ui.add(egui::TextEdit::singleline(&mut s.rpc_username).desired_width(180.0)).changed());
