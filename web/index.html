@@ -233,11 +233,11 @@ body.calm .bigorb * { animation: none !important; }
 #bstage { display: none; }
 html:has(body.blades) { background: #cfcfcf; }
 body.blades { background: #cfcfcf; text-shadow: none; }
-body.blades #bstage { display: block; position: fixed; inset: 0; overflow: hidden; background: linear-gradient(90deg, #cfcfcf 0%, #f2f2f2 50%, #c8c8c8 100%); touch-action: pan-y; user-select: none; }
+body.blades #bstage { display: block; position: fixed; inset: 0; overflow: clip; background: linear-gradient(90deg, #cfcfcf 0%, #f2f2f2 50%, #c8c8c8 100%); touch-action: pan-y; user-select: none; }
 body.blades .app { padding: 0; gap: 0; }
 body.blades .main, body.blades #gbar, body.blades #gfoot, body.blades footer.status, body.blades #ghome, body.blades #gbg { display: none; }
 body.blades .gonly { display: inline-flex; align-items: center; }
-.bsec { position: absolute; left: 0; top: 0; width: var(--bw); height: 100%; display: flex; background: linear-gradient(90deg, #ffffff 0%, #ececec 35%, #c4c4c4 100%); border-radius: var(--r) 0 0 var(--r) / 50% 0 0 50%; overflow: hidden; filter: drop-shadow(-8px 0 12px rgba(0, 0, 0, .28)); transition: transform var(--ms) cubic-bezier(.22, .9, .25, 1); }
+.bsec { position: absolute; left: 0; top: 0; width: var(--bw); height: 100%; display: flex; background: linear-gradient(90deg, #ffffff 0%, #ececec 35%, #c4c4c4 100%); border-radius: var(--r) 0 0 var(--r) / 50% 0 0 50%; overflow: clip; filter: drop-shadow(-8px 0 12px rgba(0, 0, 0, .28)); transition: transform var(--ms) cubic-bezier(.22, .9, .25, 1); }
 .btab { position: relative; width: calc(var(--p) + 2px + var(--r)); height: 100%; flex: none; border: 0; padding: 0; margin: 0; cursor: pointer; background: linear-gradient(90deg, #9c9c9c 0%, #f1f1f1 14%, #ffffff 26%, #e3e3e3 48%, #c4c4c4 78%, #a0a0a0 100%); box-shadow: inset -8px 0 10px rgba(0, 0, 0, .22), inset 4px 0 0 rgba(255, 255, 255, .8), inset 0 10px 14px rgba(255, 255, 255, .55), inset 0 -14px 18px rgba(0, 0, 0, .18), -3px 0 6px rgba(0, 0, 0, .18); }
 .btab::before { content: ""; position: absolute; z-index: 2; left: 6px; top: 34px; bottom: 34px; width: 15px; border-radius: 15px 0 0 15px / 50% 0 0 50%; border-left: 5px solid rgba(255, 255, 255, .8); pointer-events: none; filter: blur(.8px); -webkit-mask-image: linear-gradient(180deg, transparent, #000 22%, #000 78%, transparent); mask-image: linear-gradient(180deg, transparent, #000 22%, #000 78%, transparent); }
 .btab::after { content: ""; position: absolute; z-index: 2; left: calc((var(--p) + 2px) / 2 - 19px); top: 50%; margin-top: -150px; width: 38px; height: 300px; max-height: 70%; border-radius: 19px; pointer-events: none; background: linear-gradient(90deg, rgba(0, 0, 0, .18), rgba(255, 255, 255, .3) 40%, rgba(255, 255, 255, .12) 70%, rgba(0, 0, 0, .1)); box-shadow: inset 5px 0 7px rgba(0, 0, 0, .4), inset 0 5px 6px rgba(0, 0, 0, .18), inset -3px 0 4px rgba(255, 255, 255, .75), 0 0 0 1px rgba(255, 255, 255, .7), 2px 2px 3px rgba(255, 255, 255, .5), -1px 0 2px rgba(0, 0, 0, .25); }
@@ -245,7 +245,7 @@ body.blades .gonly { display: inline-flex; align-items: center; }
 .blabel { position: absolute; z-index: 3; left: calc((var(--p) + 2px) / 2 + 4px); top: 50%; transform: translate(-50%, -50%); writing-mode: vertical-rl; margin: 0; line-height: 1; white-space: nowrap; font: 700 22px Nunito, sans-serif; letter-spacing: .03em; color: #6a6a6a; transition: color .5s ease; text-shadow: none; }
 .bsec.open .blabel { color: #1d1d1d; }
 .bwrap { flex: 1; min-width: 0; margin-left: calc(-1 * var(--r)); height: 100%; }
-.bpanel { position: relative; height: 100%; display: flex; flex-direction: column; overflow: hidden; color: #ffffff; border-radius: var(--r) 0 0 var(--r) / 50% 0 0 50%; box-shadow: -6px 0 10px rgba(0, 0, 0, .38), inset 2px 0 0 rgba(255, 255, 255, .45); }
+.bpanel { position: relative; height: 100%; display: flex; flex-direction: column; overflow: clip; color: #ffffff; border-radius: var(--r) 0 0 var(--r) / 50% 0 0 50%; box-shadow: -6px 0 10px rgba(0, 0, 0, .38), inset 2px 0 0 rgba(255, 255, 255, .45); }
 .bsec.k-torrents .bpanel { background: linear-gradient(160deg, #4a9a32 0%, #357a22 45%, #2a6619 100%); --band: #1f4c12; }
 .bsec.k-add .bpanel, .bsec.k-rss .bpanel { background: linear-gradient(160deg, #c27416 0%, #9d560b 45%, #864807 100%); --band: #5e3204; }
 .bsec.k-connection .bpanel { background: linear-gradient(160deg, #3479c0 0%, #245f9c 45%, #1c4f85 100%); --band: #133a63; }
