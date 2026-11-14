@@ -678,7 +678,7 @@ async function drawSettings() {
   const logBox = el('div', { class: 'log logbox' });
   // The theme switches and saves at once.
   const themeSegs = el('div', { class: 'segs', role: 'group', 'aria-label': 'Theme' });
-  const drawThemeSegs = () => themeSegs.replaceChildren(...[['ff', 'FFVII menu'], ['green', 'Box of X'], ['blades', 'Blades']].map(([val, label]) =>
+  const drawThemeSegs = () => themeSegs.replaceChildren(...[['ff', 'FFVII Menu'], ['green', 'Xbox'], ['blades', 'Blades']].map(([val, label]) =>
     el('button', { class: 'seg', 'aria-pressed': String((state && state.theme) === val), onclick: async () => {
       if (state.theme === val) return;
       try { await api('settings', 'PUT', { theme: val }); state.theme = val; applyTheme(true); drawThemeSegs(); }
@@ -743,7 +743,7 @@ async function drawSettings() {
         field('blocklist_url', 'BLOCKLIST URL', text('blocklist_url', { style: 'width:100%' }))),
       el('h2', {}, 'LOOK'),
       el('div', { class: 'field' }, el('span', { class: 'lbl' }, 'THEME'), el('div', {}, themeSegs)),
-      field('reduce_motion', 'CALMER MOTION', check('reduce_motion'), 'Pages switch with no zoom, and the orb on the Box of X home screen holds still.'),
+      field('reduce_motion', 'CALMER MOTION', check('reduce_motion'), 'Pages switch with no zoom, and the orb on the Xbox home screen holds still.'),
       el('h2', {}, 'UPDATES'),
       updBox,
       (state && state.update && state.update.canInstall) ? field('auto_update', 'UPDATE AUTOMATICALLY', check('auto_update'), 'Checks every 6 hours and installs new versions by itself. Downloads pause for a few seconds while it restarts.') : null,
