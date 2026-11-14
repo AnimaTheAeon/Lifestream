@@ -24,7 +24,8 @@ pub const RESTART_CODE: i32 = 75;
 const CHECK_EVERY: Duration = Duration::from_secs(6 * 3600);
 
 static RESTART: AtomicBool = AtomicBool::new(false);
-static STATUS: Mutex<Status> = Mutex::new(Status { latest: None, checked: None, error: None, busy: None, checking: false });
+static STATUS: Mutex<Status> =
+    Mutex::new(Status { latest: None, checked: None, error: None, busy: None, checking: false, phase: "", done: 0, total: 0, target: None });
 
 struct Status {
     latest: Option<Release>,
@@ -33,6 +34,11 @@ struct Status {
     /// What the updater is doing right now, for the page.
     busy: Option<String>,
     checking: bool,
+    /// "download", "unpack" or "restart" while installing, for the progress bar.
+    phase: &'static str,
+    done: u64,
+    total: u64,
+    target: Option<String>,
 }
 
 fn with<T>(f: impl FnOnce(&mut Status) -> T) -> T {
@@ -66,6 +72,10 @@ pub fn status_json(auto: bool) -> Value {
             "canInstall": can_install(),
             "auto": auto,
             "busy": s.busy.clone(),
+            "phase": s.phase,
+            "done": s.done,
+            "total": s.total,
+            "target": s.target.clone(),
             "checking": s.checking,
             "error": s.error.clone(),
             "checkedMinsAgo": s.checked.map(|t| t.elapsed().as_secs() / 60),
@@ -149,17 +159,26 @@ fn install(release: &Release) {
     with(|s| {
         s.busy = Some(format!("Downloading {}…", release.version));
         s.error = None;
+        s.phase = "download";
+        s.done = 0;
+        s.total = release.nas.as_ref().map(|a| a.size).unwrap_or(0);
+        s.target = Some(release.version.clone());
     });
     match stage(release) {
         Ok(()) => {
             crate::applog::info(format!("Lifestream {} is ready. Saving progress and restarting into it.", release.version));
-            with(|s| s.busy = Some(format!("Restarting into {}…", release.version)));
+            with(|s| {
+                s.busy = Some(format!("Restarting into {}…", release.version));
+                s.phase = "restart";
+            });
             RESTART.store(true, Ordering::SeqCst);
         }
         Err(e) => {
             crate::applog::error(format!("Update failed: {e} Lifestream keeps running the current version."));
             with(|s| {
                 s.busy = None;
+                s.phase = "";
+                s.target = None;
                 s.error = Some(format!("Update failed: {e}"));
             });
         }
@@ -176,8 +195,20 @@ fn stage(release: &Release) -> Result<(), String> {
     if !resp.status().is_success() {
         return Err(format!("Download failed: HTTP {}", resp.status().as_u16()));
     }
+    if let Some(len) = resp.content_length() {
+        with(|s| s.total = len);
+    }
     let mut bytes = Vec::new();
-    resp.read_to_end(&mut bytes).map_err(|e| format!("Download failed: {e}"))?;
+    let mut buf = [0u8; 64 * 1024];
+    loop {
+        let n = resp.read(&mut buf).map_err(|e| format!("Download failed: {e}"))?;
+        if n == 0 {
+            break;
+        }
+        bytes.extend_from_slice(&buf[..n]);
+        let got = bytes.len() as u64;
+        with(|s| s.done = got);
+    }
     if let Some(expected) = &asset.sha256 {
         let actual: String = Sha256::digest(&bytes).iter().map(|b| format!("{b:02x}")).collect();
         if &actual != expected {
@@ -185,7 +216,10 @@ fn stage(release: &Release) -> Result<(), String> {
         }
     }
 
-    with(|s| s.busy = Some(format!("Unpacking {}…", release.version)));
+    with(|s| {
+        s.busy = Some(format!("Unpacking {}…", release.version));
+        s.phase = "unpack";
+    });
     let work = dir.join("staging");
     let _ = std::fs::remove_dir_all(&work);
     std::fs::create_dir_all(&work).map_err(|e| e.to_string())?;

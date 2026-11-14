@@ -142,6 +142,8 @@ pub struct App {
     pub updater: Arc<crate::updater::Updater>,
     pub manual_update_check: bool,
     quitting_for_update: bool,
+    /// When the update was ready; the window closes a moment later so the bar is seen full.
+    restart_seen: Option<Instant>,
     /// Quit was chosen: window hidden, progress saving in the background.
     shutting_down: Option<Instant>,
     pub leak_open: bool,
@@ -218,7 +220,7 @@ impl App {
             tracker_input: String::new(),
             adapters: Vec::new(),
             adapters_at: None,
-            notice: startup_notice.map(|n| (n, Instant::now())),
+            notice: crate::updater::take_update_result().map(|(_, m)| m).or(startup_notice).map(|n| (n, Instant::now())),
             start_hidden,
             frames: 0,
             download_dir,
@@ -232,6 +234,7 @@ impl App {
             },
             manual_update_check: false,
             quitting_for_update: false,
+            restart_seen: None,
             shutting_down: None,
             leak_open: false,
             green_in_page: false,
@@ -761,9 +764,11 @@ impl App {
                 .interactable(false)
                 .show(ctx, |ui| {
                     ui.set_max_width(360.0);
-                    ff::window(ui, |ui| {
-                        ui.set_width(320.0);
-                        ui.add(egui::Label::new(RichText::new(m).color(TEXT()).strong()).wrap());
+                    ff::solid_backing(ui, |ui| {
+                        ff::window(ui, |ui| {
+                            ui.set_width(320.0);
+                            ui.add(egui::Label::new(RichText::new(m).color(TEXT()).strong()).wrap());
+                        })
                     })
                 });
             y += area.response.rect.height() + 10.0;
@@ -878,6 +883,11 @@ impl App {
         use crate::updater::State;
         match self.updater.state() {
             State::Restarting if !self.quitting_for_update => {
+                let seen = *self.restart_seen.get_or_insert_with(Instant::now);
+                if seen.elapsed() < Duration::from_millis(1500) {
+                    ctx.request_repaint_after(Duration::from_millis(50));
+                    return;
+                }
                 self.quitting_for_update = true;
                 #[cfg(windows)]
                 crate::tray::QUIT.store(true, std::sync::atomic::Ordering::SeqCst);
@@ -917,7 +927,7 @@ impl App {
             .frame(egui::Frame::NONE)
             .backdrop_color(egui::Color32::from_black_alpha(150))
             .show(ctx, |ui| {
-                ff::window(ui, |ui| {
+                ff::solid_backing(ui, |ui| ff::window(ui, |ui| {
                     ui.set_width(460.0);
                     match &state {
                         State::Available(r) => {
@@ -956,19 +966,32 @@ impl App {
                             });
                         }
                         State::Downloading(r) => {
-                            ff::title(ui, &format!("Downloading v{}", r.version), 22.0, TEXT());
+                            ff::title(ui, &format!("Updating to v{}", r.version), 22.0, TEXT());
                             let done = self.updater.downloaded.load(SeqCst);
-                            let total = self.updater.total.load(SeqCst).max(1);
-                            ff::stat_bar(ui, done as f32 / total as f32, 420.0, ff::LABEL(), egui::Color32::WHITE);
-                            ui.label(dim(&format!(
-                                "{} of {}",
-                                crate::core::human_bytes(done as i64),
-                                crate::core::human_bytes(total as i64)
-                            )));
+                            let total = self.updater.total.load(SeqCst);
+                            let frac = if total > 0 { done as f32 / total as f32 } else { 0.0 };
+                            let step = if total > 0 {
+                                format!(
+                                    "Step 1 of 2 · Downloading {} of {}",
+                                    crate::core::human_bytes(done as i64),
+                                    crate::core::human_bytes(total as i64)
+                                )
+                            } else {
+                                "Step 1 of 2 · Starting the download".to_string()
+                            };
+                            ff::update_progress(ui, 0.02 + 0.86 * frac, &step);
+                            ui.label(dim("Lifestream keeps running while it downloads."));
                         }
                         State::Restarting => {
-                            ff::title(ui, "Installing update…", 22.0, TEXT());
-                            ui.label(dim("Saving your torrents. Lifestream will reopen in a moment."));
+                            let target = self.updater.target.lock().map(|t| t.clone()).unwrap_or_default();
+                            ff::title(ui, &format!("Installing v{target}"), 22.0, TEXT());
+                            let t = self.restart_seen.map(|s| s.elapsed().as_secs_f32()).unwrap_or(0.0);
+                            ff::update_progress(ui, 0.9 + 0.1 * (t / 1.5).min(1.0), "Step 2 of 2 · Installing");
+                            ui.label(dim(if crate::updater::is_installed() {
+                                "Saving your torrents. Lifestream closes, the installer shows its own progress, then Lifestream reopens and says when it's done."
+                            } else {
+                                "Saving your torrents. Lifestream reopens in a moment and says when it's done."
+                            }));
                         }
                         State::Failed(e) => {
                             ff::title(ui, "Update didn't work", 22.0, ff::BAD());
@@ -980,7 +1003,7 @@ impl App {
                         }
                         _ => {}
                     }
-                });
+                }));
             });
         if let Some(r) = install {
             crate::updater::install_in_background(Arc::clone(&self.updater), r, ctx.clone());
