@@ -58,6 +58,8 @@ pub struct Updater {
     pub downloaded: AtomicU64,
     pub total: AtomicU64,
     pub dismissed: std::sync::atomic::AtomicBool,
+    /// The version being installed, for the progress window.
+    pub target: Mutex<String>,
     /// Why the last check didn't get an answer (only shown for manual checks).
     pub last_error: Mutex<Option<String>>,
 }
@@ -205,6 +207,7 @@ pub fn is_newer(candidate: &str, current: &str) -> bool {
 #[cfg(feature = "gui")]
 pub fn install_in_background(updater: Arc<Updater>, release: Release, ctx: eframe::egui::Context) {
     updater.set(State::Downloading(release.clone()));
+    *updater.target.lock().unwrap_or_else(|e| e.into_inner()) = release.version.clone();
     updater.downloaded.store(0, Ordering::SeqCst);
     updater.total.store(0, Ordering::SeqCst);
     std::thread::spawn(move || {
@@ -230,6 +233,7 @@ pub fn install_in_background(updater: Arc<Updater>, release: Release, ctx: efram
         match result {
             Ok(()) => {
                 crate::applog::info(format!("Updating to v{}", release.version));
+                let _ = std::fs::write(marker_path(), &release.version);
                 updater.set(State::Restarting);
             }
             Err(e) => {
@@ -363,5 +367,25 @@ mod tests {
         assert_eq!(r.version, "0.2.0");
         assert_eq!(r.portable.unwrap().sha256.as_deref(), Some("ab"));
         assert_eq!(r.installer.unwrap().url, "b");
+    }
+}
+
+fn marker_path() -> PathBuf {
+    crate::settings::data_dir().join("updating-to")
+}
+
+/// After a restart: says whether the update that was being installed made it.
+pub fn take_update_result() -> Option<(bool, String)> {
+    let path = marker_path();
+    let target = std::fs::read_to_string(&path).ok()?;
+    let _ = std::fs::remove_file(&path);
+    let target = target.trim().to_string();
+    if target.is_empty() {
+        return None;
+    }
+    if target == APP_VERSION {
+        Some((true, format!("Lifestream updated to v{target}.")))
+    } else {
+        Some((false, format!("The update to v{target} didn't finish. You're still on v{APP_VERSION}; you can try again from Settings.")))
     }
 }

@@ -330,6 +330,33 @@ body.blades .toast.bad { color: #ffd2c8; }
   .bbody .t { grid-template-columns: 40px minmax(0, 1fr); } .bbody .t > .gauge, .bbody .t > .tagcell, .bbody .t > .acts { grid-column: 2; }
   .bbody .field { grid-template-columns: 1fr; } .bbody .field .help { grid-column: 1; }
 }
+
+/* ---- Update progress (all three themes) */
+.upd { position: fixed; inset: 0; z-index: 90; display: flex; align-items: center; justify-content: center; background: rgba(0, 0, 0, .45); opacity: 0; transition: opacity .6s ease; }
+.upd[hidden] { display: none; }
+.upd.on { opacity: 1; }
+.updcard { width: min(520px, calc(100vw - 40px)); padding: 22px 26px 20px; }
+.updtitle { font-size: 22px; font-weight: 800; margin-bottom: 14px; }
+.updbar { position: relative; height: 14px; border-radius: 7px; background: var(--well); border: 1px solid var(--dark); overflow: hidden; }
+.updbar i { position: absolute; left: 0; top: 0; bottom: 0; width: 0; border-radius: 7px; background: linear-gradient(90deg, #1e6ee6, #8ce6ff); transition: width .8s ease; }
+.updbar i::after { content: ""; position: absolute; inset: 0 0 50% 0; border-radius: 7px 7px 0 0; background: rgba(255, 255, 255, .22); }
+.updline { display: flex; gap: 12px; margin-top: 10px; font-size: 14px; }
+.updline .updpct { margin-left: auto; font-weight: 800; }
+.updnote { margin-top: 8px; font-size: 13px; color: var(--dim); }
+.updnote:empty { display: none; }
+.upd.bad .updtitle { color: var(--bad); }
+.upd .btn { margin-top: 14px; }
+body.green .updtitle { font-family: Orbitron, Nunito, sans-serif; text-transform: uppercase; font-size: 18px; color: var(--accent); }
+body.green .updbar { background: #000e00; border-color: #0c3406; border-radius: 0; }
+body.green .updbar i { border-radius: 0; background: linear-gradient(90deg, #4fb51a, #e2ff6a); }
+body.green .updbar i::after { border-radius: 0; }
+body.blades .upd { background: rgba(40, 40, 48, .28); }
+body.blades .updcard { background: rgba(28, 24, 40, .9); border: 1px solid rgba(255, 255, 255, .55); border-radius: 22px; box-shadow: 0 10px 30px rgba(0, 0, 0, .4), inset 0 1px 0 rgba(255, 255, 255, .25); color: #ffffff; }
+body.blades .updbar { height: 16px; border-radius: 8px; background: rgba(0, 0, 0, .3); border: 1px solid rgba(255, 255, 255, .35); }
+body.blades .updbar i { border-radius: 8px; background: linear-gradient(90deg, rgba(255, 255, 255, .75), #ffffff); box-shadow: 0 0 10px rgba(255, 255, 255, .35); }
+body.blades .updbar i::after { border-radius: 8px 8px 0 0; background: rgba(255, 255, 255, .45); }
+body.blades .updnote { color: rgba(255, 255, 255, .78); }
+body.blades .upd.bad .updtitle { color: #ffb4a8; }
 </style>
 </head>
 <body>
@@ -387,6 +414,8 @@ body.blades .toast.bad { color: #ffd2c8; }
   <footer class="win status"><span id="s-badge" class="badge"></span><span id="s-text"></span><a id="s-update" class="tag warn" style="margin-left:auto;min-width:0;text-decoration:none" target="_blank" rel="noreferrer" hidden></a></footer>
 </div>
 <div id="toast" class="win toast" role="status"></div>
+<div id="upd" class="upd" hidden role="status" aria-live="polite"><div class="win updcard"><div class="updtitle"></div><div class="updbar"><i></i></div><div class="updline"><span class="updstep"></span><span class="updpct"></span></div><div class="updnote"></div><div class="updact"></div></div></div>
+
 
 <script>
 'use strict';
@@ -438,7 +467,9 @@ function fillUpdateLink(link, long) {
 }
 function installUpdate(v) {
   if (!confirm(`Update Lifestream to ${v} now?\n\nDownloads pause for a few seconds while it restarts. Your torrents and settings are kept.`)) return;
-  doAction('update-install', 'Downloading the update. This page reloads when Lifestream is back.');
+  UPD.target = v; UPD.restartAt = 0; UPD.finished = false; UPD.startedAt = Date.now();
+  updShow(`Updating Lifestream to ${v}`, 0.02, 'Step 1 of 3 · Starting the download', '');
+  api('action', 'POST', { action: 'update-install' }).then(() => setTimeout(refresh, 400)).catch((e) => { UPD.target = '__failed'; updShow("The update didn't work", 0, '', e.message, true); });
 }
 const doAction = (action, done) => api('action', 'POST', { action }).then(() => done && toast(done)).catch((e) => toast(e.message, true));
 
@@ -467,6 +498,53 @@ async function api(path, method = 'GET', body) {
   return j;
 }
 
+
+// ---- Update progress: one bar from "Update now" until the new version answers.
+const UPD = { target: null, restartAt: 0, finished: false, startedAt: 0 };
+const mb = (b) => (b / 1048576).toFixed(1);
+function updShow(title, frac, step, note, bad) {
+  const box = $('#upd');
+  box.querySelector('.updtitle').textContent = title;
+  box.querySelector('.updbar i').style.width = (Math.max(0, Math.min(1, frac)) * 100).toFixed(1) + '%';
+  box.querySelector('.updstep').textContent = step;
+  box.querySelector('.updpct').textContent = bad ? '' : Math.round(frac * 100) + '%';
+  box.querySelector('.updnote').textContent = note || '';
+  box.classList.toggle('bad', !!bad);
+  box.querySelector('.updact').replaceChildren(bad ? el('button', { class: 'btn', onclick: () => { UPD.target = null; updHide(); } }, 'OK') : '');
+  if (box.hidden) { box.hidden = false; requestAnimationFrame(() => box.classList.add('on')); }
+}
+function updHide() { const box = $('#upd'); box.classList.remove('on'); setTimeout(() => { if (!box.classList.contains('on')) box.hidden = true; }, 600); }
+// Called after every poll. lost = Lifestream didn't answer (it's restarting).
+function drawUpdateProgress(lost) {
+  if (UPD.finished) return;
+  const u = (!lost && state && state.update) || null;
+  if (u && u.busy && u.target && UPD.target !== u.target) { UPD.target = u.target; UPD.restartAt = 0; UPD.startedAt = Date.now(); }
+  if (!UPD.target) return;
+  const title = `Updating Lifestream to ${UPD.target}`;
+  if (!lost && state && state.version === UPD.target) {
+    UPD.finished = true;
+    try { sessionStorage.setItem('ls-updated', UPD.target); } catch (e) { /* private mode */ }
+    updShow(`Lifestream ${UPD.target} is installed`, 1, 'Done', 'Reloading the page…');
+    setTimeout(() => location.reload(), 1800);
+    return;
+  }
+  if (lost || (u && u.phase === 'restart')) {
+    if (!UPD.restartAt) UPD.restartAt = Date.now();
+    const t = (Date.now() - UPD.restartAt) / 1000;
+    updShow(title, 0.9 + 0.08 * (1 - Math.exp(-t / 25)), 'Step 3 of 3 · Restarting',
+      lost ? (t > 120 ? "It's taking longer than usual. Lifestream keeps trying; if it doesn't come back, restart it in Package Center." : "Lifestream is starting the new version. This page reloads by itself when it's back.") : 'Saving torrent progress…');
+  } else if (u && u.phase === 'unpack') {
+    updShow(title, 0.84, 'Step 2 of 3 · Unpacking', '');
+  } else if (u && u.busy) {
+    const f = u.total ? Math.min(1, u.done / u.total) : 0;
+    updShow(title, 0.02 + 0.78 * f, u.total ? `Step 1 of 3 · Downloading ${mb(u.done)} of ${mb(u.total)} MB` : 'Step 1 of 3 · Downloading', 'Torrents keep running while it downloads.');
+  } else if (u && u.error) {
+    updShow("The update didn't work", 0, '', u.error + ' Lifestream keeps running the version you have.', true);
+    UPD.target = '__failed';
+  } else if (UPD.target !== '__failed' && Date.now() - UPD.startedAt > 6000) { UPD.target = null; updHide(); }
+}
+try { const v = sessionStorage.getItem('ls-updated'); if (v) { sessionStorage.removeItem('ls-updated'); setTimeout(() => toast(`Lifestream updated to ${v}.`), 800); } } catch (e) { /* private mode */ }
+
 // ---- state
 let state = null, torrents = [], page = location.hash.slice(1) || 'torrents';
 const FIELDS = ['id','hashString','name','status','percentDone','totalSize','leftUntilDone','rateDownload','rateUpload','eta','uploadRatio','labels','errorString','downloadDir','peersConnected','isPrivate'];
@@ -474,7 +552,8 @@ const FIELDS = ['id','hashString','name','status','percentDone','totalSize','lef
 async function refresh() {
   try {
     state = await api('state');
-    if (refresh.version && state.version && state.version !== refresh.version) { location.reload(); return; }
+    drawUpdateProgress(false);
+    if (refresh.version && state.version && state.version !== refresh.version) { if (!UPD.finished) location.reload(); return; }
     refresh.version = state.version || refresh.version;
     if (state.setup) { $('#setup').hidden = false; $('#app').hidden = true; return; }
     $('#setup').hidden = true; $('#app').hidden = false;
@@ -484,6 +563,7 @@ async function refresh() {
     if (page === 'torrents') drawTorrents();
   } catch (e) {
     $('#s-text').textContent = 'Lost contact with Lifestream (' + e.message + ')';
+    drawUpdateProgress(true);
   }
 }
 
@@ -1085,15 +1165,15 @@ function bladesContour(stage, bodySel, panelSel) {
       const rows = [];
       [...open.children].forEach((c) => pick(c, rows));
       for (const el of rows) {
-        el.style.translate = '';
+        shiftRow(el, 0);
         const er = el.getBoundingClientRect();
         const top = Math.max(er.top, br.top), bot = Math.min(er.bottom, br.bottom);
         if (bot <= top) continue;
         const dx = Math.round(Math.max(arc(top), arc(bot)));
-        if (dx > 0) { el.style.translate = `${dx}px 0`; next.add(el); }
+        if (dx > 0) { shiftRow(el, dx); next.add(el); }
       }
     }
-    shifted.forEach((el) => { if (!next.has(el)) el.style.translate = ''; });
+    shifted.forEach((el) => { if (!next.has(el)) shiftRow(el, 0); });
     shifted = next;
   };
   const queue = () => { if (!queued) { queued = true; requestAnimationFrame(run); } };
@@ -1110,10 +1190,17 @@ function bladesContour(stage, bodySel, panelSel) {
       stage.removeEventListener('scroll', queue, true);
       removeEventListener('resize', queue);
       stage.removeEventListener('transitionend', queue);
-      shifted.forEach((el) => { el.style.translate = ''; });
+      shifted.forEach((el) => { shiftRow(el, 0); });
       shifted.clear();
     },
   };
+}
+
+// Moves a row right by dx and narrows it by the same amount, so its right
+// end stays where it was instead of running past the blade's edge.
+function shiftRow(el, dx) {
+  el.style.translate = dx ? `${dx}px 0` : '';
+  el.style.maxWidth = dx ? `calc(100% - ${dx}px)` : '';
 }
 
 let bcontour = null;
