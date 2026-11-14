@@ -204,7 +204,7 @@ fn state(core: &CoreHandle, setup_only: bool) -> Value {
         "ulRate": s.ul_rate,
         "torrentCount": s.torrents.len(),
         "userPaused": s.user_paused,
-        "theme": if settings.theme == "green" { "green" } else { "ff" },
+        "theme": match settings.theme.as_str() { "green" => "green", "blades" => "blades", _ => "ff" },
         "advanced": settings.advanced_mode,
         "reduceMotion": settings.reduce_motion,
         "killHold": s.kill_hold,
@@ -329,7 +329,7 @@ fn apply_settings(b: &Value) -> Result<Settings, String> {
         s.max_peers_global = clamp(v, 10, 10_000);
     }
     if let Some(v) = str_of("theme") {
-        s.theme = if v == "green" { "green".into() } else { "ff".into() };
+        s.theme = match v.as_str() { "green" => "green".into(), "blades" => "blades".into(), _ => "ff".into() };
     }
     if let Some(v) = str_of("adapter") {
         s.adapter = v;
