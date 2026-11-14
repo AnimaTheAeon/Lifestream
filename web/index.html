@@ -225,6 +225,111 @@ body.calm .bigorb * { animation: none !important; }
   .field { grid-template-columns: 1fr; }
   .field .help { grid-column: 1; }
 }
+
+/* =====================================================================
+   Blades: glossy silver blades, the open one wears its color (project doc
+   claude/themes/blades.md). Everything hangs off body.blades.
+   ===================================================================== */
+#bstage { display: none; }
+html:has(body.blades) { background: #cfcfcf; }
+body.blades { background: #cfcfcf; text-shadow: none; }
+body.blades #bstage { display: block; position: fixed; inset: 0; overflow: hidden; background: linear-gradient(90deg, #cfcfcf 0%, #f2f2f2 50%, #c8c8c8 100%); touch-action: pan-y; user-select: none; }
+body.blades .app { padding: 0; gap: 0; }
+body.blades .main, body.blades #gbar, body.blades #gfoot, body.blades footer.status, body.blades #ghome, body.blades #gbg { display: none; }
+body.blades .gonly { display: inline-flex; align-items: center; }
+.bsec { position: absolute; left: 0; top: 0; width: var(--bw); height: 100%; display: flex; background: linear-gradient(90deg, #ffffff 0%, #ececec 35%, #c4c4c4 100%); border-radius: var(--r) 0 0 var(--r) / 50% 0 0 50%; overflow: hidden; filter: drop-shadow(-8px 0 12px rgba(0, 0, 0, .28)); transition: transform var(--ms) cubic-bezier(.22, .9, .25, 1); }
+.btab { position: relative; width: calc(var(--p) + 2px + var(--r)); height: 100%; flex: none; border: 0; padding: 0; margin: 0; cursor: pointer; background: linear-gradient(90deg, #9c9c9c 0%, #f1f1f1 14%, #ffffff 26%, #e3e3e3 48%, #c4c4c4 78%, #a0a0a0 100%); box-shadow: inset -8px 0 10px rgba(0, 0, 0, .22), inset 4px 0 0 rgba(255, 255, 255, .8), inset 0 10px 14px rgba(255, 255, 255, .55), inset 0 -14px 18px rgba(0, 0, 0, .18), -3px 0 6px rgba(0, 0, 0, .18); }
+.btab::before { content: ""; position: absolute; z-index: 2; left: 6px; top: 34px; bottom: 34px; width: 15px; border-radius: 15px 0 0 15px / 50% 0 0 50%; border-left: 5px solid rgba(255, 255, 255, .8); pointer-events: none; filter: blur(.8px); -webkit-mask-image: linear-gradient(180deg, transparent, #000 22%, #000 78%, transparent); mask-image: linear-gradient(180deg, transparent, #000 22%, #000 78%, transparent); }
+.btab::after { content: ""; position: absolute; z-index: 2; left: calc((var(--p) + 2px) / 2 - 19px); top: 50%; margin-top: -150px; width: 38px; height: 300px; max-height: 70%; border-radius: 19px; pointer-events: none; background: linear-gradient(90deg, rgba(0, 0, 0, .18), rgba(255, 255, 255, .3) 40%, rgba(255, 255, 255, .12) 70%, rgba(0, 0, 0, .1)); box-shadow: inset 5px 0 7px rgba(0, 0, 0, .4), inset 0 5px 6px rgba(0, 0, 0, .18), inset -3px 0 4px rgba(255, 255, 255, .75), 0 0 0 1px rgba(255, 255, 255, .7), 2px 2px 3px rgba(255, 255, 255, .5), -1px 0 2px rgba(0, 0, 0, .25); }
+.btab:focus-visible { outline: 2px solid #2466a8; outline-offset: -4px; }
+.blabel { position: absolute; z-index: 3; left: calc((var(--p) + 2px) / 2 + 4px); top: 50%; transform: translate(-50%, -50%); writing-mode: vertical-rl; margin: 0; line-height: 1; white-space: nowrap; font: 700 22px Nunito, sans-serif; letter-spacing: .03em; color: #6a6a6a; transition: color .5s ease; text-shadow: none; }
+.bsec.open .blabel { color: #1d1d1d; }
+.bwrap { flex: 1; min-width: 0; margin-left: calc(-1 * var(--r)); height: 100%; }
+.bpanel { position: relative; height: 100%; display: flex; flex-direction: column; overflow: hidden; color: #ffffff; border-radius: var(--r) 0 0 var(--r) / 50% 0 0 50%; box-shadow: -6px 0 10px rgba(0, 0, 0, .38), inset 2px 0 0 rgba(255, 255, 255, .45); }
+.bsec.k-torrents .bpanel { background: linear-gradient(160deg, #4a9a32 0%, #357a22 45%, #2a6619 100%); --band: #1f4c12; }
+.bsec.k-add .bpanel, .bsec.k-rss .bpanel { background: linear-gradient(160deg, #c27416 0%, #9d560b 45%, #864807 100%); --band: #5e3204; }
+.bsec.k-connection .bpanel { background: linear-gradient(160deg, #3479c0 0%, #245f9c 45%, #1c4f85 100%); --band: #133a63; }
+.bsec.k-settings .bpanel { background: linear-gradient(160deg, #8064b4 0%, #674c9c 45%, #583f8a 100%); --band: #3d2a63; }
+/* The glass orb in the corner: still, with one soft glint that sweeps across it now and then. */
+.bpanel::before { content: ""; position: absolute; right: 14px; top: 38%; width: 470px; height: 470px; border-radius: 50%; pointer-events: none; filter: blur(3px);
+  background: radial-gradient(circle 340px at 50% 50%, rgba(255,255,255,0) 270px, rgba(255,255,255,.12) 296px, rgba(255,255,255,.3) 306px, rgba(255,255,255,.12) 316px, rgba(255,255,255,0) 340px),
+    radial-gradient(ellipse 9% 5.5% at 26% 19%, rgba(255,255,255,.95), rgba(255,255,255,0) 100%),
+    radial-gradient(ellipse 20% 12% at 35% 27%, rgba(255,255,255,.5), rgba(255,255,255,0) 100%),
+    radial-gradient(ellipse 58% 38% at 50% 2%, rgba(255,255,255,.3), rgba(255,255,255,0) 72%),
+    radial-gradient(ellipse 56% 32% at 58% 100%, rgba(255,255,255,.42), rgba(255,255,255,0) 75%),
+    radial-gradient(circle closest-side at 50% 50%, rgba(255,255,255,0) 94%, rgba(255,255,255,.2) 97.5%, rgba(255,255,255,.04) 100%),
+    radial-gradient(circle closest-side at 50% 50%, rgba(0,0,0,0) 60%, rgba(0,0,0,.18) 88%, rgba(0,0,0,0) 100%),
+    radial-gradient(circle at 40% 36%, rgba(255,255,255,.34) 0, rgba(255,255,255,.2) 30%, rgba(255,255,255,.09) 55%, rgba(255,255,255,0) 63%),
+    radial-gradient(circle at 50% 50%, rgba(255,255,255,0) 68%, rgba(255,255,255,.1) 70%, rgba(255,255,255,0) 72%);
+  background-size: 300% 300%, 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%; background-repeat: no-repeat;
+  background-position: -870px -870px, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0; animation: bsheen 6s ease-in-out infinite; }
+@keyframes bsheen { 0% { background-position: -870px -870px, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0; } 55%, 100% { background-position: -470px -470px, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0; } }
+body.calm .bpanel::before { animation: none; }
+.bband { position: relative; height: 78px; flex: none; display: flex; align-items: center; gap: 18px; padding: 0 calc(var(--r) + 30px) 0 var(--r); border-bottom: 2px solid rgba(255, 255, 255, .35); border-radius: 0 0 26px 26px; background: linear-gradient(180deg, rgba(255, 255, 255, .22), rgba(255, 255, 255, 0) 70%), var(--band); }
+.bband h1 { margin: 0; font: 700 28px Nunito, sans-serif; white-space: nowrap; }
+.bchip { margin-left: auto; display: flex; align-items: center; gap: 8px; background: rgba(255, 255, 255, .16); border-radius: 16px; padding: 5px 12px; font-size: 14px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+.bdot { width: 9px; height: 9px; border-radius: 50%; background: #8dff6a; box-shadow: 0 0 8px #8dff6a; flex: none; }
+.bdot.warn { background: #ffe14a; box-shadow: 0 0 8px #ffe14a; } .bdot.bad { background: #ff7a5a; box-shadow: 0 0 8px #ff7a5a; }
+.bband .gchip { clip-path: none; border-radius: 12px; font: 800 12px Nunito, sans-serif; background: rgba(255, 255, 255, .88); color: #26203a; }
+.bspeed { font-size: 14px; font-weight: 700; opacity: .92; white-space: nowrap; }
+.bbody { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 10px calc(var(--r) + 30px) 6px 14px; opacity: 0; transform: translateX(60px); transition: opacity var(--ms) ease, transform calc(var(--ms) + 150ms) cubic-bezier(.22, .9, .25, 1); }
+.bsec.open .bbody { opacity: 1; transform: none; }
+.bfoot { position: relative; height: 64px; flex: none; display: flex; align-items: center; gap: 10px; padding: 0 calc(var(--r) + 24px) 0 var(--r); font-size: 14px; font-weight: 700; border-top: 2px solid rgba(255, 255, 255, .25); border-radius: 26px 26px 0 0; background: linear-gradient(180deg, rgba(0, 0, 0, .05), rgba(0, 0, 0, .25)), var(--band); }
+.bkey { border: 1.5px solid rgba(255, 255, 255, .8); border-radius: 6px; padding: 1px 7px; font-size: 12px; margin-left: 8px; }
+.bnavs { margin-left: auto; display: flex; gap: 10px; }
+.bnav { border: 0; width: 44px; height: 44px; border-radius: 50%; background: rgba(255, 255, 255, .85); color: #26203a; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; }
+.bnav:hover { background: #ffffff; } .bnav:disabled { opacity: .35; cursor: default; }
+.bedge { position: absolute; right: 0; top: 0; width: var(--edge); height: 100%; z-index: 40; border-radius: calc(var(--r) * .7) 0 0 calc(var(--r) * .7) / 50% 0 0 50%; background: linear-gradient(90deg, #ffffff, #d6d6d6 50%, #ababab); filter: drop-shadow(-6px 0 10px rgba(0, 0, 0, .25)); pointer-events: none; }
+/* The page inside a blade: glass pills on the blade's color. */
+.bbody .win.content { background: none; border: 0; border-radius: 0; box-shadow: none; filter: none; flex: 1; min-height: 0; }
+.bbody #page { height: 100%; }
+.bbody .toolbar { border-bottom-color: rgba(255, 255, 255, .25); padding: 4px 0 12px; }
+.bbody .toolbar h1, .bbody .scroll > h1 { visibility: hidden; font-size: 1px; }
+.bbody .scroll > h1 { display: none; }
+.bbody .content .scroll, .bbody .scroll { padding: 12px 6px 18px 0; }
+.bbody h2 { color: rgba(255, 255, 255, .95); }
+.bbody .lbl, .bbody .dimc, .bbody .sub, .bbody .field .help, .bbody .saved-note, .bbody .empty { color: rgba(255, 255, 255, .8); }
+.bbody .good { color: #d9ffc4; } .bbody .warn { color: #fff0a6; } .bbody .bad { color: #ffd2c8; }
+.bbody .btn { min-height: 38px; padding: 0 18px; border: 1px solid rgba(255, 255, 255, .5); border-radius: 19px; background: linear-gradient(180deg, rgba(255, 255, 255, .22), rgba(255, 255, 255, .06)); color: #ffffff; text-shadow: none; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .4); }
+.bbody .btn:hover, .bbody .btn:focus-visible { background: linear-gradient(180deg, rgba(255, 255, 255, .36), rgba(255, 255, 255, .14)); border-color: rgba(255, 255, 255, .85); outline: none; }
+.bbody .btn:active:not(:disabled) { background: rgba(255, 255, 255, .45); }
+.bbody .btn.primary { background: linear-gradient(180deg, rgba(255, 255, 255, .42), rgba(255, 255, 255, .16)); border-color: rgba(255, 255, 255, .85); }
+.bbody .btn.danger { color: #ffd2c8; border-color: rgba(255, 190, 175, .7); }
+.bbody .btn.saved, .bbody .btn.saved:hover { background: linear-gradient(180deg, rgba(220, 255, 200, .6), rgba(150, 230, 120, .3)); border-color: rgba(230, 255, 210, .9); color: #ffffff; }
+.bbody .icon-btn { width: 38px; padding: 0; border-radius: 50%; }
+.bbody input[type=text], .bbody input[type=password], .bbody input[type=number], .bbody select { min-height: 38px; border: 1px solid rgba(255, 255, 255, .45); border-radius: 19px; padding: 0 16px; background: rgba(0, 0, 0, .22); color: #ffffff; text-shadow: none; }
+.bbody input::placeholder { color: rgba(255, 255, 255, .6); }
+.bbody input:focus, .bbody select:focus { border-color: #ffffff; box-shadow: 0 0 0 2px rgba(255, 255, 255, .35); }
+.bbody select option { color: #26203a; }
+.bbody .field input[type=checkbox] { accent-color: #ffffff; }
+.bbody .segs { border: 1px solid rgba(255, 255, 255, .5); border-radius: 19px; }
+.bbody .seg { color: rgba(255, 255, 255, .85); padding: 8px 18px; text-shadow: none; }
+.bbody .seg[aria-pressed="true"] { background: linear-gradient(180deg, rgba(255, 255, 255, .36), rgba(255, 255, 255, .16)); color: #ffffff; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .7); }
+.bbody .t { margin-bottom: 7px; padding: 8px 14px 8px 10px; border: 1px solid rgba(255, 255, 255, .3); border-radius: 18px; background: linear-gradient(180deg, rgba(255, 255, 255, .12), rgba(255, 255, 255, .03)); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .3); transition: background .35s ease; }
+.bbody .t:hover { background: linear-gradient(180deg, rgba(255, 255, 255, .36) 0%, rgba(255, 255, 255, .16) 48%, rgba(255, 255, 255, .08) 52%, rgba(255, 255, 255, .2) 100%); border-color: rgba(255, 255, 255, .65); }
+.bbody .sq { border: 1px solid rgba(255, 255, 255, .55); border-radius: 50%; background: radial-gradient(circle at 34% 28%, rgba(255, 255, 255, .5), rgba(255, 255, 255, 0) 45%), rgba(0, 0, 0, .25); }
+.bbody .bar { background: rgba(0, 0, 0, .28); border-color: rgba(255, 255, 255, .25); }
+.bbody .f-dl { background: linear-gradient(90deg, #ffffff, #e8ffd4); }
+.bbody .f-done { background: linear-gradient(90deg, #d4ffb8, #f4ffe8); }
+.bbody .f-wait { background: linear-gradient(90deg, #ffe9a0, #fff6d4); }
+.bbody .f-off { background: #b8bcb9; }
+.bbody .tag { border-radius: 12px; }
+.bbody .drop { border-color: rgba(255, 255, 255, .5); border-radius: 18px; color: rgba(255, 255, 255, .85); }
+.bbody .drop.over { background: rgba(255, 255, 255, .12); border-color: #ffffff; }
+.bbody .logbox { background: rgba(0, 0, 0, .3); border-radius: 14px; }
+.bbody .notice { border-radius: 14px; }
+.bbody a { color: #ffffff; }
+.bbody .scroll::-webkit-scrollbar-thumb, .bbody .logbox::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, .45); border-radius: 6px; }
+body.blades .toast { position: fixed; right: 40px; bottom: 80px; z-index: 60; max-width: min(560px, calc(100vw - 60px)); background: rgba(28, 24, 40, .92); border: 1px solid rgba(255, 255, 255, .55); border-radius: 16px; box-shadow: 0 6px 18px rgba(0, 0, 0, .4); color: #ffffff; }
+body.blades .toast.bad { color: #ffd2c8; }
+@media (max-width: 700px) {
+  .bband { height: 62px; padding-right: 18px; gap: 10px; } .bband h1 { font-size: 20px; } .bspeed { display: none; }
+  .bbody { padding-right: 14px; } .bfoot { padding-right: 14px; height: 56px; } .bfoot .bhint { display: none; }
+  .bpanel::before { display: none; } .blabel { font-size: 18px; }
+  .btab::after { width: 26px; left: calc((var(--p) + 2px) / 2 - 13px); border-radius: 13px; }
+  .bbody .t { grid-template-columns: 40px minmax(0, 1fr); } .bbody .t > .gauge, .bbody .t > .tagcell, .bbody .t > .acts { grid-column: 2; }
+  .bbody .field { grid-template-columns: 1fr; } .bbody .field .help { grid-column: 1; }
+}
 </style>
 </head>
 <body>
@@ -256,6 +361,7 @@ body.calm .bigorb * { animation: none !important; }
 </div>
 
 <div id="app" class="app" hidden>
+  <div id="bstage" aria-label="Blades"></div>
   <div id="gbar"><div class="gtitle" id="gtitle"></div><button class="gstatus" id="gstatus" title="Open Settings"></button></div>
   <div class="main">
     <section class="win content" aria-live="polite">
@@ -406,6 +512,7 @@ function drawInfo() {
   fillUpdateLink($('#s-update'), true);
   if ($('#t-pause')) $('#t-pause').textContent = state.userPaused ? 'Resume all' : 'Pause all';
   drawGreenStatus(kind, title, detail);
+  drawBladesStatus(kind, title, detail);
   if (page === 'settings' && drawSettings.drawUpdates) drawSettings.drawUpdates();
   if (state.toast && state.toast !== drawInfo.lastToast) { drawInfo.lastToast = state.toast; toast(state.toast); }
 }
@@ -571,7 +678,7 @@ async function drawSettings() {
   const logBox = el('div', { class: 'log logbox' });
   // The theme switches and saves at once.
   const themeSegs = el('div', { class: 'segs', role: 'group', 'aria-label': 'Theme' });
-  const drawThemeSegs = () => themeSegs.replaceChildren(...[['ff', 'FFVII menu'], ['green', 'Box of X']].map(([val, label]) =>
+  const drawThemeSegs = () => themeSegs.replaceChildren(...[['ff', 'FFVII menu'], ['green', 'Box of X'], ['blades', 'Blades']].map(([val, label]) =>
     el('button', { class: 'seg', 'aria-pressed': String((state && state.theme) === val), onclick: async () => {
       if (state.theme === val) return;
       try { await api('settings', 'PUT', { theme: val }); state.theme = val; applyTheme(true); drawThemeSegs(); }
@@ -673,12 +780,16 @@ const calm = () => !!(state && state.reduceMotion) || matchMedia('(prefers-reduc
 /** Match the page to the saved theme. `stay` keeps the current page open (switching from Settings). */
 function applyTheme(stay) {
   document.body.classList.toggle('calm', calm());
-  const theme = isGreen() ? 'green' : 'ff';
+  const theme = isBlades() ? 'blades' : isGreen() ? 'green' : 'ff';
   if (theme === themeShown && !stay) return;
-  themeShown = theme;
+  const was = themeShown; themeShown = theme;
   document.body.classList.toggle('green', theme === 'green');
-  $('meta[name=theme-color]').content = theme === 'green' ? '#0a3608' : '#121e78';
-  if (theme !== 'green') { document.body.classList.remove('ghome-on'); home = false; stopHelix(); return; }
+  document.body.classList.toggle('blades', theme === 'blades');
+  $('meta[name=theme-color]').content = theme === 'green' ? '#0a3608' : theme === 'blades' ? '#cfcfcf' : '#121e78';
+  if (was === 'blades' && theme !== 'blades') bladesOff();
+  if (theme !== 'green') { document.body.classList.remove('ghome-on'); home = false; stopHelix(); }
+  if (theme === 'blades') { bladesOn(); return; }
+  if (theme !== 'green') return;
   drawGreenTabs();
   if (state) { const [k, t, d] = overall(); drawGreenStatus(k, t, d); }
   // Box of X opens on its home screen.
@@ -902,9 +1013,115 @@ $('#gmode').addEventListener('click', async () => {
   catch (e) { toast(e.message, true); }
 });
 
+// ---- Blades (the glossy silver blades theme; doc claude/themes/blades.md)
+const BLADES = [['torrents', 'Torrents'], ['add', 'Add'], ['settings', 'Settings']];
+const isBlades = () => !!(state && state.theme === 'blades');
+let bstage = null, bcur = 0, bdrag = null;
+const contentEl = () => $('section.content');
+const ARROW = (d) => `<svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16"><path d="${d}" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+
+function bladesBuild() {
+  if (bstage) return;
+  bstage = $('#bstage');
+  const nav = (dir, label, d) => { const b = el('button', { class: 'bnav', 'data-dir': dir, 'aria-label': label, onclick: () => bladesStep(dir) }); b.innerHTML = ARROW(d); return b; };
+  BLADES.forEach(([key, label]) => {
+    const band = el('div', { class: 'bband' },
+      el('h1', {}, label),
+      el('span', { class: 'bchip', title: 'Open Settings', onclick: () => go('settings') }, el('span', { class: 'bdot' }), el('span', { class: 'btxt' })),
+      el('a', { class: 'gchip bupd', hidden: true }),
+      el('span', { class: 'bspeed' }));
+    const foot = el('div', { class: 'bfoot' },
+      el('span', { class: 'bkey bhint' }, '← →'), el('span', { class: 'bhint' }, 'Blades'),
+      el('span', { class: 'bkey bhint' }, 'ENTER'), el('span', { class: 'bhint' }, 'Select'),
+      el('span', { class: 'bkey bhint' }, 'ESC'), el('span', { class: 'bhint' }, 'Back'),
+      el('span', { class: 'bnavs' }, nav(-1, 'Previous blade', 'M10 3 L5 8 L10 13'), nav(1, 'Next blade', 'M6 3 L11 8 L6 13')));
+    bstage.append(el('section', { class: 'bsec k-' + key, 'aria-label': label },
+      el('button', { class: 'btab', 'aria-label': label, onclick: () => { if (page !== key) go(key); } }, el('span', { class: 'blabel' }, label.toLowerCase())),
+      el('div', { class: 'bwrap' }, el('div', { class: 'bpanel' }, band, el('div', { class: 'bbody' }), foot))));
+  });
+  bstage.append(el('div', { class: 'bedge', 'aria-hidden': 'true' }));
+  // Swipe sideways: anywhere with a finger, or from a tab or the top band with the mouse.
+  bstage.addEventListener('pointerdown', (e) => { bdrag = { x: e.clientX, y: e.clientY, ok: e.pointerType === 'touch' || !!e.target.closest('.btab, .bband') }; });
+  bstage.addEventListener('pointerup', (e) => {
+    if (!bdrag || !bdrag.ok) { bdrag = null; return; }
+    const dx = e.clientX - bdrag.x, dy = e.clientY - bdrag.y; bdrag = null;
+    if (Math.abs(dx) > 70 && Math.abs(dy) < 60) bladesStep(dx < 0 ? 1 : -1);
+  });
+}
+
+function bladesPlace(instant) {
+  if (!bstage) return;
+  const W = innerWidth, narrow = W < 700, p = narrow ? 34 : 52, r = narrow ? 22 : 44, edge = narrow ? 16 : 30, n = BLADES.length;
+  const ms = instant || calm() ? 0 : 700;
+  bstage.style.cssText = `--p:${p}px;--r:${r}px;--edge:${edge}px;--bw:${W - edge - (n - 1) * p + r}px;--ms:${ms}ms`;
+  bstage.querySelectorAll('.bsec').forEach((s, i) => {
+    s.style.transform = `translateX(${i <= bcur ? i * p : W - edge - (n - i) * p}px)`;
+    s.style.zIndex = 10 + i;
+    s.classList.toggle('open', i === bcur);
+    const tab = s.querySelector('.btab'); tab.tabIndex = i === bcur ? -1 : 0;
+    s.querySelector('.bwrap').inert = i !== bcur;
+  });
+  bstage.querySelectorAll('.bnav').forEach((b) => { b.disabled = (+b.dataset.dir < 0 && bcur === 0) || (+b.dataset.dir > 0 && bcur === n - 1); });
+}
+
+/** Open a blade: the page moves into it and the blades slide. */
+function bladesShow(key, instant) {
+  bladesBuild();
+  const i = Math.max(0, BLADES.findIndex((b) => b[0] === key));
+  const slot = bstage.querySelectorAll('.bbody')[i], c = contentEl();
+  if (c.parentNode !== slot) slot.append(c);
+  bcur = i;
+  bladesPlace(instant);
+  if (state) { const [k, t, d] = overall(); drawBladesStatus(k, t, d); }
+}
+
+function bladesOn() { bladesShow(page, true); }
+function bladesOff() { const c = contentEl(), m = $('.main'); if (c && m && c.parentNode !== m) m.prepend(c); }
+
+function bladesStep(d) {
+  const j = Math.max(0, Math.min(BLADES.length - 1, bcur + d));
+  if (j !== bcur) go(BLADES[j][0]);
+}
+
+function drawBladesStatus(kind, title) {
+  if (!isBlades() || !bstage) return;
+  const held = state.killHold || state.userPaused;
+  const label = (title.charAt(0) + title.slice(1).toLowerCase()).replace(/\bvpn\b/i, 'VPN') + (kind === 'good' && state.adapter ? ' · ' + state.adapter : '');
+  const speed = `Down ${rate(held ? 0 : state.dlRate)} · Up ${rate(held ? 0 : state.ulRate)}`;
+  bstage.querySelectorAll('.bband').forEach((b) => {
+    b.querySelector('.btxt').textContent = label;
+    b.querySelector('.bdot').className = 'bdot ' + (kind === 'good' ? '' : kind);
+    b.querySelector('.bspeed').textContent = speed;
+    fillUpdateLink(b.querySelector('.bupd'), false);
+  });
+}
+
+// Left and right move between blades, Esc goes back to Torrents, Enter picks the first thing on the page.
+document.addEventListener('keydown', (e) => {
+  if (!isBlades() || $('#app').hidden || e.altKey || e.ctrlKey || e.metaKey) return;
+  const tag = (document.activeElement || {}).tagName || '';
+  if (/^(INPUT|TEXTAREA|SELECT)$/.test(tag)) return;
+  if (e.key === 'ArrowRight') { e.preventDefault(); bladesStep(1); }
+  else if (e.key === 'ArrowLeft') { e.preventDefault(); bladesStep(-1); }
+  else if (e.key === 'Escape' && bcur > 0) { e.preventDefault(); go('torrents'); }
+  else if (e.key === 'Enter' && (!tag || tag === 'BODY')) {
+    const first = bstage.querySelector('.bsec.open .bbody button, .bsec.open .bbody input, .bsec.open .bbody select');
+    if (first) { e.preventDefault(); first.focus(); }
+  }
+});
+for (const type of ['mousedown', 'mouseup']) {
+  window.addEventListener(type, (e) => {
+    if (e.button !== 3 || !isBlades()) return;
+    e.preventDefault();
+    if (type === 'mouseup') bladesStep(-1);
+  });
+}
+addEventListener('resize', () => { if (isBlades()) bladesPlace(true); });
+
 function go(p, keepHome) {
   page = p; history.replaceState(null, '', '#' + p);
-  if (isGreen() && !(keepHome && home)) leaveHome(p);
+  if (isBlades()) bladesShow(p);
+  else if (isGreen() && !(keepHome && home)) leaveHome(p);
   document.querySelectorAll('.mi').forEach((b) => b.setAttribute('aria-current', b.dataset.page === p ? 'page' : 'false'));
   ({ torrents: drawTorrents, add: drawAdd, settings: drawSettings })[p]();
 }

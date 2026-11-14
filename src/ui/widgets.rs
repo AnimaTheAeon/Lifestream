@@ -114,6 +114,8 @@ pub fn row_tagged<R>(
         [egui::pos2(rect.left(), rect.top() + 2.0), egui::pos2(rect.right(), rect.top() + 2.0)],
         if ff::is_green() {
             egui::Stroke::new(1.0, Color32::from_rgba_unmultiplied(150, 255, 70, 40))
+        } else if ff::is_blades() {
+            egui::Stroke::new(1.0, Color32::from_rgba_unmultiplied(255, 255, 255, 45))
         } else {
             egui::Stroke::new(1.0, Color32::from_rgba_premultiplied(150, 160, 220, 40))
         },
@@ -184,6 +186,12 @@ pub fn pill(ui: &mut Ui, text: &str, selected: bool) -> egui::Response {
         (false, false) => Color32::from_rgb(12, 20, 72),
     };
     let fill = if selected && !green { Color32::from_rgb(60, 100, 200) } else { fill };
+    // Blades: glass pills.
+    let (color, fill) = if ff::is_blades() {
+        (Color32::WHITE, Color32::from_rgba_unmultiplied(255, 255, 255, if selected { 95 } else { 28 }))
+    } else {
+        (color, fill)
+    };
     ui.add(
         egui::Button::new(RichText::new(text).color(color).strong())
             .fill(fill)

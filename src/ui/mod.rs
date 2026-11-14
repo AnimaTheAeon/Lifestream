@@ -1,5 +1,6 @@
 //! The party-menu style window.
 
+mod blades;
 mod green;
 mod pages;
 pub mod theme;
@@ -155,6 +156,12 @@ pub struct App {
     /// Going back: the page sinks into the glow, then the orb shrinks away.
     pub green_leave: Option<Instant>,
     pub green_unzoom: Option<Instant>,
+    /// Blades: the blade that was open before the current slide, and when it started.
+    pub blades_anim: Option<(usize, Instant)>,
+    /// Blades: the blade shown last frame (a page change starts a slide).
+    pub blades_last: usize,
+    /// Blades: how far the current sideways drag has gone.
+    pub blades_drag: f32,
 }
 
 impl App {
@@ -233,6 +240,9 @@ impl App {
             green_reveal: None,
             green_leave: None,
             green_unzoom: None,
+            blades_anim: None,
+            blades_last: 0,
+            blades_drag: 0.0,
         }
     }
 
@@ -657,6 +667,9 @@ impl App {
         if ff::is_green() {
             return self.green_layout(ui);
         }
+        if ff::is_blades() {
+            return self.blades_layout(ui);
+        }
         let full = ui.max_rect();
         let gap = 12.0;
         let side_w = 210.0_f32.min(full.width() * 0.3);
@@ -843,7 +856,7 @@ impl eframe::App for App {
         self.handle_drops(&ctx);
         self.quick_add_magnet(&ctx);
         egui::CentralPanel::default()
-            .frame(egui::Frame::new().fill(ff::BACKDROP()).inner_margin(egui::Margin::same(14)))
+            .frame(egui::Frame::new().fill(ff::BACKDROP()).inner_margin(egui::Margin::same(if ff::is_blades() { 0 } else { 14 })))
             .show(ui, |ui| self.layout(ui));
         self.click_flash(&ctx);
     }

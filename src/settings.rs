@@ -90,7 +90,7 @@ pub enum SeederDisplay {
 pub struct Settings {
     // Mode
     pub advanced_mode: bool,
-    /// "ff" (FFVII menu) or "green" (green dashboard).
+    /// "ff" (FFVII menu), "green" (Box of X) or "blades" (Blades).
     pub theme: String,
 
     // Folders
