@@ -831,7 +831,7 @@ impl App {
         }
         ui.add_space(6.0);
         ui.horizontal(|ui| {
-            ui.add(egui::TextEdit::singleline(&mut self.tracker_input).hint_text("udp://tracker.example:1337/announce").desired_width(320.0));
+            ui.add(egui::TextEdit::singleline(&mut self.tracker_input).margin(crate::ui::theme::input_margin()).hint_text("udp://tracker.example:1337/announce").desired_width(320.0));
             if ui.button("Add tracker").on_hover_text("Extra trackers can help slow torrents find more peers.").clicked() {
                 for line in self.tracker_input.split_whitespace() {
                     self.core.send(Cmd::AddTracker(t.info.hash.clone(), line.to_string()));
@@ -903,7 +903,7 @@ impl App {
                         ui.label(dim("Paste a magnet link, or choose a .torrent file. You can also drop .torrent files on the window."));
                         ui.add_space(4.0);
                         ui.horizontal(|ui| {
-                            let r = ui.add(egui::TextEdit::singleline(&mut self.add.magnet).hint_text("magnet:?xt=urn:btih:…").desired_width(400.0));
+                            let r = ui.add(egui::TextEdit::singleline(&mut self.add.magnet).margin(crate::ui::theme::input_margin()).hint_text("magnet:?xt=urn:btih:…").desired_width(400.0));
                             if self.add.magnet.is_empty() && !r.has_focus() && ui.memory(|m| m.focused().is_none()) {
                                 r.request_focus();
                             }
@@ -1039,14 +1039,14 @@ impl App {
                         let old = feed.name.clone();
                         ui.horizontal(|ui| {
                             ff::stat_label(ui, "NAME");
-                            if ui.add(egui::TextEdit::singleline(&mut feed.name).desired_width(200.0)).changed() {
+                            if ui.add(egui::TextEdit::singleline(&mut feed.name).margin(crate::ui::theme::input_margin()).desired_width(200.0)).changed() {
                                 changed = true;
                                 renamed = Some((old.clone(), feed.name.clone()));
                             }
                         });
                         ui.horizontal(|ui| {
                             ff::stat_label(ui, "ADDRESS");
-                            changed |= ui.add(egui::TextEdit::singleline(&mut feed.url).desired_width((ui.available_width() - 10.0).max(200.0))).changed();
+                            changed |= ui.add(egui::TextEdit::singleline(&mut feed.url).margin(crate::ui::theme::input_margin()).desired_width((ui.available_width() - 10.0).max(200.0))).changed();
                         });
                         if let Some(s) = status {
                             match &s.result {
@@ -1089,8 +1089,8 @@ impl App {
                 changed = true;
             }
             ui.horizontal(|ui| {
-                ui.add(egui::TextEdit::singleline(&mut self.new_feed.0).hint_text("Name").desired_width(140.0));
-                ui.add(egui::TextEdit::singleline(&mut self.new_feed.1).hint_text("https://…/rss").desired_width((ui.available_width() - 100.0).max(160.0)));
+                ui.add(egui::TextEdit::singleline(&mut self.new_feed.0).margin(crate::ui::theme::input_margin()).hint_text("Name").desired_width(140.0));
+                ui.add(egui::TextEdit::singleline(&mut self.new_feed.1).margin(crate::ui::theme::input_margin()).hint_text("https://…/rss").desired_width((ui.available_width() - 100.0).max(160.0)));
                 let ok = !self.new_feed.1.trim().is_empty();
                 if ui.add_enabled(ok, egui::Button::new("Add feed")).clicked() {
                     let name = if self.new_feed.0.trim().is_empty() { format!("Feed {}", self.settings.feeds.len() + 1) } else { self.new_feed.0.trim().to_string() };
@@ -1148,26 +1148,26 @@ impl App {
             if let Some(rule) = self.settings.rules.get_mut(self.rss_rule) {
                 ui.add_space(6.0);
                 ui.columns(2, |cols| {
-                    changed |= field(&mut cols[0], "NAME", "", |ui| ui.text_edit_singleline(&mut rule.name)).changed();
+                    changed |= field(&mut cols[0], "NAME", "", |ui| ui.add(egui::TextEdit::singleline(&mut rule.name).margin(crate::ui::theme::input_margin()).margin(crate::ui::theme::input_margin()))).changed();
                     changed |= field(
                         &mut cols[0],
                         "MUST CONTAIN",
                         if rule.use_regex { "A regular expression the title must match." } else { "Every word must appear in the title (any order)." },
-                        |ui| ui.text_edit_singleline(&mut rule.must_contain),
+                        |ui| ui.add(egui::TextEdit::singleline(&mut rule.must_contain).margin(crate::ui::theme::input_margin()).margin(crate::ui::theme::input_margin())),
                     )
                     .changed();
                     changed |= field(
                         &mut cols[1],
                         "MUST NOT CONTAIN",
                         if rule.use_regex { "A regular expression the title must not match." } else { "Comma-separated. Any of these in the title skips it." },
-                        |ui| ui.text_edit_singleline(&mut rule.must_not_contain),
+                        |ui| ui.add(egui::TextEdit::singleline(&mut rule.must_not_contain).margin(crate::ui::theme::input_margin()).margin(crate::ui::theme::input_margin())),
                     )
                     .changed();
                     changed |= field(
                         &mut cols[0],
                         "EPISODES",
                         "Leave empty for everything. Examples: S02 · S02E05- (from E05 on) · S01E01-S01E10 · S03E02, S03E07",
-                        |ui| ui.text_edit_singleline(&mut rule.episodes),
+                        |ui| ui.add(egui::TextEdit::singleline(&mut rule.episodes).margin(crate::ui::theme::input_margin()).margin(crate::ui::theme::input_margin())),
                     )
                     .changed();
                 });
@@ -1452,11 +1452,11 @@ impl App {
             if s.proxy_type > 0 {
                 row(ui, "Host and port", "", |ui| {
                     changed |= ui.add(egui::DragValue::new(&mut s.proxy_port).range(1..=65535)).changed();
-                    changed |= ui.add(egui::TextEdit::singleline(&mut s.proxy_host).hint_text("proxy.example.net").desired_width(170.0)).changed();
+                    changed |= ui.add(egui::TextEdit::singleline(&mut s.proxy_host).margin(crate::ui::theme::input_margin()).hint_text("proxy.example.net").desired_width(170.0)).changed();
                 });
                 row(ui, "Username and password", "Leave empty if the proxy doesn't need them.", |ui| {
-                    changed |= ui.add(egui::TextEdit::singleline(&mut s.proxy_pass).password(true).hint_text("password").desired_width(110.0)).changed();
-                    changed |= ui.add(egui::TextEdit::singleline(&mut s.proxy_user).hint_text("username").desired_width(110.0)).changed();
+                    changed |= ui.add(egui::TextEdit::singleline(&mut s.proxy_pass).margin(crate::ui::theme::input_margin()).password(true).hint_text("password").desired_width(110.0)).changed();
+                    changed |= ui.add(egui::TextEdit::singleline(&mut s.proxy_user).margin(crate::ui::theme::input_margin()).hint_text("username").desired_width(110.0)).changed();
                 });
                 row(ui, "Send peer connections through proxy", "Without this, only tracker traffic uses the proxy.", |ui| changed |= toggle(ui, &mut s.proxy_peers));
                 row(ui, "Send tracker traffic through proxy", "", |ui| changed |= toggle(ui, &mut s.proxy_trackers));
@@ -1467,7 +1467,7 @@ impl App {
                 if ui.button("Update").clicked() {
                     update_bl = true;
                 }
-                changed |= ui.add(egui::TextEdit::singleline(&mut s.blocklist_url).hint_text("https://… (.p2p, .dat or .gz)").desired_width(230.0)).changed();
+                changed |= ui.add(egui::TextEdit::singleline(&mut s.blocklist_url).margin(crate::ui::theme::input_margin()).hint_text("https://… (.p2p, .dat or .gz)").desired_width(230.0)).changed();
             });
             row(ui, "Update weekly", "", |ui| changed |= toggle(ui, &mut s.blocklist_auto));
             ui.label(dim(if bl_status.is_empty() { "No blocklist loaded." } else { &bl_status }));
@@ -1535,7 +1535,7 @@ impl App {
                 if ui.button("Browse").clicked() {
                     browse = Some(super::FolderSetting::Downloads);
                 }
-                changed |= ui.add(egui::TextEdit::singleline(&mut s.download_dir).desired_width((ui.available_width() - 10.0).max(200.0))).changed();
+                changed |= ui.add(egui::TextEdit::singleline(&mut s.download_dir).margin(crate::ui::theme::input_margin()).desired_width((ui.available_width() - 10.0).max(200.0))).changed();
             });
             ui.add_space(4.0);
             row(ui, "Download limit", "", |ui| changed |= rate(ui, &mut s.dl_limit_kb).changed());
@@ -1573,7 +1573,7 @@ impl App {
                         if ui.button("Browse").clicked() {
                             browse = Some(super::FolderSetting::Incomplete);
                         }
-                        changed |= ui.add(egui::TextEdit::singleline(&mut s.incomplete_dir).desired_width((ui.available_width() - 10.0).max(200.0))).changed();
+                        changed |= ui.add(egui::TextEdit::singleline(&mut s.incomplete_dir).margin(crate::ui::theme::input_margin()).desired_width((ui.available_width() - 10.0).max(200.0))).changed();
                     });
                 }
 
@@ -1590,9 +1590,9 @@ impl App {
                 row(ui, "On a schedule", "", |ui| changed |= toggle(ui, &mut s.turtle_schedule));
                 if s.turtle_schedule {
                     row(ui, "From / to", "24-hour time, like 18:00. Overnight works too (22:00 to 06:00).", |ui| {
-                        changed |= ui.add(egui::TextEdit::singleline(&mut s.turtle_to).desired_width(60.0)).changed();
+                        changed |= ui.add(egui::TextEdit::singleline(&mut s.turtle_to).margin(crate::ui::theme::input_margin()).desired_width(60.0)).changed();
                         ui.label("to");
-                        changed |= ui.add(egui::TextEdit::singleline(&mut s.turtle_from).desired_width(60.0)).changed();
+                        changed |= ui.add(egui::TextEdit::singleline(&mut s.turtle_from).margin(crate::ui::theme::input_margin()).desired_width(60.0)).changed();
                     });
                     row(ui, "Days", "", |ui| {
                         for (i, d) in ["Sun", "Sat", "Fri", "Thu", "Wed", "Tue", "Mon"].iter().enumerate() {
@@ -1695,9 +1695,9 @@ impl App {
                     row(ui, "Allow other computers", "Turn on if Midgar, Turks or Materia runs on another machine (like the NAS), and set a username and password.", |ui| {
                         changed |= toggle(ui, &mut s.rpc_allow_lan)
                     });
-                    row(ui, "Username", "", |ui| changed |= ui.add(egui::TextEdit::singleline(&mut s.rpc_username).desired_width(180.0)).changed());
+                    row(ui, "Username", "", |ui| changed |= ui.add(egui::TextEdit::singleline(&mut s.rpc_username).margin(crate::ui::theme::input_margin()).desired_width(180.0)).changed());
                     row(ui, "Password", "", |ui| {
-                        changed |= ui.add(egui::TextEdit::singleline(&mut s.rpc_password).password(true).desired_width(180.0)).changed()
+                        changed |= ui.add(egui::TextEdit::singleline(&mut s.rpc_password).margin(crate::ui::theme::input_margin()).password(true).desired_width(180.0)).changed()
                     });
                 }
             }
@@ -1718,7 +1718,7 @@ impl App {
                         if ui.button("Browse").clicked() {
                             browse = Some(super::FolderSetting::Backups);
                         }
-                        changed |= ui.add(egui::TextEdit::singleline(&mut s.backup_dir).desired_width((ui.available_width() - 10.0).max(200.0))).changed();
+                        changed |= ui.add(egui::TextEdit::singleline(&mut s.backup_dir).margin(crate::ui::theme::input_margin()).desired_width((ui.available_width() - 10.0).max(200.0))).changed();
                     });
                     row(ui, "Keep the last", "", |ui| changed |= ui.add(egui::DragValue::new(&mut s.backup_keep).range(1..=52).suffix(" backups")).changed());
                 }
