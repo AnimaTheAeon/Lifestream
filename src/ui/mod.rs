@@ -3,6 +3,7 @@
 mod blades;
 mod green;
 mod pages;
+mod splash;
 pub mod theme;
 mod widgets;
 
@@ -164,6 +165,8 @@ pub struct App {
     pub blades_last: usize,
     /// Blades: how far the current sideways drag has gone.
     pub blades_drag: f32,
+    /// The start screen shown over the window at launch.
+    splash: splash::Splash,
 }
 
 impl App {
@@ -246,6 +249,7 @@ impl App {
             blades_anim: None,
             blades_last: 0,
             blades_drag: 0.0,
+            splash: if start_hidden { splash::Splash::skipped() } else { splash::Splash::default() },
         }
     }
 
@@ -864,6 +868,8 @@ impl eframe::App for App {
             .frame(egui::Frame::new().fill(ff::BACKDROP()).inner_margin(egui::Margin::same(if ff::is_blades() { 0 } else { 14 })))
             .show(ui, |ui| self.layout(ui));
         self.click_flash(&ctx);
+        let calm = self.settings.reduce_motion;
+        self.splash.overlay(&ctx, calm);
     }
 
     fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {

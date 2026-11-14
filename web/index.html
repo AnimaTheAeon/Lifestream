@@ -92,8 +92,7 @@ body.green .btn.saved, body.green .btn.saved:hover { background: linear-gradient
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 
 /* =====================================================================
-   Box of X: the green console-dashboard theme (project doc
-   claude/themes/green-dashboard.md). Everything hangs off body.green.
+   Box of X: the green console-dashboard theme. Everything hangs off body.green.
    ===================================================================== */
 @font-face { font-family: Orbitron; font-weight: 800; src: url('/fonts/orbitron-800.ttf') format('truetype'); }
 #gbg, #ghome, #gbar, #gfoot, .gonly { display: none; }
@@ -227,8 +226,7 @@ body.calm .bigorb * { animation: none !important; }
 }
 
 /* =====================================================================
-   Blades: glossy silver blades, the open one wears its color (project doc
-   claude/themes/blades.md). Everything hangs off body.blades.
+   Blades: glossy silver blades, the open one wears its color. Everything hangs off body.blades.
    ===================================================================== */
 #bstage { display: none; }
 html:has(body.blades) { background: #cfcfcf; }
@@ -360,6 +358,66 @@ body.blades .upd.bad .updtitle { color: #ffb4a8; }
 </style>
 </head>
 <body>
+<style>
+/* Start screen: the app's emblem over its name while the page connects. Slow fades,
+   nothing flashes; hidden with Reduce motion. */
+#splash{position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;
+  background:radial-gradient(ellipse at 50% 42%,#101a6e 0%,#080c34 45%,#04040c 100%);
+  --si:#f4f4f8;--sa:#70ccff;--sd:#aab2d6;color:var(--si);transition:opacity .6s ease}
+#splash.green{background:radial-gradient(ellipse at 50% 42%,#165c10 0%,#0a3608 38%,#041c04 70%,#010a01 100%);--si:#e4ffc4;--sa:#c8ff4a;--sd:#a6dc80}
+#splash.blades{background:linear-gradient(135deg,#cfcfcf 0%,#f2f2f2 50%,#c8c8c8 100%);--si:#2f2f2f;--sa:#5b5b5b;--sd:#6a6a6a}
+#splash.out{opacity:0;pointer-events:none}
+#splash .sp-in{display:flex;flex-direction:column;align-items:center;animation:spIn 1s ease-out both}
+#splash .sp-emblem{color:var(--sa)}
+#splash .sp-title{margin:24px 0 0;padding-left:.42em;font-size:clamp(30px,8vw,52px);font-weight:700;letter-spacing:.42em;color:var(--si);text-transform:uppercase;white-space:nowrap}
+#splash.green .sp-title{font-family:"Orbitron","Nunito",sans-serif;font-weight:800}
+#splash .sp-bar{position:relative;margin-top:14px;width:min(300px,70vw);height:3px;overflow:hidden;border-radius:2px;animation:spBar 1.1s ease-out both}
+#splash .sp-bar::before{content:"";position:absolute;inset:0;background:var(--sd);opacity:.35}
+#splash .sp-bar i{position:absolute;top:0;bottom:0;left:-90px;width:90px;border-radius:2px;background:var(--sa);animation:spGlide 3.2s ease-in-out infinite}
+#splash .sp-status{margin-top:16px;font-size:17px;letter-spacing:.04em;color:var(--sd);animation:spFade 1.2s ease-out .5s both}
+@keyframes spIn{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+@keyframes spFade{from{opacity:0}to{opacity:1}}
+@keyframes spBar{from{transform:scaleX(0)}to{transform:none}}
+@keyframes spGlide{0%{left:-90px}100%{left:100%}}
+@media (prefers-reduced-motion:reduce){#splash{display:none}}
+</style>
+<div id="splash"><div class="sp-in"><canvas id="spHelix" class="sp-emblem" width="240" height="240" style="width:120px;height:120px" aria-hidden="true"></canvas><div class="sp-title">Lifestream</div><div class="sp-bar"><i></i></div><div class="sp-status">Torrent client&hellip;</div></div></div>
+<script>
+(function () {
+  var s = document.getElementById('splash'); if (!s) return;
+  try { var t = localStorage.getItem('lifestream-theme'); if (t === 'green' || t === 'blades') s.classList.add(t); } catch (e) {}
+  var born = Date.now(), gone = false;
+  function out() { if (gone) return; gone = true; s.classList.add('out'); setTimeout(function () { s.remove(); }, 700); }
+  window.splashDone = function (theme) {
+    try { if (theme) localStorage.setItem('lifestream-theme', theme); } catch (e) {}
+    setTimeout(out, Math.max(0, 1800 - (Date.now() - born)));
+  };
+  setTimeout(out, 9000);
+})();
+
+(function () {
+  var c = document.getElementById('spHelix'); if (!c) return;
+  var g = c.getContext('2d'), W = 240, H = 240, t0 = performance.now();
+  function col(a) { var s = getComputedStyle(c).color.match(/\d+/g) || [112, 204, 255]; return 'rgba(' + s[0] + ',' + s[1] + ',' + s[2] + ',' + a + ')'; }
+  function draw(now) {
+    if (!document.getElementById('spHelix')) return;
+    var t = (now - t0) / 1000, tw = t * 0.7, steps = 56, turns = 2.5, top = 20, h = 200, amp = 68;
+    g.clearRect(0, 0, W, H);
+    function pt(i, strand) {
+      var u = i / steps, ph = u * turns * Math.PI * 2 + tw + strand * Math.PI;
+      var edge = Math.max(0.35, Math.sqrt(Math.max(0, u * (1 - u) * 4)));
+      return { x: W / 2 + Math.sin(ph) * amp * edge, y: top + u * h, d: Math.cos(ph) * 0.5 + 0.5 };
+    }
+    var i, s;
+    for (i = 0; i <= steps; i += 4) { var a = pt(i, 0), b = pt(i, 1); g.strokeStyle = col(0.2 + 0.4 * a.d); g.lineWidth = 3; g.beginPath(); g.moveTo(a.x, a.y); g.lineTo(b.x, b.y); g.stroke(); }
+    for (s = 0; s < 2; s++) for (i = 0; i < steps; i++) { var p = pt(i, s), q = pt(i + 1, s); g.strokeStyle = col(0.35 + 0.65 * p.d); g.lineWidth = 3 + 4 * p.d; g.lineCap = 'round'; g.beginPath(); g.moveTo(p.x, p.y); g.lineTo(q.x, q.y); g.stroke(); }
+    for (var n = 0; n < 4; n++) { var m = pt(Math.min(steps, Math.floor(((t * 0.12 + n / 4) % 1) * steps)), n % 2); g.fillStyle = getComputedStyle(c).getPropertyValue('--si') ? col(0.5 + 0.5 * m.d) : col(1); g.beginPath(); g.arc(m.x, m.y, 4 + 3 * m.d, 0, 7); g.fill(); }
+    requestAnimationFrame(draw);
+  }
+  requestAnimationFrame(draw);
+})();
+</script>
+
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
   <symbol id="glove" viewBox="0 0 30 20"><rect x="2" y="8" width="22" height="11" rx="4" fill="#000" fill-opacity=".35"/><rect x="1" y="5" width="6" height="11" rx="2" fill="#c4c8d6" stroke="#1e1e28" stroke-width="1.2"/><rect x="6" y="4" width="12" height="13" rx="4" fill="#fafafc" stroke="#1e1e28" stroke-width="1.2"/><rect x="14" y="4" width="15" height="5" rx="2.5" fill="#fafafc" stroke="#1e1e28" stroke-width="1.2"/><path d="M9 10h7M9 13h7" stroke="#c4c8d6"/></symbol>
 </svg>
@@ -555,9 +613,10 @@ async function refresh() {
     drawUpdateProgress(false);
     if (refresh.version && state.version && state.version !== refresh.version) { if (!UPD.finished) location.reload(); return; }
     refresh.version = state.version || refresh.version;
-    if (state.setup) { $('#setup').hidden = false; $('#app').hidden = true; return; }
+    if (state.setup) { $('#setup').hidden = false; $('#app').hidden = true; if (window.splashDone) splashDone(); return; }
     $('#setup').hidden = true; $('#app').hidden = false;
     applyTheme();
+    if (window.splashDone) splashDone(themeShown);
     torrents = (await rpc('torrent-get', { fields: FIELDS })).torrents;
     drawInfo();
     if (page === 'torrents') drawTorrents();
@@ -1093,7 +1152,7 @@ $('#gmode').addEventListener('click', async () => {
   catch (e) { toast(e.message, true); }
 });
 
-// ---- Blades (the glossy silver blades theme; doc claude/themes/blades.md)
+// ---- Blades (the glossy silver blades theme)
 const BLADES = [['torrents', 'Torrents'], ['add', 'Add'], ['settings', 'Settings']];
 const isBlades = () => !!(state && state.theme === 'blades');
 let bstage = null, bcur = 0, bdrag = null;

@@ -1,5 +1,4 @@
-//! Green dashboard layout (ported from Jenova; see the project doc
-//! claude/themes/green-dashboard.md): a home screen with a glowing jelly orb
+//! Green dashboard layout (ported from Jenova): a home screen with a glowing jelly orb
 //! and a curved column of ring nodes wired to slanted menu tabs; each entry
 //! opens a full page with a slanted title bar and a framed panel.
 

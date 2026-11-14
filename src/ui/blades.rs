@@ -1,7 +1,6 @@
 //! "Blades": glossy silver blades stacked left and right; the open one wears its
 //! page's color. Passed blades stack on the left, coming ones on the right.
 //! Switching slides the blades (0.7 s, gentle); Reduce motion turns that off.
-//! Project doc: claude/themes/blades.md.
 
 use super::theme as ff;
 use super::{App, Page, MENU};
