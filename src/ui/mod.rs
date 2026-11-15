@@ -182,7 +182,6 @@ impl App {
     ) -> Self {
         configure_fonts(&cc.egui_ctx);
         ff::set_theme(ff::Theme::from_key(&settings.theme));
-        widgets::init_icons(&cc.egui_ctx);
         ff::apply_style(&cc.egui_ctx);
         let download_dir = Arc::new(Mutex::new(settings.download_dir.clone()));
 

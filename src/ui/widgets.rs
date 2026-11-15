@@ -4,35 +4,24 @@ use eframe::egui::{self, Align, Color32, Layout, RichText, Ui};
 
 use super::theme::{self as ff, BAD, GOOD, LABEL, TEXT, TEXT_DIM, WARN};
 
-static SHINRA: std::sync::OnceLock<egui::TextureHandle> = std::sync::OnceLock::new();
-/// Help icon for the green dashboard theme.
-static GREEN_HELP: std::sync::OnceLock<egui::TextureHandle> = std::sync::OnceLock::new();
-
-/// Loads the help icon once at startup.
-pub fn init_icons(ctx: &egui::Context) {
-    let load = |cell: &std::sync::OnceLock<egui::TextureHandle>, name: &str, bytes: &[u8]| {
-        if cell.get().is_some() {
-            return;
-        }
-        if let Ok(img) = image::load_from_memory(bytes) {
-            let img = img.to_rgba8();
-            let (w, h) = img.dimensions();
-            let color = egui::ColorImage::from_rgba_unmultiplied([w as usize, h as usize], img.as_raw());
-            let _ = cell.set(ctx.load_texture(name, color, egui::TextureOptions::LINEAR));
-        }
-    };
-    load(&SHINRA, "shinra", include_bytes!("../../resources/shinra.png"));
-    load(&GREEN_HELP, "help_green", include_bytes!("../../resources/help_green.png"));
-}
-
-/// The help icon: hover it to read what a setting does.
+/// The help mark: a small, faint "?" in a thin ring, in the theme's dim text
+/// color so it sits quietly next to its label. It brightens a little while
+/// hovered; hover it to read what a setting does.
 pub fn help_icon(ui: &mut Ui, help: &str) -> egui::Response {
-    let size = egui::vec2(17.0, 17.0);
-    let icon = if ff::is_green() { GREEN_HELP.get() } else { SHINRA.get() };
-    let r = match icon {
-        Some(tex) => ui.add(egui::Image::new((tex.id(), size)).sense(egui::Sense::hover())),
-        None => ui.label(RichText::new("?").color(LABEL()).strong()),
-    };
+    let d = 14.0;
+    let (rect, r) = ui.allocate_exact_size(egui::vec2(d, d), egui::Sense::hover());
+    let lift = ui.ctx().animate_bool_with_time(r.id, r.hovered(), 0.25);
+    let base = if ff::is_blades() { Color32::WHITE } else { TEXT_DIM() };
+    let alpha = (if ff::is_blades() { 95.0 } else { 120.0 } + 110.0 * lift) as u8;
+    let color = Color32::from_rgba_unmultiplied(base.r(), base.g(), base.b(), alpha);
+    let painter = ui.painter();
+    let c = rect.center();
+    if ff::is_green() {
+        painter.rect_stroke(rect.shrink(1.5), 0.0, egui::Stroke::new(1.0, color), egui::StrokeKind::Inside);
+    } else {
+        painter.circle_stroke(c, d / 2.0 - 1.0, egui::Stroke::new(1.0, color));
+    }
+    painter.text(c + egui::vec2(0.0, 0.5), egui::Align2::CENTER_CENTER, "?", egui::FontId::proportional(10.0), color);
     if r.hovered() {
         ui.ctx().set_cursor_icon(egui::CursorIcon::Help);
     }
