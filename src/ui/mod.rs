@@ -739,7 +739,6 @@ impl App {
 
         ff::window_at(ui, main, "main", |ui| self.render_page_body(ui));
 
-        self.update_prompt(ui.ctx());
         self.files_popup(ui.ctx(), main);
         self.add_dialog(ui.ctx());
         self.remove_dialog(ui.ctx());
@@ -866,6 +865,9 @@ impl eframe::App for App {
         egui::CentralPanel::default()
             .frame(egui::Frame::new().fill(ff::BACKDROP()).inner_margin(egui::Margin::same(if ff::is_blades() { 0 } else { 14 })))
             .show(ui, |ui| self.layout(ui));
+        // Drawn here, once, for every look, so no look can leave the
+        // Update button doing nothing.
+        self.update_prompt(&ctx);
         self.click_flash(&ctx);
         let calm = self.settings.reduce_motion;
         self.splash.overlay(&ctx, calm);

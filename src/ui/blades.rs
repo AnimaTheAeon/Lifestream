@@ -418,7 +418,6 @@ impl App {
         if !calm && !narrow {
             ctx.request_repaint_after(std::time::Duration::from_millis(33));
         }
-        self.update_prompt(&ctx);
         self.files_popup(&ctx, body);
         self.add_dialog(&ctx);
         self.remove_dialog(&ctx);

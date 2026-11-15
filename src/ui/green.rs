@@ -392,7 +392,6 @@ impl App {
             }
             main = full;
         }
-        self.update_prompt(&ctx);
         self.files_popup(&ctx, main);
         self.add_dialog(&ctx);
         self.remove_dialog(&ctx);
