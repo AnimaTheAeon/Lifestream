@@ -1,6 +1,6 @@
 # Lifestream, created by its Package Center package. Container Manager shows
 # it as the project "lifestream". It lives inside Barrier's network
-# (the container nas-vpn), so it can only reach the internet through the VPN.
+# (the container barrier), so it can only reach the internet through the VPN.
 # If Barrier isn't running, Lifestream can't start: it never goes around it.
 services:
   lifestream:
@@ -9,7 +9,7 @@ services:
     pull_policy: never
     container_name: lifestream
     restart: unless-stopped
-    network_mode: "container:nas-vpn"
+    network_mode: "container:barrier"
     environment:
       # Inside Barrier's network the tunnel is tun0. A new install starts locked to it.
       - LIFESTREAM_ADAPTER=tun0

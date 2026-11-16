@@ -1,21 +1,21 @@
-# Lifestream in Docker, through NAS VPN
+# Lifestream in Docker, through Barrier
 
 > **Easier way:** the Package Center `.spk` (1.2.0 and newer) sets all of this
 > up by itself: it runs Lifestream in Container Manager inside Barrier's
 > network. This folder is the hand-made version of the same thing.
 
-Lifestream runs inside NAS VPN's network, so it can only reach the internet
-through ExpressVPN. If the VPN drops, NAS VPN's kill switch cuts it off, and
+Lifestream runs inside Barrier's network, so it can only reach the internet
+through ExpressVPN. If the VPN drops, Barrier's kill switch cuts it off, and
 Lifestream's own kill switch (locked to the tunnel, `tun0`) pauses everything.
 
 ## Before you start
-- NAS VPN is running and connected, and its **kill switch is on** (NAS VPN › Settings).
+- Barrier is running and connected, and its **kill switch is on** (Barrier › Settings).
 - Uninstall the Lifestream package in Package Center if it's there (it would
   fight over port 9091).
 
-## Step 1. Open port 9091 on NAS VPN
-Lifestream's web page has to be published by NAS VPN, because Lifestream uses
-its network. In `/volume1/docker/nas-vpn/docker-compose.yml`, add one line
+## Step 1. Open port 9091 on Barrier
+Lifestream's web page has to be published by Barrier, because Lifestream uses
+its network. In `/volume1/docker/barrier/docker-compose.yml`, add one line
 under `ports:`
 
 ```yaml
@@ -24,7 +24,7 @@ under `ports:`
       - "9091:9091"     # Lifestream
 ```
 
-Then in **Container Manager › Project › nas-vpn › Action › Build** (or Stop
+Then in **Container Manager › Project › barrier › Action › Build** (or Stop
 then Start) so the new port takes effect.
 
 ## Step 2. Put this folder on the NAS
@@ -43,13 +43,13 @@ line in `docker-compose.yml` first.
 ## Step 4. Check it
 1. Open `http://<your-NAS-IP>:9091`, choose a username and password.
 2. **Connection** page: the adapter is `tun0` and the badge is green. The leak
-   check should show the same ExpressVPN address NAS VPN shows.
+   check should show the same ExpressVPN address Barrier shows.
 3. In Midgar and Turks, the Transmission download client is: this NAS,
    port 9091, URL base `/transmission/`, and that username and password.
    Inside Midgar/Turks, the download folder is `/volume1/downloads/Lifestream`.
 
 ## Good to know
-- **Start order:** NAS VPN first, then Lifestream. If NAS VPN is ever rebuilt
+- **Start order:** Barrier first, then Lifestream. If Barrier is ever rebuilt
   or recreated (not just restarted), restart the lifestream project after.
   Until then it has no internet: safe, but nothing moves.
 - **Updating Lifestream:** it updates itself. Every 6 hours it checks GitHub
@@ -60,4 +60,4 @@ line in `docker-compose.yml` first.
   Rebuilding (Project › lifestream › Action › Build) still works and is only
   needed to pick up changes to this folder's files.
 - **Other apps** go through the VPN the same way: `network_mode:
-  "container:nas-vpn"`, and their web port moves onto NAS VPN's `ports:` list.
+  "container:barrier"`, and their web port moves onto Barrier's `ports:` list.

@@ -68,7 +68,7 @@ Lifestream updates itself: it checks for a new release each time it opens.
 
 - **Lifestream-x.y.z-x86_64.spk**: Synology version (DSM 7.2.1+, x86_64
   models such as the DS923+). It runs Lifestream in Container Manager inside
-  **Barrier**'s network (the VPN container `nas-vpn`), so every byte goes
+  **Barrier**'s network (the VPN container `barrier`), so every byte goes
   through the VPN, and Lifestream can't run at all while Barrier is stopped.
   1. In Barrier's compose file, add `"9091:9091"` under `ports:` and rebuild
      Barrier (Lifestream's page is published through Barrier).

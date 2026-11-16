@@ -856,7 +856,7 @@ async function drawSettings() {
       adv(field('incomplete_enabled', 'KEEP UNFINISHED SEPARATE', check('incomplete_enabled')),
         field('incomplete_dir', 'UNFINISHED FOLDER', text('incomplete_dir', { style: 'width:100%' }))),
       el('h2', {}, 'VPN'),
-      field('adapter', 'VPN ADAPTER', adapterSel, 'Torrent traffic only uses this connection. In Docker behind NAS VPN, pick tun0.'),
+      field('adapter', 'VPN ADAPTER', adapterSel, 'Torrent traffic only uses this connection. In Docker behind Barrier, pick tun0.'),
       field('kill_switch', 'KILL SWITCH', check('kill_switch'), 'If the adapter drops (or none is picked), everything pauses until it is back.'),
       adv(field('listen_port', 'LISTENING PORT', num('listen_port')),
         field('follow_vpn_port', 'USE VPN PORT FORWARDING', check('follow_vpn_port')),
