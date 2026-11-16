@@ -19,6 +19,7 @@ mod tray;
 mod ui;
 mod updater;
 mod web;
+mod weblogin;
 #[cfg(windows)]
 mod winint;
 

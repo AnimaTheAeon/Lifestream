@@ -101,7 +101,25 @@ fn handle(core: CoreHandle, mut req: Request, session: &str, user: &str, pass: &
         let _ = req.respond(Response::from_string("Set a username and password in Lifestream (Settings → Remote control) to allow other devices.").with_status_code(403));
         return;
     }
-    if !authorized(&req, user, pass) {
+    if !is_rpc && *req.method() == Method::Post && path == "/lifestream/login" {
+        crate::weblogin::login(req, user, pass);
+        return;
+    }
+    if !is_rpc && !authorized(&req, user, pass) && !crate::weblogin::signed_in(&req, user, pass) {
+        // The web page: its own sign-in page instead of the browser's pop-up.
+        if crate::weblogin::is_public(&path) {
+            crate::web::handle(&core, req, false);
+        } else if crate::weblogin::is_page(&path) && *req.method() == Method::Get {
+            crate::weblogin::send_page(req);
+        } else {
+            let resp = Response::from_string("{\"error\":\"Not signed in. Reload the page and sign in again.\"}")
+                .with_status_code(401)
+                .with_header(header("Content-Type", "application/json; charset=UTF-8"));
+            let _ = req.respond(resp);
+        }
+        return;
+    }
+    if is_rpc && !authorized(&req, user, pass) {
         let resp = Response::from_string("Unauthorized").with_status_code(401).with_header(header("WWW-Authenticate", "Basic realm=\"Lifestream\""));
         let _ = req.respond(resp);
         return;
