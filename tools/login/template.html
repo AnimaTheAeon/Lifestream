@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#121e78" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="format-detection" content="telephone=no" />
+    <meta name="description" content="%%APP%%" />
+%%HEAD%%
+    <title>Sign in - %%APP%%</title>
+
+    <style>
+      /* %%APP%%: sign-in page in the look picked in the app (FFVII menu, Xbox or Blades). */
+      html, body { height: 100%; margin: 0; }
+      * { box-sizing: border-box; }
+      body { font-family: 'Nunito', 'Roboto', 'Helvetica Neue', Arial, sans-serif; font-weight: 700; -webkit-font-smoothing: antialiased; }
+      .hidden { display: none !important; }
+      .x-only, .b-only { display: none; }
+      body.green .x-only, body.blades .b-only { display: revert; }
+      body.blades .not-b { display: none; }
+      .stage { position: relative; min-height: 100%; display: flex; align-items: center; justify-content: center; padding: 24px; }
+      .form-input { width: 100%; font: inherit; font-size: 16px; }
+      .form-input:focus { outline: 0; }
+      .remember { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 16px; font-size: 14px; }
+      .remember label { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
+      .remember input { width: 18px; height: 18px; margin: 0; cursor: pointer; }
+      .forgot { font-size: 13px; text-decoration: none; }
+      .forgot:hover, .forgot:focus { text-decoration: underline; }
+      .button { position: relative; width: 100%; min-height: 46px; margin-top: 22px; font: inherit; font-weight: 800; font-size: 18px; cursor: pointer; }
+      .button:focus-visible, .form-input:focus-visible { outline: 0; }
+      .failed { margin-top: 16px; font-size: 14px; text-align: center; }
+      .label { display: block; margin: 16px 0 6px; font-weight: 800; font-size: 13px; letter-spacing: .06em; }
+      .brand { display: flex; align-items: center; gap: 12px; }
+      .logo { width: 40px; height: 40px; flex: none; }
+
+      /* ---------------- FFVII menu ---------------- */
+      body.ff { background: #04040c; color: #f4f4f8; }
+      body.ff .window { width: 340px; max-width: 100%; padding: 22px 26px 26px; border: 2px solid #d6d8e4; border-radius: 8px;
+        background: linear-gradient(160deg, #2e56be 0%, #1a2c96 40%, #121e78 62%, #06083a 100%);
+        box-shadow: 0 0 0 1px #2c2e46, inset 0 0 0 1px #8c90a8, 0 6px 14px rgba(0, 0, 0, .6); text-shadow: 2px 2px 0 rgba(0, 0, 0, .85); }
+      body.ff .brand { margin-bottom: 6px; font-weight: 800; font-size: 28px; }
+      body.ff .label { color: #70ccff; }
+      body.ff .form-input { height: 40px; padding: 0 12px; border: 1px solid #5a64a0; border-radius: 4px; background: #080c34; color: #f4f4f8; text-shadow: none; }
+      body.ff .form-input:focus { border-color: #d6d8e4; box-shadow: 0 0 0 2px rgba(112, 204, 255, .4); }
+      body.ff .remember input { accent-color: #70ccff; }
+      body.ff .forgot { color: #aab2d6; }
+      body.ff .forgot:hover { color: #fff; }
+      body.ff .button { border: 1px solid #d6d8e4; border-radius: 4px; background: #3c64c8; color: #fff; text-shadow: 1px 1px 0 #000; }
+      body.ff .button:hover, body.ff .button:focus { background: #4a78e0; }
+      /* The white pointing glove from the game's menus. */
+      body.ff .button:hover::before, body.ff .button:focus::before { position: absolute; top: 50%; left: 12px; width: 30px; height: 20px; margin-top: -10px; content: '';
+        background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 20'%3E%3Crect x='1' y='5' width='6' height='11' rx='2' fill='%23c4c8d6' stroke='%231e1e28' stroke-width='1.2'/%3E%3Crect x='6' y='4' width='12' height='13' rx='4' fill='%23fafafc' stroke='%231e1e28' stroke-width='1.2'/%3E%3Crect x='14' y='4' width='15' height='5' rx='2.5' fill='%23fafafc' stroke='%231e1e28' stroke-width='1.2'/%3E%3C/svg%3E") no-repeat center / contain; }
+      body.ff .failed { color: #ff6e6e; }
+
+      /* ---------------- Xbox ---------------- */
+      html:has(body.green) { background: #020c02; }
+      body.green { color: #e4ffc4; background: radial-gradient(ellipse at 50% 42%, #165c10 0%, #0a3608 30%, #041c04 62%, #010a01 100%) fixed; overflow: hidden; }
+      body.green .rays { position: fixed; inset: 0; pointer-events: none; opacity: .5;
+        background: repeating-conic-gradient(from 0deg at 50% 42%, rgba(160, 255, 80, .07) 0deg 1deg, transparent 1deg 15deg),
+          repeating-radial-gradient(circle at 50% 42%, transparent 0 139px, rgba(160, 255, 80, .08) 140px 141px, transparent 142px 260px); }
+      body.green .window { position: relative; width: 380px; max-width: 100%; padding: 26px 30px 30px; border: 2px solid rgba(160, 255, 80, .75);
+        background: linear-gradient(135deg, rgba(26, 86, 12, .9) 0%, rgba(14, 60, 8, .9) 40%, rgba(10, 48, 6, .92) 60%, rgba(3, 22, 3, .94) 100%);
+        clip-path: polygon(22px 0, 100% 0, 100% calc(100% - 22px), calc(100% - 22px) 100%, 0 100%, 0 22px);
+        box-shadow: inset 0 0 40px rgba(160, 255, 80, .12); }
+      body.green .window::before { position: absolute; top: 0; left: 22px; right: 0; height: 3px; content: ''; background: linear-gradient(90deg, #c8ff4a, rgba(200, 255, 74, 0)); }
+      body.green .brand { margin-bottom: 4px; font-family: 'Orbitron', 'Nunito', sans-serif; font-size: 24px; letter-spacing: .08em; text-transform: uppercase; color: #f0ffb0; text-shadow: 0 0 12px rgba(200, 255, 74, .45); }
+      body.green .sub { margin: 0 0 6px; color: #a8e078; font-size: 13px; letter-spacing: .14em; text-transform: uppercase; }
+      body.green .label { color: #c8ff4a; font-family: 'Orbitron', 'Nunito', sans-serif; font-size: 11.5px; letter-spacing: .16em; }
+      body.green .form-input { height: 42px; padding: 0 12px; border: 1px solid #50a028; border-radius: 1px; background: rgba(2, 16, 2, .85); color: #f0ffe0; }
+      body.green .form-input:focus { border-color: #a0ff50; box-shadow: 0 0 0 2px rgba(200, 255, 74, .35), 0 0 14px rgba(160, 255, 80, .25); }
+      body.green .remember input { accent-color: #8ad82c; }
+      body.green .forgot { color: #c8ff4a; }
+      body.green .forgot:hover { color: #f0ffb0; }
+      body.green .button { border: 1px solid #a0ff50; border-radius: 1px; background: linear-gradient(180deg, #78c828 0%, #4e9a14 55%, #3a7c0c 100%); color: #ffffff;
+        font-family: 'Orbitron', 'Nunito', sans-serif; font-size: 16px; letter-spacing: .14em; text-transform: uppercase; text-shadow: 0 1px 2px rgba(0, 0, 0, .6);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, .35), 0 0 16px rgba(160, 255, 80, .25); }
+      body.green .button:hover, body.green .button:focus { background: linear-gradient(180deg, #92e23a 0%, #62b41c 55%, #4a8e12 100%); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .45), 0 0 22px rgba(200, 255, 74, .45); }
+      body.green .failed { color: #ff9a7a; }
+
+      /* ---------------- Blades ---------------- */
+      body.blades { --r: 44px; --edge: 30px; --tab: 52px; color: #ffffff; background: linear-gradient(180deg, #cfcfcf 0%, #f2f2f2 50%, #c8c8c8 100%); overflow: hidden; }
+      body.blades .stage { position: fixed; inset: 0; padding: 0; display: block; overflow: clip; }
+      body.blades .bedge { position: absolute; top: 0; right: 0; bottom: 0; width: var(--edge); z-index: 3; background: linear-gradient(90deg, #a8a8a8, #eeeeee 40%, #c4c4c4); box-shadow: inset 2px 0 3px rgba(0, 0, 0, .25); }
+      /* The one open blade: silver tab on the left, colored sheet over it. */
+      body.blades .blade { position: absolute; top: 0; bottom: 0; left: 0; right: var(--edge); border-radius: var(--r) 0 0 var(--r) / 50%;
+        background: linear-gradient(90deg, #9c9c9c 0, #f1f1f1 14%, #fff 26%, #e3e3e3 48%, #c4c4c4 78%, #a0a0a0 100%);
+        background-size: var(--tab) 100%; background-repeat: no-repeat; background-color: #c4c4c4;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, .9), inset 0 -1px 0 rgba(0, 0, 0, .25), inset 4px 0 0 rgba(255, 255, 255, .8), -2px 0 6px rgba(0, 0, 0, .25); }
+      body.blades .grip { position: absolute; top: 50%; left: 7px; width: 38px; height: 300px; max-height: 60%; transform: translateY(-50%); border-radius: 19px;
+        box-shadow: inset 0 2px 4px rgba(0, 0, 0, .28), inset 0 -1px 2px rgba(255, 255, 255, .8), 0 1px 0 rgba(255, 255, 255, .7);
+        display: flex; align-items: center; justify-content: center; }
+      body.blades .grip span { writing-mode: vertical-rl; color: #1d1d1d; font-weight: 800; font-size: 19px; letter-spacing: .04em; text-shadow: 0 1px 0 rgba(255, 255, 255, .8); }
+      body.blades .panel { position: absolute; top: 0; bottom: 0; left: var(--tab); right: var(--edge); border-radius: var(--r) 0 0 var(--r) / 50%; overflow: clip;
+        background: linear-gradient(160deg, %%B1%% 0%, %%B2%% 45%, %%B3%% 100%);
+        box-shadow: -6px 0 12px rgba(0, 0, 0, .28), inset 2px 0 0 rgba(255, 255, 255, .35); display: flex; flex-direction: column; }
+      body.blades .band { position: relative; flex: none; height: 78px; display: flex; align-items: center; gap: 14px; padding: 0 24px 0 calc(var(--r) + 20px);
+        background: linear-gradient(180deg, rgba(255, 255, 255, .22) 0%, rgba(255, 255, 255, 0) 55%), %%B4%%; box-shadow: 0 1px 0 rgba(255, 255, 255, .25); z-index: 2; }
+      body.blades .band h1 { margin: 0; font-size: 28px; font-weight: 800; text-shadow: 0 1px 2px rgba(0, 0, 0, .35); }
+      body.blades .band .logo { width: 34px; height: 34px; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .4)); }
+      body.blades .chip { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; padding: 5px 14px; border-radius: 14px; background: rgba(0, 0, 0, .22); font-size: 14px; }
+      body.blades .chip i { width: 9px; height: 9px; border-radius: 50%; background: #ffd34a; box-shadow: 0 0 6px #ffd34a; }
+      body.blades .body { position: relative; flex: 1; display: flex; align-items: center; justify-content: center; padding: 20px 20px 20px calc(var(--r) + 40px); z-index: 1; }
+      body.blades .foot { flex: none; height: 64px; display: flex; align-items: center; gap: 10px; padding: 0 24px 0 calc(var(--r) + 20px); background: %%B4%%; filter: brightness(.82); font-size: 15px; z-index: 2; }
+      body.blades .key { padding: 2px 8px; border: 1.5px solid rgba(255, 255, 255, .85); border-radius: 6px; font-size: 12px; font-weight: 800; }
+      body.blades .foot span + .key { margin-left: 10px; }
+      /* The glass orb behind the content. */
+      body.blades .orb { position: absolute; right: 14px; top: 38%; width: 470px; height: 470px; border-radius: 50%; pointer-events: none; filter: blur(3px); z-index: 0;
+        background: radial-gradient(circle at 34% 30%, rgba(255, 255, 255, .55) 0 4%, rgba(255, 255, 255, .12) 9%, rgba(255, 255, 255, 0) 30%),
+          radial-gradient(circle at 50% 92%, rgba(255, 255, 255, .22) 0, rgba(255, 255, 255, 0) 38%),
+          radial-gradient(circle at 50% 50%, rgba(255, 255, 255, .05) 0 64%, rgba(255, 255, 255, .2) 69%, rgba(0, 0, 0, .12) 71%, rgba(255, 255, 255, 0) 72%);
+        box-shadow: inset 0 0 0 2px rgba(255, 255, 255, .2), inset 0 -30px 60px rgba(0, 0, 0, .12); }
+      body.blades .orb::after { position: absolute; left: 82px; top: 82px; width: 306px; height: 306px; border-radius: 50%; content: '';
+        border-top: 6px solid rgba(255, 255, 255, .35); filter: blur(4px); animation: glint 6s cubic-bezier(.4, 0, .2, 1) infinite; opacity: 0; }
+      @keyframes glint { 0% { transform: rotate(-70deg); opacity: 0; } 10% { opacity: 1; } 45% { opacity: 1; } 55% { transform: rotate(110deg); opacity: 0; } 100% { transform: rotate(110deg); opacity: 0; } }
+      @media (prefers-reduced-motion: reduce) { body.blades .orb::after { animation: none; } }
+      body.blades .slot { position: relative; width: 100%; max-width: 360px; min-width: 0; }
+      body.blades .window { position: relative; width: 100%; }
+      body.blades .lead { margin: 0 0 8px; font-size: 16px; opacity: .92; text-shadow: 0 1px 2px rgba(0, 0, 0, .3); }
+      body.blades .label { color: #ffffff; opacity: .9; text-shadow: 0 1px 1px rgba(0, 0, 0, .3); }
+      body.blades .form-input { height: 42px; padding: 0 16px; border: 1px solid rgba(255, 255, 255, .45); border-radius: 21px; background: rgba(0, 0, 0, .22); color: #ffffff; box-shadow: inset 0 1px 3px rgba(0, 0, 0, .25); }
+      body.blades .form-input:focus { border-color: rgba(255, 255, 255, .95); box-shadow: inset 0 1px 3px rgba(0, 0, 0, .25), 0 0 12px rgba(255, 255, 255, .3); }
+      body.blades .remember input { accent-color: #ffffff; }
+      body.blades .forgot { color: rgba(255, 255, 255, .85); }
+      body.blades .forgot:hover { color: #fff; }
+      body.blades .button { border: 1px solid rgba(255, 255, 255, .7); border-radius: 23px; color: #ffffff; text-shadow: 0 1px 2px rgba(0, 0, 0, .35);
+        background: linear-gradient(180deg, rgba(255, 255, 255, .36) 0%, rgba(255, 255, 255, .16) 48%, rgba(255, 255, 255, .08) 52%, rgba(255, 255, 255, .2) 100%);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, .75), 0 0 12px rgba(255, 255, 255, .22); }
+      body.blades .button:hover, body.blades .button:focus { background: linear-gradient(180deg, rgba(255, 255, 255, .5) 0%, rgba(255, 255, 255, .26) 48%, rgba(255, 255, 255, .16) 52%, rgba(255, 255, 255, .3) 100%); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .9), 0 0 18px rgba(255, 255, 255, .4); }
+      body.blades .failed { padding: 8px 12px; border-radius: 14px; background: rgba(120, 10, 10, .45); color: #ffe0dc; }
+      @media (max-width: 700px) {
+        body.blades { --r: 20px; --edge: 14px; --tab: 30px; }
+        body.blades .grip { left: 4px; width: 22px; }
+        body.blades .grip span { font-size: 14px; }
+        body.blades .orb { display: none; }
+        body.blades .foot .hint { display: none; }
+        body.blades .body { padding-left: calc(var(--r) + 16px); }
+      }
+    </style>
+  </head>
+
+  <body class="ff">
+    <div class="rays x-only" aria-hidden="true"></div>
+    <div class="stage">
+      <div class="bedge b-only" aria-hidden="true"></div>
+      <div class="blade b-only">
+        <div class="grip" aria-hidden="true"><span>sign in</span></div>
+      </div>
+      <div class="panel-wrap">
+        <div class="panel b-only">
+          <div class="band"><img src="%%LOGO%%" alt="" class="logo" /><h1>%%APP%%</h1><span class="chip"><i></i>Sign in</span></div>
+          <div class="body"><div class="orb" aria-hidden="true"></div><div class="slot"></div></div>
+          <div class="foot"><span class="key">TAB</span><span class="hint">Next field</span><span class="key">ENTER</span><span>Sign in</span></div>
+        </div>
+        <main class="window">
+          <div class="brand not-b"><img src="%%LOGO%%" alt="" class="logo" /><span>%%APP%%</span></div>
+          <p class="sub x-only">Sign in</p>
+          <p class="lead b-only">Sign in to continue.</p>
+          <form role="form" method="POST"%%ACTION%%>
+            <label class="label" for="username">USERNAME</label>
+            <input type="text" id="username" name="username" class="form-input" autocomplete="username" pattern=".{1,}" required title="User name is required" autofocus autocapitalize="off" />
+            <label class="label" for="password">PASSWORD</label>
+            <input type="password" id="password" name="password" class="form-input" autocomplete="current-password" required />
+            <div class="remember">
+              <label for="rememberMe"><input type="checkbox" name="rememberMe" id="rememberMe" checked="checked" />Remember me</label>
+%%FORGOT%%
+            </div>
+            <button type="submit" class="button">Sign in</button>
+            <div id="login-failed" class="failed hidden">Incorrect username or password</div>
+          </form>
+        </main>
+      </div>
+    </div>
+
+    <script type="text/javascript">
+      (function () {
+        var raw = '%%THEME%%';
+        var look = %%MAP%%;
+        document.body.className = look;
+        var meta = document.querySelector('meta[name=theme-color]');
+        if (meta) meta.setAttribute('content', look === 'green' ? '#0a3608' : look === 'blades' ? '%%B1%%' : '#121e78');
+        // Blades: the sign-in form sits on the open blade.
+        if (look === 'blades') document.querySelector('.slot').appendChild(document.querySelector('.window'));
+        if (window.location.search.indexOf('loginFailed=true') > -1) {
+          document.getElementById('login-failed').classList.remove('hidden');
+        }
+      })();
+    </script>
+  </body>
+</html>
