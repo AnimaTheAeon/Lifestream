@@ -8,20 +8,29 @@ use super::theme::{self as ff, BAD, GOOD, LABEL, TEXT, TEXT_DIM, WARN};
 /// color so it sits quietly next to its label. It brightens a little while
 /// hovered; hover it to read what a setting does.
 pub fn help_icon(ui: &mut Ui, help: &str) -> egui::Response {
-    let d = 14.0;
-    let (rect, r) = ui.allocate_exact_size(egui::vec2(d, d), egui::Sense::hover());
+    // A small, quiet mark: 10 px, with the "?" centered on its actual ink
+    // (fonts leave uneven space around characters, so plain centering sits off).
+    let d = 10.0;
+    let (slot, r) = ui.allocate_exact_size(egui::vec2(d + 2.0, d), egui::Sense::hover());
     let lift = ui.ctx().animate_bool_with_time(r.id, r.hovered(), 0.25);
     let base = if ff::is_blades() { Color32::WHITE } else { TEXT_DIM() };
-    let alpha = (if ff::is_blades() { 95.0 } else { 120.0 } + 110.0 * lift) as u8;
+    let alpha = (if ff::is_blades() { 110.0 } else { 130.0 } + 100.0 * lift) as u8;
     let color = Color32::from_rgba_unmultiplied(base.r(), base.g(), base.b(), alpha);
     let painter = ui.painter();
-    let c = rect.center();
+    let c = slot.center();
+    let line = egui::Stroke::new(1.0, color);
     if ff::is_green() {
-        painter.rect_stroke(rect.shrink(1.5), 0.0, egui::Stroke::new(1.0, color), egui::StrokeKind::Inside);
+        painter.rect_stroke(egui::Rect::from_center_size(c, egui::vec2(d, d)).shrink(0.5), 0.0, line, egui::StrokeKind::Inside);
     } else {
-        painter.circle_stroke(c, d / 2.0 - 1.0, egui::Stroke::new(1.0, color));
+        painter.circle_stroke(c, d / 2.0 - 0.5, line);
     }
-    painter.text(c + egui::vec2(0.0, 0.5), egui::Align2::CENTER_CENTER, "?", egui::FontId::proportional(10.0), color);
+    let galley = painter.layout_no_wrap("?".into(), egui::FontId::proportional(8.5), color);
+    let ink = galley
+        .rows
+        .first()
+        .and_then(|row| row.row.glyphs.first().map(|g| row.pos + g.pos.to_vec2() + g.uv_rect.offset + g.uv_rect.size / 2.0))
+        .unwrap_or_else(|| galley.rect.center());
+    painter.galley(c - ink.to_vec2(), galley, color);
     if r.hovered() {
         ui.ctx().set_cursor_icon(egui::CursorIcon::Help);
     }
