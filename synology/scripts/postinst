@@ -5,7 +5,7 @@ cat << 'NOTE'
 <p style="font-weight:bold;">Lifestream runs behind Barrier</p>
 <p>It lives inside Barrier's network (the container <b>barrier</b>), so every byte goes through the VPN. If Barrier is stopped, Lifestream can't run.</p>
 <ol style="list-style-type:decimal;list-style-position:inside;">
-<li>Barrier must publish Lifestream's port: <b>9091:9091</b> under <b>ports:</b> in Barrier's compose file.</li>
+<li>Install the <b>Barrier</b> package first; it publishes Lifestream's port 9091. If Barrier's container is ever replaced (a Barrier .spk install), install this Lifestream .spk again so it joins the new one.</li>
 <li>Open <b>Lifestream</b> from the main menu (or port <b>9091</b> on this NAS). Your shared folders are at their usual paths, like <b>/volume1/Downloads</b>.</li>
 </ol>
 <p>In Midgar or Turks add a <b>Transmission</b> download client: this NAS, port 9091, URL base /transmission/, and your Lifestream username and password.</p>
