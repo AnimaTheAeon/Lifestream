@@ -368,6 +368,7 @@ body.green .t.drag-ghost { background: rgba(8, 34, 6, .94); }
 body.blades .t.drag-ghost { background: linear-gradient(180deg, rgba(255, 255, 255, .24), rgba(255, 255, 255, .08)), rgba(0, 0, 0, .16); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); border-color: rgba(255, 255, 255, .7); }
 /* In Blades the copy needs the blade's row styles, so it sits in its own blade layer. */
 .drag-layer { position: fixed !important; inset: 0; z-index: 60; padding: 0 !important; opacity: 1 !important; transform: none !important; transition: none !important; pointer-events: none; display: block !important; }
+.t .gauge .rates { white-space: nowrap; }
 .dropline { position: fixed; z-index: 59; height: 3px; pointer-events: none; background: var(--dropline); border-radius: 2px; box-shadow: 0 0 8px var(--dropline); }
 .dropline::before, .dropline::after { position: absolute; top: -4px; width: 11px; height: 11px; border-radius: 50%; content: ''; background: var(--dropline); }
 .dropline::before { left: -5px; } .dropline::after { right: -5px; }
@@ -509,7 +510,7 @@ function el(tag, attrs, ...kids) {
 }
 const bytes = (n) => { if (!n || n < 0) return '0 B'; const u = ['B','KB','MB','GB','TB']; let i = 0; while (n >= 1024 && i < u.length - 1) { n /= 1024; i++; } return (i ? n.toFixed(1) : n) + ' ' + u[i]; };
 const rate = (n) => bytes(n) + '/s';
-const eta = (s) => { if (s < 0) return '—'; const h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60; return h ? `${h}h ${m}m` : `${m}m ${s % 60}s`; };
+const eta = (s) => { if (s < 0 || s > 100 * 86400) return '—'; const h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60; return h ? `${h}h ${m}m` : `${m}m ${s % 60}s`; };
 const clock = (s) => [Math.floor(s / 3600), Math.floor(s / 60) % 60, s % 60].map((n) => String(n).padStart(2, '0')).join(':');
 function badge(kind) {
   const fill = { good: '#1e9a46', warn: '#c89614', bad: '#b43c3c' }[kind];
@@ -697,7 +698,9 @@ function torrentRow(t) {
         el('span', {}, el('span', { class: 'lbl' }, 'PEERS '), t.peersConnected),
         t.errorString ? el('span', { class: 'bad' }, t.errorString) : null)),
     el('div', { class: 'gauge' },
-      el('div', { class: 'row' }, el('span', { class: 'lbl' }, done ? 'DONE' : 'ETA ' + eta(t.eta)), el('span', { class: 'val', style: 'font-size:14px' }, `↓ ${rate(t.rateDownload)}  ↑ ${rate(t.rateUpload)}`)),
+      // Like the Windows app: no speed or time left while paused or held.
+      el('div', { class: 'row' }, el('span', { class: 'lbl' }, done ? 'DONE' : (paused || word === 'HELD') ? '' : 'ETA ' + eta(t.eta)),
+        (paused || word === 'HELD') ? null : el('span', { class: 'val rates', style: 'font-size:14px' }, done ? `↑ ${rate(t.rateUpload)}` : `↓ ${rate(t.rateDownload)}  ↑ ${rate(t.rateUpload)}`)),
       el('div', { class: 'bar', role: 'progressbar', 'aria-valuenow': pct, 'aria-valuemin': 0, 'aria-valuemax': 100, 'aria-label': (t.name || '') + ' progress' }, el('div', { class: 'fill ' + fill, style: `width:${pct}%` }))),
     el('div', { class: 'tagcell' }, el('span', { class: 'tag ' + cls }, word)),
     el('div', { class: 'acts' },

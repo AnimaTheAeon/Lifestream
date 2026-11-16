@@ -1246,7 +1246,13 @@ impl Core {
             let base = info.all_time_download.max(info.total_done).max(1);
             let ratio = info.all_time_upload as f64 / base as f64;
             let left = (info.total_wanted - info.total_done).max(0);
-            let eta = if info.state == 2 && info.dl_rate > 0 { Some(left / info.dl_rate as i64) } else { None };
+            // No time left for paused downloads, and none from a trickle that would
+            // take more than 100 days (a paused torrent can still report a few B/s).
+            let eta = if info.state == 2 && !info.paused && info.dl_rate > 0 {
+                Some(left / info.dl_rate as i64).filter(|s| *s <= 100 * 86_400)
+            } else {
+                None
+            };
             let met = self.seed_goal_met(&info, ratio);
             let m = self.meta.get(&info.hash);
             let category = m.map(|m| m.category.clone()).unwrap_or_default();
