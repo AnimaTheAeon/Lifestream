@@ -355,6 +355,23 @@ body.blades .updbar i { border-radius: 8px; background: linear-gradient(90deg, r
 body.blades .updbar i::after { border-radius: 8px 8px 0 0; background: rgba(255, 255, 255, .45); }
 body.blades .updnote { color: rgba(255, 255, 255, .78); }
 body.blades .upd.bad .updtitle { color: #ffb4a8; }
+
+/* Drag a download to reorder the queue (same as the Windows app). */
+:root { --dropline: #70ccff; }
+body.green { --dropline: #dcff64; }
+body.blades { --dropline: #ffffff; }
+.t.draggable { cursor: grab; touch-action: pan-y; }
+.t.draggable .btn { cursor: pointer; }
+.t.drag-src { opacity: .35; }
+.t.drag-ghost { position: fixed; z-index: 60; pointer-events: none; opacity: .92; box-shadow: 0 10px 26px rgba(0, 0, 0, .5); cursor: grabbing; background: rgba(20, 24, 60, .92); }
+body.green .t.drag-ghost { background: rgba(8, 34, 6, .94); }
+body.blades .t.drag-ghost { background: linear-gradient(180deg, rgba(255, 255, 255, .24), rgba(255, 255, 255, .08)), rgba(0, 0, 0, .16); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); border-color: rgba(255, 255, 255, .7); }
+/* In Blades the copy needs the blade's row styles, so it sits in its own blade layer. */
+.drag-layer { position: fixed !important; inset: 0; z-index: 60; padding: 0 !important; opacity: 1 !important; transform: none !important; transition: none !important; pointer-events: none; display: block !important; }
+.dropline { position: fixed; z-index: 59; height: 3px; pointer-events: none; background: var(--dropline); border-radius: 2px; box-shadow: 0 0 8px var(--dropline); }
+.dropline::before, .dropline::after { position: absolute; top: -4px; width: 11px; height: 11px; border-radius: 50%; content: ''; background: var(--dropline); }
+.dropline::before { left: -5px; } .dropline::after { right: -5px; }
+body.dragging-row, body.dragging-row * { cursor: grabbing !important; user-select: none; }
 </style>
 </head>
 <body>
@@ -605,7 +622,7 @@ try { const v = sessionStorage.getItem('ls-updated'); if (v) { sessionStorage.re
 
 // ---- state
 let state = null, torrents = [], page = location.hash.slice(1) || 'torrents';
-const FIELDS = ['id','hashString','name','status','percentDone','totalSize','leftUntilDone','rateDownload','rateUpload','eta','uploadRatio','labels','errorString','downloadDir','peersConnected','isPrivate'];
+const FIELDS = ['id','hashString','name','status','percentDone','totalSize','leftUntilDone','rateDownload','rateUpload','eta','uploadRatio','labels','errorString','downloadDir','peersConnected','isPrivate','queuePosition'];
 
 async function refresh() {
   try {
@@ -668,7 +685,8 @@ function torrentRow(t) {
   if (state && (state.killHold || state.userPaused) && t.status !== 0) [word, cls, fill] = ['HELD', 'warn', 'f-wait'];
   const paused = t.status === 0;
   const act = (method) => async () => { try { await rpc(method, { ids: [t.hashString] }); refresh(); } catch (e) { toast(e.message, true); } };
-  return el('div', { class: 't' },
+  const canMove = !filter && t.queuePosition >= 0;
+  const row = el('div', { class: 't' + (canMove ? ' draggable' : ''), 'data-hash': t.hashString, title: canMove ? 'Drag up or down to change its place in the queue' : '' },
     el('div', { class: 'sq', title: t.isPrivate ? 'Private tracker' : '' }, pct >= 100 ? '✓' : Math.floor(pct) + '%'),
     el('div', { style: 'min-width:0' },
       el('div', { class: 'name', title: t.name }, t.name || t.hashString),
@@ -685,6 +703,110 @@ function torrentRow(t) {
     el('div', { class: 'acts' },
       el('button', { class: 'btn icon-btn', title: paused ? 'Resume' : 'Pause', 'aria-label': (paused ? 'Resume ' : 'Pause ') + t.name, onclick: act(paused ? 'torrent-start' : 'torrent-stop') }, paused ? '▶' : '❚❚'),
       el('button', { class: 'btn icon-btn danger', title: 'Remove', 'aria-label': 'Remove ' + t.name, onclick: () => removeDialog(t) }, '✕')));
+  if (canMove) row.addEventListener('pointerdown', (e) => rowDragStart(e, row, t));
+  return row;
+}
+
+// ---- Drag to reorder (same as the Windows app) ----
+// Grab a download anywhere but its buttons and move it up or down. A faded gap
+// stays where it was, a copy follows the pointer and a line shows where it will
+// land. With a finger, hold it for a moment first so scrolling still works.
+let rowDrag = null;
+function rowDragStart(e, row, t) {
+  if (e.button !== 0 || e.target.closest('button, a, input')) return;
+  const touch = e.pointerType === 'touch';
+  rowDrag = { row, t, x: e.clientX, y: e.clientY, live: false, ready: !touch, id: e.pointerId, ghost: null, line: null, target: null, before: null };
+  if (touch) rowDrag.timer = setTimeout(() => { if (rowDrag && rowDrag.row === row) { rowDrag.ready = true; if (navigator.vibrate) navigator.vibrate(10); goLive(rowDrag, rowDrag.x, rowDrag.y); } }, 350);
+  addEventListener('pointermove', rowDragMove, { passive: false });
+  addEventListener('pointerup', rowDragEnd, true);
+  addEventListener('pointercancel', rowDragCancel, true);
+}
+function goLive(d, x, y) {
+  d.live = true;
+  const r = d.row.getBoundingClientRect();
+  d.grabY = y - r.top; d.left = r.left; d.width = r.width;
+  d.ghost = d.row.cloneNode(true);
+  d.ghost.classList.add('drag-ghost');
+  d.ghost.style.cssText = `left:${r.left}px;top:${r.top}px;width:${r.width}px;transform:none;max-width:none`;
+  d.line = el('div', { class: 'dropline', hidden: '' });
+  const inBlade = d.row.closest('.bbody');
+  d.layer = inBlade ? el('div', { class: 'bbody drag-layer' }, d.ghost) : null;
+  document.body.append(d.layer || d.ghost, d.line);
+  d.row.classList.add('drag-src');
+  document.body.classList.add('dragging-row');
+  rowDragAt(x, y);
+}
+function rowDragMove(e) {
+  const d = rowDrag; if (!d || e.pointerId !== d.id) return;
+  if (!d.live) {
+    const moved = Math.hypot(e.clientX - d.x, e.clientY - d.y) > 6;
+    if (!d.ready) { if (moved) rowDragCancel(); return; } // a finger scrolling, not a hold
+    if (!moved) return;
+    goLive(d, e.clientX, e.clientY);
+  }
+  e.preventDefault();
+  rowDragAt(e.clientX, e.clientY);
+}
+function rowDragAt(x, y) {
+  const d = rowDrag, list = $('#tlist');
+  d.py = y;
+  d.ghost.style.top = (y - d.grabY) + 'px';
+  const rows = [...list.querySelectorAll('.t.draggable')];
+  // Drop before the first row whose middle is below the pointer.
+  const i = rows.findIndex((r) => { const b = r.getBoundingClientRect(); return y < b.top + b.height / 2; });
+  const from = d.t.queuePosition;
+  let target, lineY, ref;
+  if (i >= 0) {
+    const pos = torrents.find((x) => x.hashString === rows[i].dataset.hash).queuePosition;
+    target = from < pos ? pos - 1 : pos; ref = rows[i]; lineY = rows[i].getBoundingClientRect().top - 4;
+  } else {
+    ref = rows[rows.length - 1];
+    target = torrents.find((x) => x.hashString === ref.dataset.hash).queuePosition; lineY = ref.getBoundingClientRect().bottom + 4;
+  }
+  d.target = target; d.before = i >= 0 ? rows[i] : null;
+  const box = list.getBoundingClientRect();
+  d.line.hidden = target === from;
+  const lr = (ref || d.row).getBoundingClientRect();
+  d.line.style.cssText = `left:${lr.left + 6}px;width:${Math.max(0, lr.width - 12)}px;top:${Math.min(Math.max(lineY, box.top + 2), box.bottom - 4)}px`;
+  // Scroll when dragging near the top or bottom of the list.
+  const edge = 50;
+  const dy = y < box.top + edge ? -(box.top + edge - y) * 0.3 : y > box.bottom - edge ? (y - (box.bottom - edge)) * 0.3 : 0;
+  clearInterval(d.scroll);
+  if (dy) d.scroll = setInterval(() => { list.scrollTop += dy; if (rowDrag) rowDragAt(x, rowDrag.py); }, 30);
+}
+function rowDragClean() {
+  const d = rowDrag; if (!d) return;
+  clearTimeout(d.timer); clearInterval(d.scroll);
+  removeEventListener('pointermove', rowDragMove);
+  removeEventListener('pointerup', rowDragEnd, true);
+  removeEventListener('pointercancel', rowDragCancel, true);
+  if (d.ghost) d.ghost.remove();
+  if (d.layer) d.layer.remove();
+  if (d.line) d.line.remove();
+  d.row.classList.remove('drag-src');
+  document.body.classList.remove('dragging-row');
+  rowDrag = null;
+}
+function rowDragCancel() { rowDragClean(); drawTorrents(); }
+async function rowDragEnd(e) {
+  const d = rowDrag; if (!d || e.pointerId !== d.id) return;
+  if (!d.live) { rowDragClean(); return; }
+  e.stopPropagation(); // not a blade swipe
+  const { t, target, before } = d;
+  const ghostTop = d.ghost.getBoundingClientRect().top;
+  rowDragClean();
+  if (target == null || target === t.queuePosition) { drawTorrents(); return; }
+  // Show the new order right away; the next refresh confirms it.
+  const from = t.queuePosition;
+  for (const x of torrents) {
+    if (x.queuePosition < 0 || x === t) continue;
+    if (from < target && x.queuePosition > from && x.queuePosition <= target) x.queuePosition--;
+    if (from > target && x.queuePosition >= target && x.queuePosition < from) x.queuePosition++;
+  }
+  t.queuePosition = target;
+  drawTorrents({ glideFrom: { hash: t.hashString, top: ghostTop } });
+  try { await api('action', 'POST', { action: 'queue-set', hash: t.hashString, pos: target }); } catch (err) { toast(err.message, true); }
+  refresh();
 }
 
 async function removeDialog(t) {
@@ -694,7 +816,10 @@ async function removeDialog(t) {
 }
 
 let filter = '';
-function drawTorrents() {
+// Queue order, as on Windows: downloads by queue spot first, then finished ones.
+const queueOrder = (a, b) => (a.queuePosition < 0) - (b.queuePosition < 0) || a.queuePosition - b.queuePosition || a.id - b.id;
+function drawTorrents(opts = {}) {
+  if (rowDrag && rowDrag.live) return; // don't redraw under a row being dragged
   const root = $('#page');
   let list = root.querySelector('#tlist');
   if (!list) {
@@ -708,8 +833,19 @@ function drawTorrents() {
       el('div', { class: 'scroll', id: 'tlist' }));
     list = root.querySelector('#tlist');
   }
-  const shown = torrents.filter((t) => !filter || (t.name || '').toLowerCase().includes(filter));
+  const shown = torrents.filter((t) => !filter || (t.name || '').toLowerCase().includes(filter)).sort(queueOrder);
+  // Rows slide from where they were to where they now are (0.3 s), unless Reduce motion is on.
+  const before = new Map([...list.querySelectorAll('.t[data-hash]')].map((r) => [r.dataset.hash, r.getBoundingClientRect().top]));
+  if (opts.glideFrom) before.set(opts.glideFrom.hash, opts.glideFrom.top);
   list.replaceChildren(...(shown.length ? shown.map(torrentRow) : [el('div', { class: 'empty' }, torrents.length ? 'Nothing matches that filter.' : 'No torrents yet. Add one, or let Midgar send some.')]));
+  if ((state && state.reduceMotion) || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  for (const r of list.querySelectorAll('.t[data-hash]')) {
+    const old = before.get(r.dataset.hash);
+    if (old == null) continue;
+    const off = old - r.getBoundingClientRect().top;
+    if (Math.abs(off) < 2) continue;
+    r.animate([{ translate: `0 ${off}px` }, { translate: '0 0' }], { duration: 300, easing: 'cubic-bezier(.2, .8, .3, 1)', composite: 'add' });
+  }
 }
 
 function drawAdd() {

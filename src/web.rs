@@ -130,6 +130,11 @@ pub fn handle(core: &CoreHandle, mut req: Request, setup_only: bool) {
                 "update-blocklist" => Some(Cmd::UpdateBlocklist),
                 "recheck" => body["hash"].as_str().map(|h| Cmd::Recheck(h.to_string())),
                 "queue-top" => body["hash"].as_str().map(|h| Cmd::QueueTop(h.to_string())),
+                // Drag a download to a new queue spot (the page's drag to reorder).
+                "queue-set" => match (body["hash"].as_str(), body["pos"].as_i64()) {
+                    (Some(h), Some(pos)) if pos >= 0 => Some(Cmd::QueueSet(h.to_string(), pos as i32)),
+                    _ => None,
+                },
                 _ => None,
             };
             match cmd {

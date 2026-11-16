@@ -119,8 +119,15 @@ fn handle(core: CoreHandle, mut req: Request, session: &str, user: &str, pass: &
         }
         return;
     }
-    if is_rpc && !authorized(&req, user, pass) {
-        let resp = Response::from_string("Unauthorized").with_status_code(401).with_header(header("WWW-Authenticate", "Basic realm=\"Lifestream\""));
+    // The RPC takes a username and password (other apps), or the web page's
+    // sign-in cookie. The session-id handshake below still guards it.
+    if is_rpc && !authorized(&req, user, pass) && !crate::weblogin::signed_in(&req, user, pass) {
+        let from_page = req.headers().iter().any(|h| h.field.equiv("X-Lifestream"));
+        let mut resp = Response::from_string("Unauthorized").with_status_code(401);
+        if !from_page {
+            // Only other apps get the Basic challenge; the page shows its own sign-in.
+            resp = resp.with_header(header("WWW-Authenticate", "Basic realm=\"Lifestream\""));
+        }
         let _ = req.respond(resp);
         return;
     }
