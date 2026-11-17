@@ -1,5 +1,7 @@
 """Builds each app's sign-in page from template.html (all three looks)."""
 import os, re, sys
+# The other apps' repos are expected next to this one (../midgar, ../materia).
+REPOS = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', '..'))
 T = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'template.html')).read()
 BLUE = ('#3479c0', '#245f9c', '#1c4f85', '#133a63')
 GREEN = ('#4a9a32', '#357a22', '#2a6619', '#1f4c12')
@@ -16,10 +18,10 @@ def build(app, head, logo, colors, mapjs, theme, action, forgot):
     return s
 FORGOT = '              <a href="{}" class="forgot">Forgot password?</a>'
 apps = {
- 'midgar': lambda: build('Midgar', servarr_head('/home/claude/midgar/frontend/src/login.html'), '/Content/Images/logo.svg', BLUE,
+ 'midgar': lambda: build('Midgar', servarr_head(os.path.join(REPOS, 'midgar/frontend/src/login.html')), '/Content/Images/logo.svg', BLUE,
     "raw === 'boxofx' ? 'green' : raw === 'blades' || raw === 'glass' ? raw : 'ff'", '_THEME_', '',
     FORGOT.format('https://wiki.servarr.com/sonarr/faq#help-i-have-locked-myself-out')),
- 'materia': lambda: build('Materia', servarr_head('/home/claude/materia/frontend/src/login.html'), '/Content/Images/logo.svg', BLUE,
+ 'materia': lambda: build('Materia', servarr_head(os.path.join(REPOS, 'materia/frontend/src/login.html')), '/Content/Images/logo.svg', BLUE,
     "raw === 'green' || raw === 'blades' || raw === 'glass' ? raw : 'ff'", '_THEME_', '',
     FORGOT.format('https://wiki.servarr.com/prowlarr/faq#help-i-have-locked-myself-out')),
  'lifestream': lambda: build('Lifestream', '''    <link rel="icon" type="image/png" href="/icon.png" />
@@ -31,7 +33,7 @@ apps = {
     "raw === 'green' || raw === 'blades' || raw === 'glass' ? raw : 'ff'", '_THEME_', ' action="/lifestream/login"',
     '              <span></span>'),
 }
-out = {'midgar': '/home/claude/midgar/frontend/src/login.html', 'materia': '/home/claude/materia/frontend/src/login.html', 'lifestream': '/home/claude/lifestream/web/login.html'}
+out = {'midgar': os.path.join(REPOS, 'midgar/frontend/src/login.html'), 'materia': os.path.join(REPOS, 'materia/frontend/src/login.html'), 'lifestream': os.path.join(REPOS, 'lifestream/web/login.html')}
 for a in (sys.argv[1:] or apps):
     html = apps[a]()
     open(out[a], 'w').write(html)
