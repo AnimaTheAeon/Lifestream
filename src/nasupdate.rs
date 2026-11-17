@@ -7,8 +7,7 @@
 //! RESTART_CODE. The start script then switches to the new version and starts
 //! it again, so updates survive the container being recreated.
 //!
-//! As a regular Synology package it only reports the update; the page links
-//! to the package for Package Center.
+//! Outside Docker it only reports the update; it never offers a download.
 
 use crate::updater::{self, Release, APP_VERSION};
 use serde_json::{json, Value};
@@ -118,7 +117,7 @@ pub fn check_in_background() {
 /// "Update now" from the page.
 pub fn install_in_background() -> Result<(), String> {
     if !can_install() {
-        return Err("This copy can't update itself. Download the new package and install it in Package Center.".into());
+        return Err("This copy can't install updates by itself. Reinstall Lifestream from its Synology package once to turn updates on.".into());
     }
     let Some(release) = with(|s| s.latest.clone()) else {
         return Err("No update found yet. Press Check now first.".into());

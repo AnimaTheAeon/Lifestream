@@ -736,10 +736,8 @@ function fillUpdateLink(link, long) {
       link.onclick = (e) => { e.preventDefault(); e.stopPropagation(); installUpdate(u.version); };
     } else {
       link.textContent = long ? `UPDATE ${u.version} READY` : `UPDATE ${u.version}`;
-      const kind = state.headless ? 'spk' : 'installer';
-      if (u[kind]) { link.href = '/lifestream/api/update-package?kind=' + kind; link.removeAttribute('target'); link.onclick = (e) => e.stopPropagation(); }
-      else { link.href = '#'; link.removeAttribute('target'); link.onclick = (e) => { e.preventDefault(); e.stopPropagation(); }; }
-      link.title = state.headless ? 'Download the new package, then in Package Center choose Manual Install. Your torrents and settings are kept.' : 'Lifestream offers this update in its own window too.';
+      link.href = '#'; link.removeAttribute('target'); link.onclick = (e) => { e.preventDefault(); e.stopPropagation(); };
+      link.title = state.headless ? "This copy can't install updates by itself. Reinstall Lifestream from its Synology package once to turn updates on." : 'Install it from Settings in the Lifestream window.';
     }
   } else link.hidden = true;
 }
@@ -827,9 +825,15 @@ try { const v = sessionStorage.getItem('ls-updated'); if (v) { sessionStorage.re
 let state = null, torrents = [], page = location.hash.slice(1) || 'torrents';
 const FIELDS = ['id','hashString','name','status','percentDone','totalSize','leftUntilDone','rateDownload','rateUpload','eta','uploadRatio','labels','errorString','downloadDir','peersConnected','isPrivate','queuePosition'];
 
+// A theme picked while a refresh was on its way wins over that refresh's older copy.
+let themeSaves = 0, themeWanted = null;
 async function refresh() {
   try {
-    state = await api('state');
+    const saves = themeSaves;
+    const fresh = await api('state');
+    if (themeWanted) fresh.theme = themeWanted;
+    else if (saves !== themeSaves && state) fresh.theme = state.theme;
+    state = fresh;
     drawUpdateProgress(false);
     if (refresh.version && state.version && state.version !== refresh.version) { if (!UPD.finished) location.reload(); return; }
     refresh.version = state.version || refresh.version;
@@ -1228,8 +1232,12 @@ async function drawSettings() {
   const drawThemeSegs = () => themeSegs.replaceChildren(...[['ff', 'FFVII Menu'], ['green', 'Xbox'], ['blades', 'Blades'], ['glass', 'Liquid Glass']].map(([val, label]) =>
     el('button', { class: 'seg', 'aria-pressed': String((state && state.theme) === val), onclick: async () => {
       if (state.theme === val) return;
-      try { await api('settings', 'PUT', { theme: val }); state.theme = val; applyTheme(true); drawThemeSegs(); }
-      catch (e) { toast("Couldn't switch: " + e.message, true); }
+      const was = state.theme;
+      themeWanted = val; themeSaves++;
+      state.theme = val; applyTheme(true); drawThemeSegs();
+      try { await api('settings', 'PUT', { theme: val }); }
+      catch (e) { if (themeWanted === val) { state.theme = was; applyTheme(true); drawThemeSegs(); } toast("Couldn't switch: " + e.message, true); }
+      finally { if (themeWanted === val) { themeWanted = null; themeSaves++; } }
     } }, label)));
   drawThemeSegs();
   const updBox = el('div', { class: 'field' });
@@ -1249,7 +1257,7 @@ async function drawSettings() {
       el('button', { class: 'btn', disabled: !!(u.busy || u.checking), onclick: () => doAction('update-check', 'Checking for updates…') }, 'Check now'),
       u.version && !u.busy ? (u.canInstall
         ? el('button', { class: 'btn primary', onclick: () => installUpdate(u.version) }, 'Update now')
-        : (u.spk ? el('a', { class: 'btn', href: '/lifestream/api/update-package?kind=spk' }, 'Download package') : null)) : null);
+        : null) : null);
     updBox.replaceChildren(el('span', { class: 'lbl' }, 'VERSION'), el('div', {}, el('div', { class: u.error && !u.version ? 'warn' : '', style: 'margin-bottom:8px' }, line), buttons));
   };
   drawSettings.drawUpdates();
