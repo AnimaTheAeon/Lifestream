@@ -1,0 +1,53 @@
+body{width:380px}
+.panel{min-height:0}
+.main{display:flex;flex-direction:column;gap:14px}
+.box{display:flex;flex-direction:column;gap:8px}
+.add{display:flex;flex-direction:column;gap:8px}
+.row{display:flex;gap:8px}
+.row input{flex:1;min-width:0}
+.recent{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;overflow:auto;max-height:230px}
+.item .tx{flex:1;min-width:0}
+.foot{display:flex;justify-content:center}
+.xorb{display:none}
+.orb-green{display:none}
+.st1{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.status{flex-direction:row}
+
+/* FFVII */
+body.look-ffvii{padding:10px}
+.look-ffvii .status{flex-direction:column}
+.look-ffvii .status .dot{display:none}
+.look-ffvii .status.ok #stTitle::before,.look-ffvii .status.bad #stTitle::before,.look-ffvii .status.wait #stTitle::before{content:"";display:inline-block;width:10px;height:10px;margin-right:8px;border-radius:50%;vertical-align:0}
+.look-ffvii .status.ok #stTitle::before{background:#7cf09c;box-shadow:0 0 6px #7cf09c}
+.look-ffvii .status.bad #stTitle::before{background:#ff8a8a;box-shadow:0 0 6px #ff8a8a}
+.look-ffvii .status.wait #stTitle::before{background:#d6d8e4}
+.look-ffvii #stTitle{font-weight:800}
+.look-ffvii #stAddr{color:#aab2d6;font-size:13px}
+.look-ffvii #nums{display:flex;gap:16px;flex-wrap:wrap;font-size:13px}
+.look-ffvii .status.bad #nums{color:#ffb0b0}
+.look-ffvii .box{gap:8px}
+.look-ffvii .recent+*,.look-ffvii .box>.lbl{margin-top:4px}
+.look-ffvii .foot{margin-top:0}
+.look-ffvii .main{gap:14px}
+
+/* Xbox */
+body.look-xbox{padding:12px}
+.look-xbox .panel{display:flex;flex-direction:column;gap:12px}
+.look-xbox .top .orb{display:none}
+.look-xbox .xorb{display:block}
+.look-xbox .main{gap:12px}
+.look-xbox .box{gap:12px}
+.look-xbox .add{gap:12px}
+.look-xbox #stTitle::after{content:" ·"}
+.look-xbox .status.bad #nums{color:#ffb49c;font-family:LsNunito,"Segoe UI",sans-serif;letter-spacing:0;text-transform:none;font-size:13px}
+.look-xbox .box>.lbl{margin-top:4px}
+
+/* Blades */
+body.look-blades{height:560px;overflow:hidden}
+.look-blades .box{display:contents}
+.look-blades .add{display:contents}
+.look-blades .recent{max-height:none;flex:1;min-height:0}
+.look-blades .pill.bad .dot{background:#ffb0a0;box-shadow:0 0 6px #ffb0a0}
+.look-blades .status.bad{color:#ffe0dc;opacity:1}
+.look-blades .box>.lbl{margin-top:2px}
+.look-blades .status .st1{display:none}

@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Lifestream for Edge · Settings</title>
+<link rel="icon" href="icons/32.png">
+<link rel="stylesheet" href="theme.css">
+<link rel="stylesheet" href="options.css">
+</head>
+<body class="look-ffvii">
+<div class="panel">
+  <div class="top"><h1>Lifestream for Edge · Settings</h1><span class="saved sub" id="saved" aria-live="polite"></span></div>
+  <div class="main">
+    <div class="box">
+      <div class="lbl">Connection</div>
+      <div class="grid">
+        <label for="address">Address</label><input id="address" type="text" spellcheck="false" placeholder="http://192.168.1.127:9091">
+        <label for="username">Username</label><input id="username" type="text" spellcheck="false" autocomplete="off" placeholder="Lifestream's remote-control username">
+        <label for="password">Password</label><input id="password" type="password" autocomplete="off">
+        <span></span><div class="test"><button class="btn" id="test" type="button">Test connection</button><span id="result" class="sub" role="status"></span></div>
+      </div>
+
+      <div class="lbl">Sending</div>
+      <label class="chk two"><input type="checkbox" id="intercept"><span><span>Send magnet links I click straight to Lifestream</span><br><span class="note">Otherwise Edge asks which app to open them with, and you can still right-click → Send to Lifestream.</span></span></label>
+      <label class="chk two"><input type="checkbox" id="paused"><span><span>Add downloads paused</span><br><span class="note">So you can check them in Lifestream before they start.</span></span></label>
+
+      <div class="lbl">Look</div>
+      <div class="seg" role="group" aria-label="Look">
+        <button type="button" data-look="ffvii" aria-pressed="true">FFVII menu</button><button type="button" data-look="xbox" aria-pressed="false">Xbox</button><button type="button" data-look="blades" aria-pressed="false">Blades</button>
+      </div>
+
+      <div class="note foot">Works on your home network. Your login stays in Edge on this PC.</div>
+    </div>
+  </div>
+</div>
+<script type="module" src="options.js"></script>
+</body>
+</html>

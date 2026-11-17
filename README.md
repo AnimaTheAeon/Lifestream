@@ -88,6 +88,10 @@ Lifestream updates itself: it checks for a new release each time it opens.
 The desktop app serves the same web page on its remote-control port, so you
 can check on downloads from your phone too.
 
+**Lifestream for Edge** (`edge-extension/`) sends magnet links you click in
+Microsoft Edge straight to Lifestream, desktop or Synology. See
+[edge-extension/README.md](edge-extension/README.md) to load it.
+
 ## Building
 
 Windows builds run on GitHub Actions (`.github/workflows/build-windows.yml`):

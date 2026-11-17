@@ -1,0 +1,126 @@
+@font-face{font-family:LsNunito;src:url(fonts/nunito-700.woff2) format("woff2");font-weight:400 700}
+@font-face{font-family:LsNunito;src:url(fonts/nunito-800.woff2) format("woff2");font-weight:800 900}
+@font-face{font-family:LsOrbitron;src:url(fonts/orbitron-800.ttf) format("truetype");font-weight:800}
+
+*{box-sizing:border-box}
+html,body{margin:0}
+body{font:700 14px/1.35 LsNunito,"Segoe UI",sans-serif}
+button,input{font:inherit}
+button{cursor:pointer}
+button:disabled{cursor:default;opacity:.6}
+a{cursor:pointer;text-decoration:none}
+a:hover{text-decoration:underline}
+:focus-visible{outline:2px solid currentColor;outline-offset:2px}
+.only-blades{display:none}
+.hidden{display:none!important}
+.nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chk{display:flex;align-items:center;gap:8px;cursor:pointer}
+.chk input{width:16px;height:16px;margin:0}
+.dot{flex:none;width:10px;height:10px;border-radius:50%;background:#888}
+.ok .dot,.dot.ok{background:#7cf09c;box-shadow:0 0 6px #7cf09c}
+.bad .dot,.dot.bad{background:#ff8a8a;box-shadow:0 0 6px #ff8a8a}
+.wait .dot,.dot.wait{background:#d6d8e4}
+.gear{width:34px;height:34px;display:flex;align-items:center;justify-content:center;padding:0}
+.retry{border:0;background:none;padding:0;font-weight:800;text-decoration:underline}
+.empty{font-size:13px;opacity:.85}
+
+/* ---------- FFVII menu ---------- */
+.look-ffvii{background:#04040c;color:#f4f4f8}
+.look-ffvii .panel{display:flex;flex-direction:column;gap:14px;padding:16px 18px;border:2px solid #d6d8e4;border-radius:8px;background:linear-gradient(160deg,#2e56be 0%,#1a2c96 40%,#121e78 62%,#06083a 100%);box-shadow:0 0 0 1px #2c2e46,inset 0 0 0 1px #8c90a8;text-shadow:2px 2px 0 rgba(0,0,0,.85)}
+.look-ffvii .top{display:flex;align-items:center;gap:10px}
+.look-ffvii h1{margin:0;flex:1;font-size:22px;font-weight:800}
+.look-ffvii .gear{border:1px solid #5a64a0;border-radius:4px;background:#101a5c;color:#f4f4f8}
+.look-ffvii .lbl{color:#70ccff;font-weight:800;font-size:13px;letter-spacing:.06em}
+.look-ffvii input[type=text],.look-ffvii input[type=password],.look-ffvii input[type=url]{height:40px;padding:0 10px;border:1px solid #5a64a0;border-radius:4px;background:#080c34;color:#f4f4f8;font-size:14px;text-shadow:none}
+.look-ffvii .btn{height:40px;padding:0 16px;border:1px solid #d6d8e4;border-radius:4px;background:#3c64c8;color:#fff;font-weight:800;text-shadow:1px 1px 0 #000}
+.look-ffvii .btn:hover:not(:disabled){background:#4c74d8}
+.look-ffvii .chk input{accent-color:#70ccff}
+.look-ffvii a,.look-ffvii .retry{color:#70ccff}
+.look-ffvii .sub{color:#aab2d6;font-size:12px}
+.look-ffvii .note{color:#aab2d6;font-size:13px;text-shadow:none}
+.look-ffvii .status{display:flex;flex-direction:column;gap:4px;padding:10px 12px;border:1px solid #5a64a0;border-radius:4px;background:rgba(8,12,52,.6)}
+.look-ffvii .k{color:#70ccff;font-weight:800}
+.look-ffvii .item{display:flex;flex-direction:column;gap:2px;padding:8px 10px;border-left:3px solid #7cf09c;background:rgba(255,255,255,.05)}
+.look-ffvii .item.st-already{border-left-color:#ffd06a}
+.look-ffvii .item.st-failed{border-left-color:#ff8a8a}
+.look-ffvii .item.st-failed .sub{color:#ffb0b0}
+.look-ffvii .item.st-sending{border-left-color:#d6d8e4}
+.look-ffvii .item .dot{display:none}
+.look-ffvii .seg{border:1px solid #d6d8e4;border-radius:6px}
+.look-ffvii .seg button{border:0;background:none;color:#aab2d6;padding:8px 16px;font-weight:800}
+.look-ffvii .seg button+button{border-left:1px solid #5a64a0}
+.look-ffvii .seg button[aria-pressed=true]{background:rgba(255,255,255,.18);color:#fff}
+.look-ffvii .good{color:#7cf09c}.look-ffvii .badtxt{color:#ffb0b0}
+
+/* ---------- Xbox ---------- */
+.look-xbox{background:radial-gradient(ellipse at 30% 0%,#165c10 0%,#0a3608 35%,#041c04 70%,#010a01 100%) fixed;color:#e4ffc4}
+.look-xbox .top{display:flex;align-items:center;gap:10px}
+.look-xbox h1{margin:0;flex:1;height:44px;display:flex;align-items:center;gap:10px;padding:0 30px 0 14px;background:#dcff64;color:#1c3504;clip-path:polygon(16px 0,100% 0,calc(100% - 16px) 100%,0 100%);font:800 19px/1 LsOrbitron,"Segoe UI",sans-serif;letter-spacing:.04em;text-transform:uppercase}
+.look-xbox .gear{width:44px;height:44px;border:1px solid #a0ff50;border-radius:1px;background:#103c08;color:#c8ff4a}
+.look-xbox .lbl,.look-xbox .k{font:800 11px/1.3 LsOrbitron,"Segoe UI",sans-serif;letter-spacing:.16em;color:#c8ff4a;text-transform:uppercase}
+.look-xbox .box{display:flex;flex-direction:column;gap:12px;padding:16px;border:2px solid rgba(160,255,80,.75);background:linear-gradient(135deg,rgba(26,86,12,.9) 0%,rgba(14,60,8,.9) 40%,rgba(10,48,6,.92) 60%,rgba(3,22,3,.94) 100%);clip-path:polygon(22px 0,100% 0,100% calc(100% - 22px),calc(100% - 22px) 100%,0 100%,0 22px)}
+.look-xbox input[type=text],.look-xbox input[type=password],.look-xbox input[type=url]{height:40px;padding:0 10px;border:1px solid #50a028;border-radius:1px;background:rgba(2,16,2,.85);color:#f0ffe0;font-size:14px}
+.look-xbox .btn{height:40px;padding:0 14px;border:1px solid #a0ff50;border-radius:1px;background:linear-gradient(180deg,#78c828 0%,#4e9a14 55%,#3a7c0c 100%);color:#fff;font:800 12px/1 LsOrbitron,"Segoe UI",sans-serif;letter-spacing:.12em;text-transform:uppercase;text-shadow:0 1px 2px rgba(0,0,0,.6)}
+.look-xbox .btn:hover:not(:disabled){background:linear-gradient(180deg,#8ad83a 0%,#5eaa22 55%,#4a8c18 100%)}
+.look-xbox .chk input{accent-color:#8ad82c}
+.look-xbox a{color:#c8ff4a;font:800 12px/1.3 LsOrbitron,"Segoe UI",sans-serif;letter-spacing:.12em;text-transform:uppercase}
+.look-xbox .retry{color:#ffb49c}
+.look-xbox .sub{color:#a6dc80;font-size:12px}
+.look-xbox .note{color:#a6dc80;font-size:13px}
+.look-xbox .status{display:flex;align-items:center;gap:10px;padding:8px 12px;border:1px solid #50a028;background:rgba(0,0,0,.8)}
+.look-xbox .status .dot{width:14px;height:14px}
+.look-xbox .status.ok .dot{background:radial-gradient(circle at 35% 30%,#f4ff9c,#9ee82c 45%,#4fb51a 80%,#1c5a0a);box-shadow:0 0 8px rgba(160,255,80,.6)}
+.look-xbox .stl{display:flex;flex-direction:column;flex:1;min-width:0;font:800 10px/1.5 LsOrbitron,"Segoe UI",sans-serif;letter-spacing:.14em;color:#a6dc80;text-transform:uppercase}
+.look-xbox .stl #nums{font-size:12px;letter-spacing:.08em;color:#e4ffc4}
+.look-xbox .item{display:flex;align-items:center;gap:10px;padding:6px 8px;background:rgba(0,0,0,.35);border:1px solid rgba(80,160,40,.6)}
+.look-xbox .item .dot{background:#8cff6e;box-shadow:none}
+.look-xbox .item.st-already .dot{background:#ffe14a}
+.look-xbox .item.st-failed .dot{background:#ff7a5a}
+.look-xbox .item.st-failed .sub{color:#ffb49c}
+.look-xbox .item.st-sending .dot{background:#d6d8e4}
+.look-xbox .seg{border:1px solid #a0ff50}
+.look-xbox .seg button{border:0;background:#103c08;color:#a6dc80;padding:8px 14px;font:800 11px/1 LsOrbitron,"Segoe UI",sans-serif;letter-spacing:.12em;text-transform:uppercase}
+.look-xbox .seg button+button{border-left:1px solid #50a028}
+.look-xbox .seg button[aria-pressed=true]{background:#dcff64;color:#1c3504}
+.look-xbox .good{color:#8cff6e}.look-xbox .badtxt{color:#ffb49c}
+
+/* ---------- Blades ---------- */
+.look-blades{color:#fff;background:linear-gradient(180deg,#cfcfcf 0%,#f2f2f2 50%,#c8c8c8 100%) fixed}
+.look-blades .only-blades{display:revert}
+.look-blades .edge{position:fixed;top:0;right:0;bottom:0;width:14px;background:linear-gradient(90deg,#a8a8a8,#eee 40%,#c4c4c4);box-shadow:inset 2px 0 3px rgba(0,0,0,.25)}
+.look-blades .tab{position:fixed;top:0;bottom:0;left:0;right:14px;border-radius:20px 0 0 20px/50%;background:linear-gradient(90deg,#9c9c9c 0,#f1f1f1 14%,#fff 26%,#e3e3e3 48%,#c4c4c4 78%,#a0a0a0 100%) no-repeat;background-size:30px 100%;background-color:#c4c4c4;box-shadow:inset 0 1px 0 rgba(255,255,255,.9),inset 4px 0 0 rgba(255,255,255,.8),-2px 0 6px rgba(0,0,0,.25)}
+.look-blades .grip{position:absolute;top:50%;left:4px;width:22px;height:220px;margin-top:-110px;border-radius:11px;box-shadow:inset 0 2px 4px rgba(0,0,0,.28),inset 0 -1px 2px rgba(255,255,255,.8),0 1px 0 rgba(255,255,255,.7);display:flex;align-items:center;justify-content:center}
+.look-blades .grip span{writing-mode:vertical-rl;color:#1d1d1d;font-weight:800;font-size:14px;letter-spacing:.04em;text-shadow:0 1px 0 rgba(255,255,255,.8)}
+.look-blades .panel{position:fixed;top:0;bottom:0;left:30px;right:14px;border-radius:20px 0 0 20px/50%;overflow:hidden;background:linear-gradient(160deg,#4a9a32 0%,#357a22 45%,#2a6619 100%);box-shadow:-6px 0 12px rgba(0,0,0,.28),inset 2px 0 0 rgba(255,255,255,.35);display:flex;flex-direction:column;text-shadow:0 1px 2px rgba(0,0,0,.35)}
+.look-blades .top{flex:none;height:64px;display:flex;align-items:center;gap:10px;padding:0 12px 0 34px;background:linear-gradient(180deg,rgba(255,255,255,.22) 0%,rgba(255,255,255,0) 55%),#1f4c12}
+.look-blades .top .orb{display:none}
+.look-blades h1{margin:0;flex:1;font-size:22px;font-weight:800}
+.look-blades .pill{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:12px;background:rgba(0,0,0,.22);font-size:13px;font-weight:700;white-space:nowrap}
+.look-blades .pill.ok .dot{background:#9dff8a;box-shadow:0 0 6px #9dff8a}
+.look-blades .gear{border:1px solid rgba(255,255,255,.6);border-radius:17px;background:linear-gradient(180deg,rgba(255,255,255,.3),rgba(255,255,255,.08));color:#fff}
+.look-blades .main{position:relative;flex:1;min-height:0;display:flex;flex-direction:column;gap:10px;padding:14px 14px 10px 30px;overflow:hidden auto}
+.look-blades .orbdeco{position:absolute;right:-150px;top:120px;width:320px;height:320px;border-radius:50%;filter:blur(3px);pointer-events:none;background:radial-gradient(circle at 34% 30%,rgba(255,255,255,.5) 0 4%,rgba(255,255,255,.12) 9%,rgba(255,255,255,0) 30%),radial-gradient(circle at 50% 50%,rgba(255,255,255,.05) 0 64%,rgba(255,255,255,.2) 69%,rgba(255,255,255,0) 72%);box-shadow:inset 0 0 0 2px rgba(255,255,255,.18)}
+.look-blades .main>*:not(.orbdeco){position:relative}
+.look-blades .lbl,.look-blades .k{font-weight:800;font-size:13px;letter-spacing:.06em;opacity:.92}
+.look-blades .status{font-size:13px;opacity:.92}
+.look-blades .status .dot,.look-blades .status #stTitle{display:none}
+.look-blades input[type=text],.look-blades input[type=password],.look-blades input[type=url]{height:40px;padding:0 14px;border:1px solid rgba(255,255,255,.45);border-radius:20px;background:rgba(0,0,0,.22);color:#fff;font-size:14px}
+.look-blades input::placeholder{color:rgba(255,255,255,.7)}
+.look-blades .btn{height:40px;padding:0 16px;border:1px solid rgba(255,255,255,.7);border-radius:20px;background:linear-gradient(180deg,rgba(255,255,255,.36) 0%,rgba(255,255,255,.16) 48%,rgba(255,255,255,.08) 52%,rgba(255,255,255,.2) 100%);box-shadow:inset 0 1px 0 rgba(255,255,255,.75),0 0 12px rgba(255,255,255,.22);color:#fff;font-weight:800;text-shadow:0 1px 2px rgba(0,0,0,.35)}
+.look-blades .btn:hover:not(:disabled){box-shadow:inset 0 1px 0 rgba(255,255,255,.85),0 0 16px rgba(255,255,255,.45)}
+.look-blades .chk input{accent-color:#fff}
+.look-blades a,.look-blades .retry{color:#fff;font-weight:800}
+.look-blades .sub{font-size:12px;opacity:.85}
+.look-blades .note{font-size:13px;opacity:.85}
+.look-blades .item{padding:7px 14px;border-radius:18px;background:linear-gradient(180deg,rgba(255,255,255,.14),rgba(255,255,255,.05));box-shadow:inset 0 1px 0 rgba(255,255,255,.35)}
+.look-blades .item .dot{display:none}
+.look-blades .item.st-failed{background:linear-gradient(180deg,rgba(120,10,10,.45),rgba(120,10,10,.25))}
+.look-blades .item.st-failed .sub{color:#ffe0dc;opacity:1}
+.look-blades .foot{flex:none;height:52px;display:flex;align-items:center;gap:8px;padding:0 14px 0 30px;background:#1a4010;font-size:13px}
+.look-blades .key{padding:1px 6px;border:1.5px solid rgba(255,255,255,.85);border-radius:6px;font-size:11px;font-weight:800}
+.look-blades .key+span+.key{margin-left:6px}
+.look-blades .foot a{margin-left:auto}
+.look-blades .seg{border:1px solid rgba(255,255,255,.6);border-radius:18px;overflow:hidden}
+.look-blades .seg button{border:0;background:none;color:#fff;padding:8px 16px;font-weight:800;opacity:.8}
+.look-blades .seg button[aria-pressed=true]{background:rgba(255,255,255,.28);opacity:1}
+.look-blades .good{color:#c8ffb8}.look-blades .badtxt{color:#ffe0dc}
