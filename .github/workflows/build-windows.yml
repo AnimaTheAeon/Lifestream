@@ -206,4 +206,4 @@ jobs:
             dist/installer/*.exe
             dist/*.spk
           make_latest: true
-          generate_release_notes: true
+          generate_release_notes: false
