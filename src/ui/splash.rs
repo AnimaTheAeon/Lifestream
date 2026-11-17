@@ -85,7 +85,8 @@ impl Splash {
                 ui.allocate_exact_size(rect.size(), Sense::click_and_drag());
                 paint(ui.painter(), rect, t, out);
             });
-        ctx.request_repaint_after(Duration::from_millis(16));
+        // Every frame, in step with the screen's refresh.
+        ctx.request_repaint();
     }
 }
 
@@ -171,43 +172,96 @@ const TITLE_SIZE: f32 = 52.0;
 const STATUS: &str = "Torrent client";
 
 /// A slowly twisting double helix with a few motes drifting along it.
+///
+/// Each strand is one smooth ribbon (a mesh with soft 1-pixel edges) whose
+/// width follows its depth, and the pieces of both strands are drawn back to
+/// front, so the near strand passes cleanly over the far one.
 fn emblem(p: &Painter, c: egui::Pos2, t: f32, k: f32, ink: &Ink) {
+    use egui::epaint::{Mesh, Vertex, WHITE_UV};
     let height = 150.0;
     let amp = 34.0;
     let turns = 2.5;
-    let steps = 56;
+    let steps = 180;
     let twist = t * 0.7;
-    let at = |i: usize, strand: f32| {
-        let u = i as f32 / steps as f32;
-        let ph = u * turns * std::f32::consts::TAU + twist + strand * std::f32::consts::PI;
+    let tau = std::f32::consts::TAU;
+    // Position and depth (-1 far .. 1 near) at u in 0..1.
+    let at = |u: f32, strand: f32| {
+        let ph = u * turns * tau + twist + strand * std::f32::consts::PI;
         let y = c.y - height / 2.0 + u * height;
         // Thin out toward the ends.
-        let edge = (u * (1.0 - u) * 4.0).sqrt().clamp(0.0, 1.0);
+        let edge = (u * (1.0 - u) * 4.0).max(0.0).sqrt().clamp(0.0, 1.0);
         (pos2(c.x + ph.sin() * amp * edge.max(0.35), y), ph.cos())
     };
+    let depth = |d: f32| (d * 0.5 + 0.5).clamp(0.0, 1.0);
 
     // Rungs first, so the strands sit on top.
-    for i in (0..=steps).step_by(4) {
-        let (a, da) = at(i, 0.0);
-        let (b, _) = at(i, 1.0);
-        let depth = (da * 0.5 + 0.5).clamp(0.0, 1.0);
-        p.line_segment([a, b], Stroke::new(2.0, ink.dim.gamma_multiply((0.25 + 0.45 * depth) * k)));
+    for i in (0..=steps).step_by(steps / 14) {
+        let u = i as f32 / steps as f32;
+        let (a, da) = at(u, 0.0);
+        let (b, _) = at(u, 1.0);
+        p.line_segment([a, b], Stroke::new(2.0, ink.dim.gamma_multiply((0.25 + 0.45 * depth(da)) * k)));
     }
-    // Strands, shaded by depth: the near side is brighter and thicker.
+
+    // Strands. One feather of 1 physical pixel on each edge keeps them smooth.
+    let feather = 0.5 / p.ctx().pixels_per_point();
+    struct Piece {
+        depth: f32,
+        verts: [Vertex; 8],
+    }
+    let mut pieces: Vec<Piece> = Vec::with_capacity(steps * 2);
     for strand in [0.0f32, 1.0] {
+        let pts: Vec<(egui::Pos2, f32)> = (0..=steps).map(|i| at(i as f32 / steps as f32, strand)).collect();
+        // Edge vertices for each sample: outer-left, inner-left, inner-right, outer-right.
+        let rim: Vec<[Vertex; 4]> = (0..=steps)
+            .map(|i| {
+                let (pt, d) = pts[i];
+                let prev = pts[i.saturating_sub(1)].0;
+                let next = pts[(i + 1).min(steps)].0;
+                let dir = (next - prev).normalized();
+                let n = vec2(-dir.y, dir.x);
+                let dd = depth(d);
+                let half = 1.0 + 1.25 * dd;
+                let col = ink.accent.gamma_multiply((0.35 + 0.65 * dd) * k);
+                let v = |off: f32, color: Color32| Vertex { pos: pt + n * off, uv: WHITE_UV, color };
+                let inner = (half - feather).max(0.0);
+                [
+                    v(-(half + feather), Color32::TRANSPARENT),
+                    v(-inner, col),
+                    v(inner, col),
+                    v(half + feather, Color32::TRANSPARENT),
+                ]
+            })
+            .collect();
         for i in 0..steps {
-            let (a, da) = at(i, strand);
-            let (b, _) = at(i + 1, strand);
-            let depth = (da * 0.5 + 0.5).clamp(0.0, 1.0);
-            let col = ink.accent.gamma_multiply((0.35 + 0.65 * depth) * k);
-            p.line_segment([a, b], Stroke::new(2.0 + 2.5 * depth, col));
+            let a = rim[i];
+            let b = rim[i + 1];
+            pieces.push(Piece {
+                depth: pts[i].1 + pts[i + 1].1,
+                verts: [a[0], a[1], a[2], a[3], b[0], b[1], b[2], b[3]],
+            });
         }
     }
-    // Motes drifting down along one strand.
+    pieces.sort_by(|a, b| a.depth.total_cmp(&b.depth));
+    let mut mesh = Mesh::default();
+    mesh.reserve_vertices(pieces.len() * 8);
+    mesh.reserve_triangles(pieces.len() * 6);
+    for piece in &pieces {
+        let base = mesh.vertices.len() as u32;
+        mesh.vertices.extend_from_slice(&piece.verts);
+        // Three bands (left feather, core, right feather), two triangles each.
+        for band in 0..3u32 {
+            let (a0, a1, b0, b1) = (base + band, base + band + 1, base + 4 + band, base + 5 + band);
+            mesh.add_triangle(a0, a1, b1);
+            mesh.add_triangle(a0, b1, b0);
+        }
+    }
+    p.add(egui::Shape::mesh(mesh));
+
+    // Motes gliding down along the strands.
     for n in 0..4 {
-        let u = ((t * 0.12 + n as f32 / 4.0).fract() * steps as f32) as usize;
-        let (m, d) = at(u.min(steps), if n % 2 == 0 { 0.0 } else { 1.0 });
-        let depth = (d * 0.5 + 0.5).clamp(0.0, 1.0);
-        p.circle_filled(m, 2.5 + 2.0 * depth, ink.text.gamma_multiply((0.4 + 0.6 * depth) * k));
+        let u = (t * 0.12 + n as f32 / 4.0).fract();
+        let (m, d) = at(u, if n % 2 == 0 { 0.0 } else { 1.0 });
+        let dd = depth(d);
+        p.circle_filled(m, 2.5 + 2.0 * dd, ink.text.gamma_multiply((0.4 + 0.6 * dd) * k));
     }
 }

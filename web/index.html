@@ -570,22 +570,66 @@ body.glass.calm #page > *, body.glass.calm .mi, body.glass.calm .btn, body.glass
 })();
 
 (function () {
+  // A twisting double helix. Drawn at the screen's real pixel density, with
+  // each strand in many short pieces painted back to front, so it stays smooth
+  // and the near strand passes cleanly over the far one.
   var c = document.getElementById('spHelix'); if (!c) return;
-  var g = c.getContext('2d'), W = 240, H = 240, t0 = performance.now();
-  function col(a) { var s = getComputedStyle(c).color.match(/\d+/g) || [112, 204, 255]; return 'rgba(' + s[0] + ',' + s[1] + ',' + s[2] + ',' + a + ')'; }
+  var g = c.getContext('2d'), W = 240, H = 240, t0 = performance.now(), dpr = 0, rgb = null, far = null;
+  var FAR = { green: [10, 54, 8], blades: [230, 230, 230], glass: [14, 16, 34] };
+  function fit() {
+    var d = Math.min(3, window.devicePixelRatio || 1);
+    if (d === dpr) return;
+    dpr = d; c.width = c.height = Math.round(120 * d);
+    var s = c.width / W; g.setTransform(s, 0, 0, s, 0, 0);
+  }
+  function colors() {
+    var m = getComputedStyle(c).color.match(/\d+/g) || [112, 204, 255];
+    rgb = [+m[0], +m[1], +m[2]];
+    var sp = document.getElementById('splash'), k;
+    far = [18, 30, 120];
+    for (k in FAR) if (sp && sp.classList.contains(k)) far = FAR[k];
+  }
+  // Depth 0 (far) fades toward the backdrop, 1 (near) is full color. Opaque,
+  // so overlapping piece ends never show as darker beads.
+  function shade(d, lo) {
+    var f = lo + (1 - lo) * d;
+    return 'rgb(' + Math.round(far[0] + (rgb[0] - far[0]) * f) + ',' + Math.round(far[1] + (rgb[1] - far[1]) * f) + ',' + Math.round(far[2] + (rgb[2] - far[2]) * f) + ')';
+  }
+  var steps = 200, turns = 2.5, top = 20, h = 200, amp = 68;
+  function pt(u, strand, tw) {
+    var ph = u * turns * Math.PI * 2 + tw + strand * Math.PI;
+    var edge = Math.max(0.35, Math.sqrt(Math.max(0, u * (1 - u) * 4)));
+    return { x: W / 2 + Math.sin(ph) * amp * edge, y: top + u * h, d: Math.cos(ph) * 0.5 + 0.5 };
+  }
+  var frame = 0;
   function draw(now) {
     if (!document.getElementById('spHelix')) return;
-    var t = (now - t0) / 1000, tw = t * 0.7, steps = 56, turns = 2.5, top = 20, h = 200, amp = 68;
+    fit();
+    if (frame++ % 30 === 0) colors(); // the theme class can arrive a moment later
+    var t = (now - t0) / 1000, tw = t * 0.7, i, s;
     g.clearRect(0, 0, W, H);
-    function pt(i, strand) {
-      var u = i / steps, ph = u * turns * Math.PI * 2 + tw + strand * Math.PI;
-      var edge = Math.max(0.35, Math.sqrt(Math.max(0, u * (1 - u) * 4)));
-      return { x: W / 2 + Math.sin(ph) * amp * edge, y: top + u * h, d: Math.cos(ph) * 0.5 + 0.5 };
+    g.lineCap = 'round';
+    for (i = 0; i <= 14; i++) {
+      var a = pt(i / 14, 0, tw), b = pt(i / 14, 1, tw);
+      g.globalAlpha = 0.2 + 0.4 * a.d; g.strokeStyle = shade(1, 0); g.lineWidth = 3;
+      g.beginPath(); g.moveTo(a.x, a.y); g.lineTo(b.x, b.y); g.stroke();
     }
-    var i, s;
-    for (i = 0; i <= steps; i += 4) { var a = pt(i, 0), b = pt(i, 1); g.strokeStyle = col(0.2 + 0.4 * a.d); g.lineWidth = 3; g.beginPath(); g.moveTo(a.x, a.y); g.lineTo(b.x, b.y); g.stroke(); }
-    for (s = 0; s < 2; s++) for (i = 0; i < steps; i++) { var p = pt(i, s), q = pt(i + 1, s); g.strokeStyle = col(0.35 + 0.65 * p.d); g.lineWidth = 3 + 4 * p.d; g.lineCap = 'round'; g.beginPath(); g.moveTo(p.x, p.y); g.lineTo(q.x, q.y); g.stroke(); }
-    for (var n = 0; n < 4; n++) { var m = pt(Math.min(steps, Math.floor(((t * 0.12 + n / 4) % 1) * steps)), n % 2); g.fillStyle = getComputedStyle(c).getPropertyValue('--si') ? col(0.5 + 0.5 * m.d) : col(1); g.beginPath(); g.arc(m.x, m.y, 4 + 3 * m.d, 0, 7); g.fill(); }
+    g.globalAlpha = 1;
+    var pieces = [];
+    for (s = 0; s < 2; s++) {
+      var prev = pt(0, s, tw);
+      for (i = 1; i <= steps; i++) { var q = pt(i / steps, s, tw); pieces.push([prev, q, (prev.d + q.d) / 2]); prev = q; }
+    }
+    pieces.sort(function (x, y) { return x[2] - y[2]; });
+    for (i = 0; i < pieces.length; i++) {
+      var pc = pieces[i];
+      g.strokeStyle = shade(pc[2], 0.35); g.lineWidth = 3 + 4 * pc[2];
+      g.beginPath(); g.moveTo(pc[0].x, pc[0].y); g.lineTo(pc[1].x, pc[1].y); g.stroke();
+    }
+    for (var n = 0; n < 4; n++) {
+      var m = pt((t * 0.12 + n / 4) % 1, n % 2, tw);
+      g.fillStyle = shade(m.d, 0.5); g.beginPath(); g.arc(m.x, m.y, 4 + 3 * m.d, 0, Math.PI * 2); g.fill();
+    }
     requestAnimationFrame(draw);
   }
   requestAnimationFrame(draw);
