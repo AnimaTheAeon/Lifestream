@@ -63,6 +63,15 @@
 .err{font-size:13px}
 .why{font-size:13px;line-height:1.4}
 .raw{font-size:11px;opacity:.7;font-weight:700}
+.pick{display:flex;flex-wrap:wrap;gap:8px;margin-top:4px}
+.pick .choice{padding:5px 12px;border:1px solid currentColor;border-radius:6px;font-size:13px;opacity:.85}
+.pick .choice:hover{text-decoration:none;opacity:1}
+.pick .choice.guess{opacity:1;box-shadow:0 0 0 1px currentColor inset}
+.xbox .pick .choice{border-radius:0}
+.blades .pick .choice{border-radius:16px;background:rgba(255,255,255,.12);color:#fff}
+.blades .pick .choice.guess{background:rgba(255,255,255,.3)}
+.st-choose .dot{background:#9cc8ff;box-shadow:0 0 6px #9cc8ff}
+.xbox.st-choose .dot{background:#dcff64}
 .acts{display:flex;flex-wrap:wrap;gap:6px 14px}
 button{all:unset;cursor:pointer;font-weight:800;font-size:13px;white-space:nowrap}
 button:hover{text-decoration:underline}
@@ -116,23 +125,19 @@ button:focus-visible{outline:2px solid currentColor;outline-offset:2px}
     shown.clear();
   }
 
-  const TITLES = {
-    sending: "Sending to Lifestream…",
-    sent: "Sent to Lifestream",
-    already: "Already in Lifestream",
-    failed: "Didn't send",
-  };
-  const MIDGAR_TITLES = {
-    sending: "Sending to Midgar…",
-    sent: "Sent to Midgar",
-    held: "Midgar is holding it",
-    refused: "Midgar didn't take it",
-    failed: "Couldn't reach Midgar",
-  };
+  const APP = { lifestream: "Lifestream", midgar: "Midgar", turks: "Turks" };
+  function titleFor(entry) {
+    const app = APP[entry.target] || "Lifestream";
+    if (entry.target === "midgar" || entry.target === "turks") {
+      return { sending: `Sending to ${app}…`, sent: `Sent to ${app}`, held: `${app} is holding it`, refused: `${app} didn't take it`, failed: `Couldn't reach ${app}` }[entry.state] || "";
+    }
+    return { sending: "Sending to Lifestream…", sent: "Sent to Lifestream", already: "Already in Lifestream", failed: "Didn't send" }[entry.state] || "";
+  }
 
-  function button(text, fn) {
+  function button(text, fn, cls) {
     const b = document.createElement("button");
     b.textContent = text;
+    if (cls) b.className = cls;
     b.addEventListener("click", fn);
     return b;
   }
@@ -166,13 +171,9 @@ button:focus-visible{outline:2px solid currentColor;outline-offset:2px}
     dot.className = "dot";
     const title = document.createElement("span");
     title.className = "title";
-    const midgar = entry.target === "midgar";
-    title.textContent = (midgar ? MIDGAR_TITLES : TITLES)[entry.state] || "";
-    const x = document.createElement("button");
-    x.className = "x";
-    x.textContent = "×";
+    title.textContent = entry.state === "choose" ? "Where should this go?" : titleFor(entry);
+    const x = button("×", () => hide(entry.id), "x");
     x.setAttribute("aria-label", "Close");
-    x.addEventListener("click", () => hide(entry.id));
     hd.append(dot, title, x);
 
     const nm = document.createElement("div");
@@ -181,13 +182,32 @@ button:focus-visible{outline:2px solid currentColor;outline-offset:2px}
     nm.title = entry.name;
     el.append(hd, nm);
 
+    const external = entry.target === "midgar" || entry.target === "turks";
+    if (entry.state === "choose") {
+      // Ask each time: nothing is sent until one of these is clicked.
+      const pick = document.createElement("div");
+      pick.className = "pick";
+      for (const [t, label] of [["midgar", "Midgar · TV"], ["turks", "Turks · Movie"], ["lifestream", "Lifestream"]]) {
+        const b = button(label, () => {
+          hide(entry.id, true);
+          chrome.runtime.sendMessage({ type: "send", url: entry.url, target: t, paused: entry.paused });
+        }, "choice" + (t === entry.guess ? " guess" : ""));
+        if (t === entry.guess) b.title = "Suggested from the name";
+        pick.append(b);
+      }
+      el.append(pick);
+      const note = document.createElement("div");
+      note.className = "raw";
+      note.textContent = `Suggested from the name: ${APP[entry.guess] || "Lifestream"}`;
+      el.append(note);
+    }
     if (entry.state === "failed" && entry.error) {
       const err = document.createElement("div");
       err.className = "err";
       err.textContent = entry.error;
       el.append(err);
     }
-    // Midgar's reason in plain words, with its own wording underneath.
+    // The app's reason in plain words, with its own wording underneath.
     if ((entry.state === "refused" || entry.state === "held") && entry.reason) {
       const why = document.createElement("div");
       why.className = "why";
@@ -196,11 +216,11 @@ button:focus-visible{outline:2px solid currentColor;outline-offset:2px}
       if (entry.detail && entry.detail !== entry.reason) {
         const raw = document.createElement("div");
         raw.className = "raw";
-        raw.textContent = "Midgar: " + entry.detail;
+        raw.textContent = `${APP[entry.target]}: ${entry.detail}`;
         el.append(raw);
       }
     }
-    if (entry.state !== "sending") {
+    if (entry.state !== "sending" && entry.state !== "choose") {
       const acts = document.createElement("div");
       acts.className = "acts";
       const toLifestream = () => {
@@ -208,16 +228,16 @@ button:focus-visible{outline:2px solid currentColor;outline-offset:2px}
         chrome.runtime.sendMessage({ type: "send", url: entry.url, target: "lifestream" });
       };
       if (entry.state === "failed") acts.append(button("Retry", () => chrome.runtime.sendMessage({ type: "retry", id: entry.id })));
-      if (midgar && entry.state === "refused") acts.append(button("Send to Lifestream anyway", toLifestream));
-      else if (midgar && entry.state === "failed") acts.append(button("Send to Lifestream instead", toLifestream));
-      if (midgar && entry.state !== "failed") acts.append(button("Open Midgar", () => chrome.runtime.sendMessage({ type: "open", target: "midgar" })));
-      if (!midgar) acts.append(button("Open Lifestream", () => chrome.runtime.sendMessage({ type: "open" })));
-      if (midgar && entry.state === "refused") acts.append(button("Dismiss", () => hide(entry.id)));
+      if (external && entry.state === "refused") acts.append(button("Send to Lifestream anyway", toLifestream));
+      else if (external && entry.state === "failed") acts.append(button("Send to Lifestream instead", toLifestream));
+      if (external && entry.state !== "failed") acts.append(button(`Open ${APP[entry.target]}`, () => chrome.runtime.sendMessage({ type: "open", target: entry.target })));
+      if (!external) acts.append(button("Open Lifestream", () => chrome.runtime.sendMessage({ type: "open" })));
+      if (external && entry.state === "refused") acts.append(button("Dismiss", () => hide(entry.id)));
       el.append(acts);
     }
+    // A refusal or a question stays until you close it, so it can be read.
     clearTimeout(item.timer);
-    // A refusal stays until you close it, so the reason can be read.
-    item.sticky = entry.state === "refused";
+    item.sticky = entry.state === "refused" || entry.state === "choose";
     const wait = entry.state === "failed" || entry.state === "held" ? 12000 : 5000;
     if (entry.state !== "sending" && !item.hover && !item.sticky) schedule(entry.id, item, wait);
   }

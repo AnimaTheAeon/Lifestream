@@ -28,14 +28,23 @@
         <span></span><div class="test"><button class="btn" id="testMidgar" type="button">Test Midgar</button><span id="resultMidgar" class="sub" role="status"></span></div>
       </div>
 
+      <div class="lbl">Turks (movies)</div>
+      <div class="note">Links for movies go through Turks, which sends them on to Lifestream and files the movie into your Movies folder when it finishes. Needs Turks 0.5.12 or newer.</div>
+      <div class="grid">
+        <label for="turksAddress">Address</label><input id="turksAddress" type="text" spellcheck="false" placeholder="http://192.168.1.127:7878">
+        <label for="turksKey">API key</label><input id="turksKey" type="password" spellcheck="false" autocomplete="off" placeholder="Turks › Settings › General › API key">
+        <span></span><div class="test"><button class="btn" id="testTurks" type="button">Test Turks</button><span id="resultTurks" class="sub" role="status"></span></div>
+      </div>
+
       <div class="lbl">Where links go</div>
       <div class="routes" role="radiogroup" aria-label="Where links go">
-        <label class="chk two"><input type="radio" name="route" value="lifestream"><span><span>Always to Lifestream</span><br><span class="note">Right-click a link → Send to Midgar when you want Midgar to handle it.</span></span></label>
-        <label class="chk two"><input type="radio" name="route" value="auto"><span><span>TV shows to Midgar, everything else to Lifestream</span><br><span class="note">Names like "Show S08", "S08E03" or "Season 8" go to Midgar. If Midgar turns one down, the notice says why and lets you send it to Lifestream anyway.</span></span></label>
+        <label class="chk two"><input type="radio" name="route" value="lifestream"><span><span>Always to Lifestream</span><br><span class="note">Right-click a link → Send to Midgar or Send to Turks when you want one of them to handle it.</span></span></label>
+        <label class="chk two"><input type="radio" name="route" value="auto"><span><span>Automatic: TV shows to Midgar, movies to Turks, everything else to Lifestream</span><br><span class="note">Names like "Show S08", "S08E03" or "Season 8" go to Midgar; names like "Movie 2019 1080p BluRay" go to Turks. If either turns one down, the notice says why and lets you send it to Lifestream anyway.</span></span></label>
+        <label class="chk two"><input type="radio" name="route" value="ask"><span><span>Ask me each time</span><br><span class="note">Clicking a magnet link shows Midgar, Turks and Lifestream buttons in the corner of the page, with the likely one marked. Nothing is sent until you pick.</span></span></label>
       </div>
 
       <div class="lbl">Sending</div>
-      <label class="chk two"><input type="checkbox" id="intercept"><span><span>Send magnet links I click straight to Lifestream</span><br><span class="note">Otherwise Edge asks which app to open them with, and you can still right-click → Send to Lifestream.</span></span></label>
+      <label class="chk two"><input type="checkbox" id="intercept"><span><span>Handle magnet links I click</span><br><span class="note">They go where "Where links go" says. Otherwise Edge asks which app to open them with, and you can still right-click → Send to….</span></span></label>
       <label class="chk two"><input type="checkbox" id="paused"><span><span>Add downloads paused</span><br><span class="note">So you can check them in Lifestream before they start.</span></span></label>
 
       <div class="lbl">Look</div>

@@ -31,6 +31,7 @@ a:hover{text-decoration:underline}
 .look-ffvii h1{margin:0;flex:1;font-size:22px;font-weight:800}
 .look-ffvii .gear{border:1px solid #5a64a0;border-radius:4px;background:#101a5c;color:#f4f4f8}
 .look-ffvii .lbl{color:#70ccff;font-weight:800;font-size:13px;letter-spacing:.06em}
+.look-ffvii select{min-height:30px;padding:0 8px;border:1px solid #5a64a0;border-radius:4px;background:#080c34;color:#f4f4f8;text-shadow:none}
 .look-ffvii input[type=text],.look-ffvii input[type=password],.look-ffvii input[type=url]{height:40px;padding:0 10px;border:1px solid #5a64a0;border-radius:4px;background:#080c34;color:#f4f4f8;font-size:14px;text-shadow:none}
 .look-ffvii .btn{height:40px;padding:0 16px;border:1px solid #d6d8e4;border-radius:4px;background:#3c64c8;color:#fff;font-weight:800;text-shadow:1px 1px 0 #000}
 .look-ffvii .btn:hover:not(:disabled){background:#4c74d8}
@@ -62,6 +63,7 @@ a:hover{text-decoration:underline}
 .look-xbox .gear{width:44px;height:44px;border:1px solid #a0ff50;border-radius:1px;background:#103c08;color:#c8ff4a}
 .look-xbox .lbl,.look-xbox .k{font:800 11px/1.3 LsOrbitron,"Segoe UI",sans-serif;letter-spacing:.16em;color:#c8ff4a;text-transform:uppercase}
 .look-xbox .box{display:flex;flex-direction:column;gap:12px;padding:16px;border:2px solid rgba(160,255,80,.75);background:linear-gradient(135deg,rgba(26,86,12,.9) 0%,rgba(14,60,8,.9) 40%,rgba(10,48,6,.92) 60%,rgba(3,22,3,.94) 100%);clip-path:polygon(22px 0,100% 0,100% calc(100% - 22px),calc(100% - 22px) 100%,0 100%,0 22px)}
+.look-xbox select{min-height:30px;padding:0 8px;border:1px solid #50a028;border-radius:1px;background:rgba(2,16,2,.85);color:#f0ffe0}
 .look-xbox input[type=text],.look-xbox input[type=password],.look-xbox input[type=url]{height:40px;padding:0 10px;border:1px solid #50a028;border-radius:1px;background:rgba(2,16,2,.85);color:#f0ffe0;font-size:14px}
 .look-xbox .btn{height:40px;padding:0 14px;border:1px solid #a0ff50;border-radius:1px;background:linear-gradient(180deg,#78c828 0%,#4e9a14 55%,#3a7c0c 100%);color:#fff;font:800 12px/1 LsOrbitron,"Segoe UI",sans-serif;letter-spacing:.12em;text-transform:uppercase;text-shadow:0 1px 2px rgba(0,0,0,.6)}
 .look-xbox .btn:hover:not(:disabled){background:linear-gradient(180deg,#8ad83a 0%,#5eaa22 55%,#4a8c18 100%)}
@@ -110,6 +112,8 @@ a:hover{text-decoration:underline}
 .look-blades .lbl,.look-blades .k{font-weight:800;font-size:13px;letter-spacing:.06em;opacity:.92}
 .look-blades .status{font-size:13px;opacity:.92}
 .look-blades .status .dot,.look-blades .status #stTitle{display:none}
+.look-blades select{min-height:30px;padding:0 12px;border:1px solid rgba(255,255,255,.45);border-radius:16px;background:rgba(0,0,0,.22);color:#fff}
+.look-blades select option{color:#000}
 .look-blades input[type=text],.look-blades input[type=password],.look-blades input[type=url]{height:40px;padding:0 14px;border:1px solid rgba(255,255,255,.45);border-radius:20px;background:rgba(0,0,0,.22);color:#fff;font-size:14px}
 .look-blades input::placeholder{color:rgba(255,255,255,.7)}
 .look-blades .btn{height:40px;padding:0 16px;border:1px solid rgba(255,255,255,.7);border-radius:20px;background:linear-gradient(180deg,rgba(255,255,255,.36) 0%,rgba(255,255,255,.16) 48%,rgba(255,255,255,.08) 52%,rgba(255,255,255,.2) 100%);box-shadow:inset 0 1px 0 rgba(255,255,255,.75),0 0 12px rgba(255,255,255,.22);color:#fff;font-weight:800;text-shadow:0 1px 2px rgba(0,0,0,.35)}

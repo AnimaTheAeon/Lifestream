@@ -1,4 +1,4 @@
-import { getSettings, rpc, hostOf, normalizeAddress, rate, ago, isSendable, STATE_TEXT } from "./lib.js";
+import { getSettings, rpc, hostOf, normalizeAddress, rate, ago, isSendable, guessTarget, nameFromLink, STATE_TEXT, APP_NAME } from "./lib.js";
 
 const $ = (id) => document.getElementById(id);
 let settings;
@@ -7,6 +7,9 @@ async function start() {
   settings = await getSettings();
   document.body.className = "look-" + settings.look;
   $("paused").checked = settings.paused;
+  // Pasted links go where the "Where links go" setting says, unless picked here.
+  $("target").value = settings.route === "lifestream" ? "lifestream" : "auto";
+  updateAutoLabel();
   $("send").textContent = "Send";
   $("stAddr").textContent = hostOf(normalizeAddress(settings.address) || settings.address);
   renderRecent((await chrome.storage.local.get("recent")).recent || []);
@@ -84,9 +87,10 @@ function renderRecent(list) {
     nm.title = e.name;
     const sub = document.createElement("div");
     sub.className = "sub";
+    const app = APP_NAME[e.target] || "Lifestream";
+    const ext = e.target === "midgar" || e.target === "turks";
     let text = STATE_TEXT[e.state] || e.state;
-    if (e.target === "midgar" && (e.state === "sent" || e.state === "sending")) text = e.state === "sent" ? "Sent to Midgar" : "Sending to Midgar…";
-    if (e.target === "midgar" && e.state === "failed") text = "Couldn't reach Midgar";
+    if (ext) text = { sending: `Sending to ${app}…`, sent: `Sent to ${app}`, failed: `Couldn't reach ${app}`, refused: `${app} didn't take it`, held: `${app} is holding it` }[e.state] || text;
     if (e.state === "failed" && e.error) text += ": " + e.error;
     if (e.state === "refused" && e.reason) text += ": " + e.reason;
     if (e.state === "held" && e.reason) text = e.reason;
@@ -130,14 +134,26 @@ $("form").addEventListener("submit", async (ev) => {
   $("mag").value = "";
   $("send").disabled = true;
   try {
-    await chrome.runtime.sendMessage({ type: "send", url, paused: $("paused").checked });
+    const pick = $("target").value;
+    const target = pick === "auto" ? guessTarget(nameFromLink(url)) : pick;
+    await chrome.runtime.sendMessage({ type: "send", url, paused: $("paused").checked, target });
   } finally {
     $("send").disabled = false;
     $("mag").focus();
   }
 });
 
-$("mag").addEventListener("input", () => $("formErr").classList.add("hidden"));
+$("mag").addEventListener("input", () => {
+  $("formErr").classList.add("hidden");
+  updateAutoLabel();
+});
+
+// "Automatic" says where the pasted link would go.
+function updateAutoLabel() {
+  const url = $("mag").value.trim();
+  const opt = $("target").querySelector('option[value="auto"]');
+  opt.textContent = isSendable(url) ? `Automatic (${APP_NAME[guessTarget(nameFromLink(url))]})` : "Automatic";
+}
 $("settings").addEventListener("click", () => {
   chrome.runtime.openOptionsPage();
   window.close();

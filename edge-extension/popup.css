@@ -51,3 +51,8 @@ body.look-blades{height:560px;overflow:hidden}
 .look-blades .status.bad{color:#ffe0dc;opacity:1}
 .look-blades .box>.lbl{margin-top:2px}
 .look-blades .status .st1{display:none}
+
+.opts{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.opts .to{font-weight:800;font-size:13px}
+.opts select{min-height:30px;padding:0 8px;font:inherit;font-size:13px}
+.opts .chk{margin-left:auto}

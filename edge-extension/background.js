@@ -1,4 +1,4 @@
-import { getSettings, rpc, nameFromLink, normalizeAddress, normalizeMidgar, midgarPush, looksLikeTv } from "./lib.js";
+import { getSettings, rpc, nameFromLink, normalizeAddress, normalizeApp, appPush, guessTarget, TARGETS } from "./lib.js";
 
 const MAX_RECENT = 12;
 
@@ -7,13 +7,14 @@ chrome.runtime.onInstalled.addListener((details) => {
     chrome.contextMenus.create({ id: "send", title: "Send to Lifestream", contexts: ["link"] });
     chrome.contextMenus.create({ id: "send-paused", title: "Send to Lifestream, paused", contexts: ["link"] });
     chrome.contextMenus.create({ id: "send-midgar", title: "Send to Midgar (TV shows)", contexts: ["link"] });
+    chrome.contextMenus.create({ id: "send-turks", title: "Send to Turks (movies)", contexts: ["link"] });
   });
   if (details.reason === "install") chrome.runtime.openOptionsPage();
 });
 
 chrome.contextMenus.onClicked.addListener((info, tab) => {
   if (!info.linkUrl) return;
-  const target = info.menuItemId === "send-midgar" ? "midgar" : "lifestream";
+  const target = { "send-midgar": "midgar", "send-turks": "turks" }[info.menuItemId] || "lifestream";
   send(info.linkUrl, info.menuItemId === "send-paused", tab && tab.id, undefined, target);
 });
 
@@ -28,8 +29,7 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
     return true;
   }
   if (msg.type === "open") {
-    if (msg.target === "midgar") openMidgar();
-    else openLifestream();
+    openApp(msg.target || "lifestream");
   }
   return false;
 });
@@ -49,20 +49,29 @@ function upsert(entry) {
   return changeRecent((list) => [entry, ...list.filter((e) => e.id !== entry.id)]);
 }
 
-// target: "lifestream", "midgar", or undefined to follow the "Where links go" setting.
+// target: "lifestream", "midgar", "turks", or undefined to follow the
+// "Where links go" setting ("ask" shows a chooser in the page instead).
 async function send(url, paused, tabId, id, target) {
   const s = await getSettings();
   if (paused === undefined || paused === null) paused = s.paused;
-  if (target !== "lifestream" && target !== "midgar") {
-    target = s.route === "auto" && looksLikeTv(nameFromLink(url)) ? "midgar" : "lifestream";
+  const name = nameFromLink(url);
+  if (!TARGETS.includes(target)) {
+    if (s.route === "ask" && tabId !== undefined && tabId >= 0) {
+      // Nothing is sent until a button in the notice is clicked.
+      const entry = { id: id || crypto.randomUUID(), url, name, paused: !!paused, at: Date.now(), state: "choose", guess: guessTarget(name) };
+      const shown = await toast(tabId, entry, s.look);
+      if (shown) return entry;
+      target = entry.guess; // pages that can't show the chooser: use the guess
+    } else {
+      target = s.route === "lifestream" ? "lifestream" : guessTarget(name);
+    }
   }
-  const entry = { id: id || crypto.randomUUID(), url, name: nameFromLink(url), paused: !!paused, at: Date.now(), state: "sending", target };
-  delete entry.error;
+  const entry = { id: id || crypto.randomUUID(), url, name, paused: !!paused, at: Date.now(), state: "sending", target };
   await upsert(entry);
   toast(tabId, entry, s.look);
   try {
-    if (target === "midgar") {
-      const r = await midgarPush(s, url);
+    if (target === "midgar" || target === "turks") {
+      const r = await appPush(target, s, url);
       entry.state = r.state;
       if (r.name) entry.name = r.name;
       entry.reason = r.reason;
@@ -90,33 +99,30 @@ async function retry(id, tabId) {
   return send(old.url, old.paused, tabId, old.id, old.target);
 }
 
-async function openLifestream() {
+async function openApp(target) {
   const s = await getSettings();
-  const address = normalizeAddress(s.address);
-  if (address) chrome.tabs.create({ url: address + "/" });
-  else chrome.runtime.openOptionsPage();
-}
-
-async function openMidgar() {
-  const s = await getSettings();
-  const address = normalizeMidgar(s.midgarAddress);
+  const address = target === "lifestream" ? normalizeAddress(s.address) : normalizeApp(s[target + "Address"]);
   if (address) chrome.tabs.create({ url: address + "/" });
   else chrome.runtime.openOptionsPage();
 }
 
 // The notice always shows in the tab's top page, even for links inside frames.
+// Returns whether it could be shown.
 async function toast(tabId, entry, look) {
-  if (tabId === undefined || tabId === null || tabId < 0) return;
+  if (tabId === undefined || tabId === null || tabId < 0) return false;
   const msg = { type: "toast", entry, look };
   try {
     await chrome.tabs.sendMessage(tabId, msg, { frameId: 0 });
+    return true;
   } catch {
     // Tabs opened before the extension was loaded don't have it yet.
     try {
       await chrome.scripting.executeScript({ target: { tabId, frameIds: [0] }, files: ["content.js"] });
       await chrome.tabs.sendMessage(tabId, msg, { frameId: 0 });
+      return true;
     } catch {
-      // Pages like edge:// and the add-ons store can't show it. That's fine.
+      // Pages like edge:// and the add-ons store can't show it.
+      return false;
     }
   }
 }

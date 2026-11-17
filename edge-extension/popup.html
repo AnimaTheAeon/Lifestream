@@ -28,7 +28,7 @@
         <label for="mag" class="lbl">Add a magnet</label>
         <div class="row"><input id="mag" type="text" placeholder="Paste a magnet link" spellcheck="false"><button class="btn" id="send" type="submit">Send</button></div>
         <div class="sub badtxt hidden" id="formErr"></div>
-        <label class="chk"><input type="checkbox" id="paused">Add paused</label>
+        <div class="opts"><label class="to" for="target">Send to</label><select id="target"><option value="auto">Automatic</option><option value="midgar">Midgar · TV</option><option value="turks">Turks · Movie</option><option value="lifestream">Lifestream</option></select><label class="chk"><input type="checkbox" id="paused">Add paused</label></div>
       </form>
       <div class="lbl">Recent</div>
       <ul id="recent" class="recent"></ul>
