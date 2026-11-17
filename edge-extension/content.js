@@ -61,8 +61,10 @@
 .title{font-weight:800;font-size:15px}
 .nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .err{font-size:13px}
-.acts{display:flex;gap:14px}
-button{all:unset;cursor:pointer;font-weight:800;font-size:13px}
+.why{font-size:13px;line-height:1.4}
+.raw{font-size:11px;opacity:.7;font-weight:700}
+.acts{display:flex;flex-wrap:wrap;gap:6px 14px}
+button{all:unset;cursor:pointer;font-weight:800;font-size:13px;white-space:nowrap}
 button:hover{text-decoration:underline}
 button:focus-visible{outline:2px solid currentColor;outline-offset:2px}
 .x{margin-left:auto;font-size:16px;line-height:1;opacity:.8}
@@ -90,6 +92,10 @@ button:focus-visible{outline:2px solid currentColor;outline-offset:2px}
 .st-failed .dot{background:#ff8a8a;box-shadow:0 0 6px #ff8a8a}
 .blades.st-failed .dot{background:#ffb0a0}
 .st-sending .dot{background:#d6d8e4}
+.st-held .dot{background:#ffd06a}
+.xbox.st-held .dot{background:#ffe14a}
+.st-refused .dot{background:#ffb070;box-shadow:0 0 6px #ffb070}
+.xbox.st-refused .dot{background:#ffc04a}
 `;
 
   let host, wrap;
@@ -116,6 +122,20 @@ button:focus-visible{outline:2px solid currentColor;outline-offset:2px}
     already: "Already in Lifestream",
     failed: "Didn't send",
   };
+  const MIDGAR_TITLES = {
+    sending: "Sending to Midgar…",
+    sent: "Sent to Midgar",
+    held: "Midgar is holding it",
+    refused: "Midgar didn't take it",
+    failed: "Couldn't reach Midgar",
+  };
+
+  function button(text, fn) {
+    const b = document.createElement("button");
+    b.textContent = text;
+    b.addEventListener("click", fn);
+    return b;
+  }
 
   function show(entry, look) {
     addFonts();
@@ -130,7 +150,7 @@ button:focus-visible{outline:2px solid currentColor;outline-offset:2px}
       });
       el.addEventListener("mouseleave", () => {
         item.hover = false;
-        schedule(entry.id, item, 2500);
+        if (!item.sticky) schedule(entry.id, item, 2500);
       });
       wrap.appendChild(el);
       shown.set(entry.id, item);
@@ -146,7 +166,8 @@ button:focus-visible{outline:2px solid currentColor;outline-offset:2px}
     dot.className = "dot";
     const title = document.createElement("span");
     title.className = "title";
-    title.textContent = TITLES[entry.state] || "";
+    const midgar = entry.target === "midgar";
+    title.textContent = (midgar ? MIDGAR_TITLES : TITLES)[entry.state] || "";
     const x = document.createElement("button");
     x.className = "x";
     x.textContent = "×";
@@ -166,23 +187,39 @@ button:focus-visible{outline:2px solid currentColor;outline-offset:2px}
       err.textContent = entry.error;
       el.append(err);
     }
+    // Midgar's reason in plain words, with its own wording underneath.
+    if ((entry.state === "refused" || entry.state === "held") && entry.reason) {
+      const why = document.createElement("div");
+      why.className = "why";
+      why.textContent = entry.reason;
+      el.append(why);
+      if (entry.detail && entry.detail !== entry.reason) {
+        const raw = document.createElement("div");
+        raw.className = "raw";
+        raw.textContent = "Midgar: " + entry.detail;
+        el.append(raw);
+      }
+    }
     if (entry.state !== "sending") {
       const acts = document.createElement("div");
       acts.className = "acts";
-      if (entry.state === "failed") {
-        const r = document.createElement("button");
-        r.textContent = "Retry";
-        r.addEventListener("click", () => chrome.runtime.sendMessage({ type: "retry", id: entry.id }));
-        acts.append(r);
-      }
-      const o = document.createElement("button");
-      o.textContent = "Open Lifestream";
-      o.addEventListener("click", () => chrome.runtime.sendMessage({ type: "open" }));
-      acts.append(o);
+      const toLifestream = () => {
+        hide(entry.id);
+        chrome.runtime.sendMessage({ type: "send", url: entry.url, target: "lifestream" });
+      };
+      if (entry.state === "failed") acts.append(button("Retry", () => chrome.runtime.sendMessage({ type: "retry", id: entry.id })));
+      if (midgar && entry.state === "refused") acts.append(button("Send to Lifestream anyway", toLifestream));
+      else if (midgar && entry.state === "failed") acts.append(button("Send to Lifestream instead", toLifestream));
+      if (midgar && entry.state !== "failed") acts.append(button("Open Midgar", () => chrome.runtime.sendMessage({ type: "open", target: "midgar" })));
+      if (!midgar) acts.append(button("Open Lifestream", () => chrome.runtime.sendMessage({ type: "open" })));
+      if (midgar && entry.state === "refused") acts.append(button("Dismiss", () => hide(entry.id)));
       el.append(acts);
     }
     clearTimeout(item.timer);
-    if (entry.state !== "sending" && !item.hover) schedule(entry.id, item, entry.state === "failed" ? 12000 : 5000);
+    // A refusal stays until you close it, so the reason can be read.
+    item.sticky = entry.state === "refused";
+    const wait = entry.state === "failed" || entry.state === "held" ? 12000 : 5000;
+    if (entry.state !== "sending" && !item.hover && !item.sticky) schedule(entry.id, item, wait);
   }
 
   function schedule(id, item, ms) {

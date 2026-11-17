@@ -1,4 +1,4 @@
-import { getSettings, rpc, normalizeAddress, LOOKS } from "./lib.js";
+import { getSettings, rpc, normalizeAddress, normalizeMidgar, midgarStatus, LOOKS, ROUTES } from "./lib.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -20,6 +20,8 @@ function current() {
     address: normalizeAddress($("address").value) || $("address").value.trim(),
     username: $("username").value,
     password: $("password").value,
+    midgarAddress: normalizeMidgar($("midgarAddress").value) || $("midgarAddress").value.trim(),
+    midgarKey: $("midgarKey").value.trim(),
   };
 }
 
@@ -30,10 +32,18 @@ async function start() {
   $("password").value = s.password;
   $("intercept").checked = s.intercept;
   $("paused").checked = s.paused;
+  $("midgarAddress").value = s.midgarAddress;
+  $("midgarKey").value = s.midgarKey;
+  for (const r of document.querySelectorAll('input[name="route"]')) {
+    r.checked = r.value === s.route;
+    r.addEventListener("change", () => {
+      if (r.checked && ROUTES.includes(r.value)) save({ route: r.value });
+    });
+  }
   applyLook(s.look);
 
   let t;
-  for (const id of ["address", "username", "password"]) {
+  for (const id of ["address", "username", "password", "midgarAddress", "midgarKey"]) {
     $(id).addEventListener("input", () => {
       clearTimeout(t);
       t = setTimeout(() => save(current()), 400);
@@ -43,6 +53,35 @@ async function start() {
     const n = normalizeAddress($("address").value);
     if (n) $("address").value = n;
     save(current());
+  });
+  $("midgarAddress").addEventListener("change", () => {
+    const n = normalizeMidgar($("midgarAddress").value);
+    if (n) $("midgarAddress").value = n;
+    save(current());
+  });
+  $("testMidgar").addEventListener("click", async () => {
+    const r = $("resultMidgar");
+    const c = current();
+    if (!normalizeMidgar(c.midgarAddress)) {
+      r.className = "sub badtxt";
+      r.textContent = "That address doesn't look right. Try http://192.168.1.127:8990";
+      return;
+    }
+    $("midgarAddress").value = normalizeMidgar(c.midgarAddress);
+    await save(c);
+    $("testMidgar").disabled = true;
+    r.className = "sub";
+    r.textContent = "Checking…";
+    try {
+      const st = await midgarStatus(c);
+      r.className = "sub good";
+      r.textContent = `Connected · ${st.appName || "Midgar"} ${st.version}`;
+    } catch (e) {
+      r.className = "sub badtxt";
+      r.textContent = e.message;
+    } finally {
+      $("testMidgar").disabled = false;
+    }
   });
   $("intercept").addEventListener("change", () => save({ intercept: $("intercept").checked }));
   $("paused").addEventListener("change", () => save({ paused: $("paused").checked }));

@@ -44,6 +44,9 @@ a:hover{text-decoration:underline}
 .look-ffvii .item.st-already{border-left-color:#ffd06a}
 .look-ffvii .item.st-failed{border-left-color:#ff8a8a}
 .look-ffvii .item.st-failed .sub{color:#ffb0b0}
+.look-ffvii .item.st-held{border-left-color:#ffd06a}
+.look-ffvii .item.st-refused{border-left-color:#ffb070}
+.look-ffvii .item.st-refused .sub{color:#ffd8b8}
 .look-ffvii .item.st-sending{border-left-color:#d6d8e4}
 .look-ffvii .item .dot{display:none}
 .look-ffvii .seg{border:1px solid #d6d8e4;border-radius:6px}
@@ -77,6 +80,9 @@ a:hover{text-decoration:underline}
 .look-xbox .item.st-already .dot{background:#ffe14a}
 .look-xbox .item.st-failed .dot{background:#ff7a5a}
 .look-xbox .item.st-failed .sub{color:#ffb49c}
+.look-xbox .item.st-held .dot{background:#ffe14a}
+.look-xbox .item.st-refused .dot{background:#ffc04a}
+.look-xbox .item.st-refused .sub{color:#ffd9a0}
 .look-xbox .item.st-sending .dot{background:#d6d8e4}
 .look-xbox .seg{border:1px solid #a0ff50}
 .look-xbox .seg button{border:0;background:#103c08;color:#a6dc80;padding:8px 14px;font:800 11px/1 LsOrbitron,"Segoe UI",sans-serif;letter-spacing:.12em;text-transform:uppercase}
@@ -116,6 +122,8 @@ a:hover{text-decoration:underline}
 .look-blades .item .dot{display:none}
 .look-blades .item.st-failed{background:linear-gradient(180deg,rgba(120,10,10,.45),rgba(120,10,10,.25))}
 .look-blades .item.st-failed .sub{color:#ffe0dc;opacity:1}
+.look-blades .item.st-refused{background:linear-gradient(180deg,rgba(130,70,0,.45),rgba(130,70,0,.25))}
+.look-blades .item.st-refused .sub{opacity:1}
 .look-blades .foot{flex:none;height:52px;display:flex;align-items:center;gap:8px;padding:0 14px 0 30px;background:#1a4010;font-size:13px}
 .look-blades .key{padding:1px 6px;border:1.5px solid rgba(255,255,255,.85);border-radius:6px;font-size:11px;font-weight:800}
 .look-blades .key+span+.key{margin-left:6px}

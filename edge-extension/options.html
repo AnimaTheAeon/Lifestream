@@ -20,6 +20,20 @@
         <span></span><div class="test"><button class="btn" id="test" type="button">Test connection</button><span id="result" class="sub" role="status"></span></div>
       </div>
 
+      <div class="lbl">Midgar (TV shows)</div>
+      <div class="note">Links for shows go through Midgar, which sends them on to Lifestream and files the episodes into your TV folders when they finish.</div>
+      <div class="grid">
+        <label for="midgarAddress">Address</label><input id="midgarAddress" type="text" spellcheck="false" placeholder="http://192.168.1.127:8990">
+        <label for="midgarKey">API key</label><input id="midgarKey" type="password" spellcheck="false" autocomplete="off" placeholder="Midgar › Settings › General › API Key">
+        <span></span><div class="test"><button class="btn" id="testMidgar" type="button">Test Midgar</button><span id="resultMidgar" class="sub" role="status"></span></div>
+      </div>
+
+      <div class="lbl">Where links go</div>
+      <div class="routes" role="radiogroup" aria-label="Where links go">
+        <label class="chk two"><input type="radio" name="route" value="lifestream"><span><span>Always to Lifestream</span><br><span class="note">Right-click a link → Send to Midgar when you want Midgar to handle it.</span></span></label>
+        <label class="chk two"><input type="radio" name="route" value="auto"><span><span>TV shows to Midgar, everything else to Lifestream</span><br><span class="note">Names like "Show S08", "S08E03" or "Season 8" go to Midgar. If Midgar turns one down, the notice says why and lets you send it to Lifestream anyway.</span></span></label>
+      </div>
+
       <div class="lbl">Sending</div>
       <label class="chk two"><input type="checkbox" id="intercept"><span><span>Send magnet links I click straight to Lifestream</span><br><span class="note">Otherwise Edge asks which app to open them with, and you can still right-click → Send to Lifestream.</span></span></label>
       <label class="chk two"><input type="checkbox" id="paused"><span><span>Add downloads paused</span><br><span class="note">So you can check them in Lifestream before they start.</span></span></label>

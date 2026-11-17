@@ -12,6 +12,7 @@ body{min-height:100vh;display:flex;justify-content:center;align-items:flex-start
 .chk.two>span>span:first-child{font-weight:800}
 .seg{display:inline-flex;align-self:flex-start;overflow:hidden}
 .lbl{margin-top:6px}
+.routes{display:flex;flex-direction:column;gap:10px}
 .foot{margin-top:8px}
 
 /* FFVII */

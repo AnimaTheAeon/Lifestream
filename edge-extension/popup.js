@@ -85,10 +85,21 @@ function renderRecent(list) {
     const sub = document.createElement("div");
     sub.className = "sub";
     let text = STATE_TEXT[e.state] || e.state;
+    if (e.target === "midgar" && (e.state === "sent" || e.state === "sending")) text = e.state === "sent" ? "Sent to Midgar" : "Sending to Midgar…";
+    if (e.target === "midgar" && e.state === "failed") text = "Couldn't reach Midgar";
     if (e.state === "failed" && e.error) text += ": " + e.error;
+    if (e.state === "refused" && e.reason) text += ": " + e.reason;
+    if (e.state === "held" && e.reason) text = e.reason;
     if (e.paused && e.state !== "failed") text += " (paused)";
     if (e.state !== "sending") text += " · " + ago(e.at);
     sub.append(text);
+    if (e.state === "refused") {
+      const l = document.createElement("button");
+      l.className = "retry";
+      l.textContent = "Send to Lifestream";
+      l.addEventListener("click", () => chrome.runtime.sendMessage({ type: "send", url: e.url, target: "lifestream" }));
+      sub.append(" · ", l);
+    }
     if (e.state === "failed") {
       const r = document.createElement("button");
       r.className = "retry";
