@@ -29,3 +29,13 @@ body.look-blades{padding:0;align-items:stretch}
 .look-blades .top{height:72px;padding:0 24px 0 48px}
 .look-blades .top h1{font-size:22px}
 .look-blades .main{padding:20px 28px 20px 48px;overflow:visible}
+
+/* Liquid Glass */
+.look-glass .panel{padding:22px 26px}
+.look-glass .top h1{font-size:24px}
+.look-glass .grid label{font-weight:600}
+.look-glass .lbl{margin-top:12px}
+.look-glass .routes{padding:4px 16px;border-radius:18px;background:rgba(255,255,255,.05);box-shadow:inset 0 1px 0 rgba(255,255,255,.1);gap:0}
+.look-glass .routes .chk{padding:10px 0}
+.look-glass .routes .chk+.chk{border-top:.5px solid var(--lg-line)}
+.look-glass .chk.two>span>span:first-child{font-weight:600}

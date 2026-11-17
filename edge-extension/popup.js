@@ -43,7 +43,7 @@ function setStatus(kind, title, nums) {
       s.append(b, " " + v);
       n.append(s);
     }
-  } else if (settings.look === "xbox") {
+  } else if (settings.look === "xbox" || settings.look === "glass") {
     n.textContent = `${nums.active} active · ↓ ${nums.down} · ↑ ${nums.up}`;
   } else {
     n.textContent = `${host} · ${nums.active} active · ↓ ${nums.down} · ↑ ${nums.up}`;

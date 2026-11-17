@@ -5,7 +5,19 @@ const $ = (id) => document.getElementById(id);
 function applyLook(look) {
   document.body.className = "look-" + look;
   for (const b of document.querySelectorAll(".seg button")) b.setAttribute("aria-pressed", String(b.dataset.look === look));
+  placePill();
 }
+
+// Liquid Glass: the selection pill glides under the picked look.
+function placePill() {
+  const seg = document.querySelector(".seg");
+  const on = seg && seg.querySelector('button[aria-pressed="true"]');
+  if (!on) return;
+  seg.style.setProperty("--sel-left", on.offsetLeft + "px");
+  seg.style.setProperty("--sel-w", on.offsetWidth + "px");
+}
+addEventListener("resize", placePill);
+document.fonts && document.fonts.ready.then(placePill);
 
 let savedTimer;
 async function save(patch) {

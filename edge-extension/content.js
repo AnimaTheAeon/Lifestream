@@ -79,7 +79,7 @@ button:focus-visible{outline:2px solid currentColor;outline-offset:2px}
 .x{margin-left:auto;font-size:16px;line-height:1;opacity:.8}
 .sending .dot{animation:p 1s ease-in-out infinite}
 @keyframes p{50%{opacity:.3}}
-@media (prefers-reduced-motion:reduce){.t{transition:none}.sending .dot{animation:none}}
+@media (prefers-reduced-motion:reduce){.t,.t.glass,.t.glass .pick .choice{transition:none}.t.glass{transform:none}.sending .dot{animation:none}}
 
 .ffvii{border:2px solid #d6d8e4;border-radius:8px;background:linear-gradient(160deg,#2e56be 0%,#1a2c96 40%,#121e78 62%,#06083a 100%);box-shadow:0 0 0 1px #2c2e46,0 8px 20px rgba(0,0,0,.35);color:#f4f4f8;text-shadow:2px 2px 0 rgba(0,0,0,.85)}
 .ffvii button{color:#70ccff}
@@ -93,6 +93,24 @@ button:focus-visible{outline:2px solid currentColor;outline-offset:2px}
 .blades{padding:12px 18px;border:1px solid rgba(255,255,255,.55);border-radius:18px;background:linear-gradient(160deg,#4a9a32 0%,#357a22 45%,#2a6619 100%);box-shadow:inset 0 1px 0 rgba(255,255,255,.5),0 8px 20px rgba(0,0,0,.3);color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.35)}
 .blades button{color:#fff}
 .blades .err{color:#ffe0dc}
+
+.glass{gap:6px;padding:14px 16px;border-radius:22px;background:rgba(30,30,36,.92);-webkit-backdrop-filter:blur(30px) saturate(170%);backdrop-filter:blur(30px) saturate(170%);box-shadow:inset 0 1px 0 rgba(255,255,255,.22),0 0 0 1px rgba(0,0,0,.45),0 0 0 2px rgba(255,255,255,.05),0 18px 44px rgba(0,0,0,.45);color:#fff;font:500 14px/1.35 -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI Variable Text","Segoe UI",Inter,system-ui,sans-serif;transform:translateY(10px) scale(.97);transition:opacity .35s cubic-bezier(.32,.72,0,1),transform .5s cubic-bezier(.32,.72,0,1)}
+.glass.in{transform:none}
+.glass .title{font-weight:600;font-size:15px}
+.glass .nm{color:rgba(235,235,245,.62)}
+.glass .why{color:rgba(235,235,245,.85)}
+.glass .err{color:#ff8f88}
+.glass button{font-weight:600;color:#0a84ff}
+.glass .x{width:22px;height:22px;border-radius:50%;background:rgba(118,118,128,.3);color:rgba(235,235,245,.8);font-size:15px;text-align:center;line-height:21px;opacity:1}
+.glass .x:hover{text-decoration:none;background:rgba(118,118,128,.45)}
+.glass .pick .choice{border:0;border-radius:15px;padding:6px 14px;background:rgba(118,118,128,.3);color:#fff;opacity:1;transition:transform .35s cubic-bezier(.32,.72,0,1)}
+.glass .pick .choice:active{transform:scale(.96)}
+.glass .pick .choice.guess{background:#0a84ff;box-shadow:0 4px 14px rgba(10,132,255,.4)}
+.glass.st-choose .dot{background:#0a84ff;box-shadow:0 0 6px rgba(10,132,255,.7)}
+.glass.st-sent .dot{background:#30d158;box-shadow:0 0 6px rgba(48,209,88,.6)}
+.glass.st-already .dot,.glass.st-held .dot,.glass.st-refused .dot{background:#ff9f0a;box-shadow:0 0 6px rgba(255,159,10,.5)}
+.glass.st-failed .dot{background:#ff453a;box-shadow:0 0 6px rgba(255,69,58,.6)}
+.glass.st-sending .dot{background:rgba(235,235,245,.6);box-shadow:none}
 
 .st-sent .dot{background:#7cf09c;box-shadow:0 0 6px #7cf09c}
 .xbox.st-sent .dot{background:#8cff6e}
