@@ -18,6 +18,8 @@ pub enum Theme {
     GreenDash,
     /// Glossy silver blades; the open one wears its page's color.
     Blades,
+    /// Dark frosted glass over soft color, capsule controls (iOS style).
+    Glass,
 }
 
 impl Theme {
@@ -25,6 +27,7 @@ impl Theme {
         match key {
             "green" => Theme::GreenDash,
             "blades" => Theme::Blades,
+            "glass" => Theme::Glass,
             _ => Theme::FfMenu,
         }
     }
@@ -33,6 +36,7 @@ impl Theme {
             Theme::FfMenu => "ff",
             Theme::GreenDash => "green",
             Theme::Blades => "blades",
+            Theme::Glass => "glass",
         }
     }
     pub fn label(self) -> &'static str {
@@ -40,6 +44,7 @@ impl Theme {
             Theme::FfMenu => "FFVII Menu",
             Theme::GreenDash => "Xbox",
             Theme::Blades => "Blades",
+            Theme::Glass => "Liquid Glass",
         }
     }
 }
@@ -61,8 +66,57 @@ pub fn theme() -> Theme {
     match THEME.load(Ordering::Relaxed) {
         1 => Theme::GreenDash,
         2 => Theme::Blades,
+        3 => Theme::Glass,
         _ => Theme::FfMenu,
     }
+}
+
+pub fn is_glass() -> bool {
+    theme() == Theme::Glass
+}
+
+static CALM: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// The Reduce motion setting, for widgets that animate on their own.
+pub fn set_calm(calm: bool) {
+    CALM.store(calm, Ordering::Relaxed);
+}
+
+pub fn calm() -> bool {
+    CALM.load(Ordering::Relaxed)
+}
+
+/// Moves a value toward `target` with an iOS-like ease-out (fast start,
+/// soft landing). Jumps straight there with Reduce motion on.
+pub fn glide(ctx: &egui::Context, id: egui::Id, target: f32) -> f32 {
+    let cur: Option<f32> = ctx.data(|d| d.get_temp(id));
+    let next = match cur {
+        Some(c) if !calm() && (c - target).abs() > 0.3 => {
+            let dt = ctx.input(|i| i.stable_dt).min(0.05);
+            let v = c + (target - c) * (1.0 - (-dt * 11.0).exp());
+            ctx.request_repaint();
+            v
+        }
+        _ => target,
+    };
+    ctx.data_mut(|d| d.insert_temp(id, next));
+    next
+}
+
+/// The glass look's backdrop: near-black with soft blue, purple and teal
+/// light behind the panes. `k` fades it (1 = full).
+pub fn paint_glass_backdrop(p: &egui::Painter, rect: Rect, k: f32) {
+    let a = |c: Color32| c.gamma_multiply(k);
+    p.rect_filled(rect, CornerRadius::ZERO, a(Color32::from_rgb(4, 5, 10)));
+    let d = rect.size().length();
+    let blob = |u: f32, v: f32, r: f32, c: (u8, u8, u8), alpha: u8| {
+        let center = Pos2::new(rect.left() + rect.width() * u, rect.top() + rect.height() * v);
+        let col = |al: u8| a(Color32::from_rgba_unmultiplied(c.0, c.1, c.2, al));
+        radial_disc(p, center, d * r, &[(0.0, col(alpha)), (0.5, col(alpha / 3)), (1.0, Color32::TRANSPARENT)]);
+    };
+    blob(0.18, 0.12, 0.42, (56, 92, 255), 97);
+    blob(0.88, 0.30, 0.40, (168, 64, 255), 66);
+    blob(0.55, 1.12, 0.45, (0, 190, 170), 51);
 }
 
 pub fn is_blades() -> bool {
@@ -72,7 +126,7 @@ pub fn is_blades() -> bool {
 /// Inner margin for text boxes. Blades rounds them like pills, so the text
 /// needs room to clear the curved ends (egui's default is 4 x 2).
 pub fn input_margin() -> egui::Margin {
-    if is_blades() { egui::Margin::symmetric(12, 4) } else { egui::Margin::symmetric(4, 2) }
+    if is_blades() || is_glass() { egui::Margin::symmetric(12, 4) } else { egui::Margin::symmetric(4, 2) }
 }
 
 pub fn is_green() -> bool {
@@ -171,8 +225,32 @@ pub const BLADES_PALETTE: Palette = Palette {
     on_accent: Color32::WHITE,
 };
 
+/// Glass: translucent white panes, iOS system colors.
+pub const GLASS_PALETTE: Palette = Palette {
+    win_tl: Color32::from_rgba_premultiplied(20, 20, 20, 20),
+    win_tr: Color32::from_rgba_premultiplied(16, 16, 16, 16),
+    win_bl: Color32::from_rgba_premultiplied(14, 14, 14, 14),
+    win_br: Color32::from_rgba_premultiplied(12, 12, 12, 12),
+    border_light: Color32::from_rgba_premultiplied(56, 56, 56, 56),
+    border_mid: Color32::from_rgba_premultiplied(30, 30, 30, 30),
+    border_dark: Color32::from_rgba_premultiplied(0, 0, 0, 115),
+    text: Color32::from_rgb(255, 255, 255),
+    text_dim: Color32::from_rgb(160, 160, 168),
+    shadow: Color32::TRANSPARENT,
+    label: Color32::from_rgb(152, 152, 160),
+    good: Color32::from_rgb(48, 209, 88),
+    warn: Color32::from_rgb(255, 159, 10),
+    bad: Color32::from_rgb(255, 69, 58),
+    backdrop: Color32::from_rgb(4, 5, 10),
+    bar_from: Color32::from_rgb(10, 132, 255),
+    bar_to: Color32::from_rgb(64, 156, 255),
+    accent: Color32::from_rgb(10, 132, 255),
+    on_accent: Color32::WHITE,
+};
+
 pub fn pal() -> &'static Palette {
     match theme() {
+        Theme::Glass => &GLASS_PALETTE,
         Theme::GreenDash => &GREEN_PALETTE,
         Theme::Blades => &BLADES_PALETTE,
         Theme::FfMenu => &FF_PALETTE,
@@ -285,7 +363,37 @@ pub fn apply_style(ctx: &egui::Context) {
         visuals.widgets.active = w(110, 255);
         visuals.widgets.open = w(60, 200);
     }
-    let blades_pad = is_blades();
+    if is_glass() {
+        // iOS: soft gray fills, no hard outlines, capsule corners.
+        let gray = |a: u8| Color32::from_rgba_unmultiplied(118, 118, 128, a);
+        let white = |a: u8| Color32::from_rgba_unmultiplied(255, 255, 255, a);
+        visuals.window_fill = Color32::from_rgb(28, 28, 34);
+        visuals.window_stroke = Stroke::new(1.0, white(40));
+        visuals.window_corner_radius = CornerRadius::same(22);
+        visuals.window_shadow = egui::epaint::Shadow { offset: [0, 12], blur: 36, spread: 0, color: Color32::from_black_alpha(140) };
+        visuals.popup_shadow = egui::epaint::Shadow { offset: [0, 8], blur: 24, spread: 0, color: Color32::from_black_alpha(120) };
+        visuals.extreme_bg_color = gray(61);
+        visuals.faint_bg_color = white(8);
+        visuals.code_bg_color = gray(61);
+        visuals.hyperlink_color = Color32::from_rgb(100, 181, 255);
+        visuals.selection.bg_fill = Color32::from_rgba_unmultiplied(10, 132, 255, 130);
+        visuals.selection.stroke = Stroke::new(1.0, Color32::WHITE);
+        let w = |bg: Color32, stroke: Color32| egui::style::WidgetVisuals {
+            bg_fill: bg,
+            weak_bg_fill: bg,
+            bg_stroke: Stroke::new(1.0, stroke),
+            corner_radius: CornerRadius::same(14),
+            fg_stroke: Stroke::new(1.5, Color32::WHITE),
+            expansion: 0.0,
+        };
+        visuals.widgets.noninteractive = w(white(10), white(26));
+        visuals.widgets.inactive = w(gray(61), white(18));
+        visuals.widgets.hovered = w(gray(92), white(40));
+        visuals.widgets.active = w(gray(130), white(60));
+        visuals.widgets.open = w(gray(80), white(40));
+    }
+    let blades_pad = is_blades() || is_glass();
+    let glass_size = is_glass();
 
     ctx.set_theme(egui::Theme::Dark);
     ctx.set_visuals_of(egui::Theme::Dark, visuals);
@@ -302,7 +410,11 @@ pub fn apply_style(ctx: &egui::Context) {
         style.spacing.item_spacing = Vec2::new(8.0, 6.0);
         // Blades: pill buttons need more room at the rounded ends.
         style.spacing.button_padding = if blades_pad { Vec2::new(14.0, 5.0) } else { Vec2::new(10.0, 4.0) };
-        style.spacing.interact_size.y = 24.0;
+        style.spacing.interact_size.y = if glass_size { 28.0 } else { 24.0 };
+        if glass_size {
+            style.spacing.button_padding = Vec2::new(14.0, 6.0);
+            style.spacing.item_spacing = Vec2::new(8.0, 8.0);
+        }
         style.spacing.scroll.floating = false;
         style.spacing.scroll.bar_width = 8.0;
     });
@@ -398,6 +510,23 @@ pub fn window_shapes(rect: Rect) -> Vec<Shape> {
     if is_green() {
         return green_window_shapes(rect);
     }
+    if is_glass() {
+        // Liquid glass: a soft shadow, a faint white pane, a dark rim and a
+        // bright top edge, rounded generously.
+        let radius = CornerRadius::same(22);
+        let shadow = egui::epaint::Shadow { offset: [0, 10], blur: 34, spread: 0, color: Color32::from_black_alpha(110) };
+        let top = rect.top() + 0.5;
+        return vec![
+            Shape::Rect(shadow.as_shape(rect, radius)),
+            Shape::rect_filled(rect, radius, Color32::from_rgba_unmultiplied(255, 255, 255, 16)),
+            Shape::rect_stroke(rect, radius, Stroke::new(1.0, Color32::from_black_alpha(115)), StrokeKind::Outside),
+            Shape::rect_stroke(rect, radius, Stroke::new(1.0, Color32::from_rgba_unmultiplied(255, 255, 255, 14)), StrokeKind::Inside),
+            Shape::line_segment(
+                [Pos2::new(rect.left() + 20.0, top + 0.5), Pos2::new(rect.right() - 20.0, top + 0.5)],
+                Stroke::new(1.0, Color32::from_rgba_unmultiplied(255, 255, 255, 60)),
+            ),
+        ];
+    }
     if is_blades() {
         // A pane of glass: faint white, a thin light rim and a bright top edge.
         let radius = CornerRadius::same(18);
@@ -452,6 +581,17 @@ pub fn window_shapes(rect: Rect) -> Vec<Shape> {
     ]
 }
 
+/// Window shapes for this layer. Glass panes are see-through, so one on a
+/// dialog or popup layer gets a solid dark fill under it; otherwise the page
+/// behind would show through its text.
+fn pane_shapes(ui: &Ui, rect: Rect) -> Vec<Shape> {
+    let mut shapes = window_shapes(rect);
+    if is_glass() && matches!(ui.layer_id().order, egui::Order::Foreground | egui::Order::Tooltip | egui::Order::Debug) {
+        shapes.insert(1, Shape::rect_filled(rect, CornerRadius::same(22), Color32::from_rgb(30, 30, 36)));
+    }
+    shapes
+}
+
 /// Paint a window into `rect` and lay out contents inside it.
 pub fn window_at<R>(
     ui: &mut Ui,
@@ -459,7 +599,7 @@ pub fn window_at<R>(
     id: &str,
     add_contents: impl FnOnce(&mut Ui) -> R,
 ) -> R {
-    ui.painter().extend(window_shapes(rect));
+    ui.painter().extend(pane_shapes(ui, rect));
     let inner = rect.shrink(WINDOW_PADDING as f32);
     let mut child = ui.new_child(
         UiBuilder::new()
@@ -477,7 +617,7 @@ pub fn window<R>(ui: &mut Ui, add_contents: impl FnOnce(&mut Ui) -> R) -> R {
     let response = egui::Frame::new()
         .inner_margin(Margin::same(WINDOW_PADDING))
         .show(ui, add_contents);
-    let shapes = window_shapes(response.response.rect);
+    let shapes = pane_shapes(ui, response.response.rect);
     ui.painter().set(bg, Shape::Vec(shapes));
     response.inner
 }
@@ -594,6 +734,20 @@ pub fn menu_item(ui: &mut Ui, label: &str, selected: bool, enabled: bool) -> Res
     let height = MENU_ITEM_HEIGHT;
     let (rect, response) =
         ui.allocate_exact_size(Vec2::new(ui.available_width(), height), Sense::click());
+    if is_glass() {
+        // The sliding selection pill is painted by the layout; this draws
+        // a faint hover pill and the label.
+        let hover = ui.ctx().animate_bool_with_time(response.id, enabled && !selected && response.hovered(), 0.2);
+        if hover > 0.0 {
+            ui.painter().rect_filled(rect, CornerRadius::same(16), Color32::from_rgba_unmultiplied(255, 255, 255, (14.0 * hover) as u8));
+        }
+        let color = if !enabled { Color32::from_rgb(110, 110, 118) } else if selected { Color32::WHITE } else { Color32::from_rgb(220, 220, 228) };
+        ui.painter().text(Pos2::new(rect.left() + 16.0, rect.center().y), egui::Align2::LEFT_CENTER, label, FontId::proportional(17.0), color);
+        if enabled && response.hovered() {
+            ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+        }
+        return response;
+    }
     let color = if !enabled {
         Color32::from_rgb(110, 116, 150)
     } else if selected {
@@ -634,8 +788,35 @@ pub fn menu_item(ui: &mut Ui, label: &str, selected: bool, enabled: bool) -> Res
     response
 }
 
+/// The glass look's selection pill behind a menu item, glided into place.
+pub fn glass_pill(ctx: &egui::Context, id: &str, target: Rect) -> Vec<Shape> {
+    let y = glide(ctx, egui::Id::new(("glass_pill", id)), target.top());
+    let r = Rect::from_min_size(Pos2::new(target.left(), y), target.size());
+    vec![
+        Shape::rect_filled(r, CornerRadius::same(16), Color32::from_rgba_unmultiplied(255, 255, 255, 34)),
+        Shape::rect_stroke(r, CornerRadius::same(16), Stroke::new(1.0, Color32::from_black_alpha(70)), StrokeKind::Outside),
+        Shape::line_segment(
+            [Pos2::new(r.left() + 14.0, r.top() + 1.0), Pos2::new(r.right() - 14.0, r.top() + 1.0)],
+            Stroke::new(1.0, Color32::from_rgba_unmultiplied(255, 255, 255, 70)),
+        ),
+    ]
+}
+
 /// Gradient stat bar (HP/MP style) with an optional caption to its right.
 pub fn stat_bar(ui: &mut Ui, fraction: f32, width: f32, from: Color32, to: Color32) -> Response {
+    if is_glass() {
+        // A slim capsule: gray track, solid fill in the bar's color.
+        let (rect, response) = ui.allocate_exact_size(Vec2::new(width, 6.0), Sense::hover());
+        let p = ui.painter();
+        p.rect_filled(rect, CornerRadius::same(3), Color32::from_rgba_unmultiplied(118, 118, 128, 61));
+        let fraction = fraction.clamp(0.0, 1.0);
+        if fraction > 0.0 {
+            let color = if from.b() > from.g() { pal().accent } else { from };
+            let w = (rect.width() * fraction).max(6.0);
+            p.rect_filled(Rect::from_min_size(rect.min, Vec2::new(w, rect.height())), CornerRadius::same(3), color);
+        }
+        return response;
+    }
     let (rect, response) = ui.allocate_exact_size(Vec2::new(width, 8.0), Sense::hover());
     let painter = ui.painter();
     painter.rect_filled(
@@ -683,6 +864,8 @@ pub fn divider(ui: &mut Ui) {
         [Pos2::new(rect.left(), y), Pos2::new(rect.right(), y)],
         if is_green() {
             Stroke::new(1.0, Color32::from_rgba_unmultiplied(150, 255, 70, 50))
+        } else if is_glass() {
+            Stroke::new(1.0, Color32::from_rgba_unmultiplied(255, 255, 255, 26))
         } else if is_blades() {
             Stroke::new(1.0, Color32::from_rgba_unmultiplied(255, 255, 255, 60))
         } else {
@@ -707,6 +890,17 @@ pub fn emblem(ui: &mut Ui, letter: &str, size: f32, active: bool) -> Response {
             display_font(size * 0.38),
             Color32::from_rgb(20, 50, 4),
         );
+        file_badge(ui, rect, &response);
+        return response;
+    }
+    if is_glass() {
+        // A round glass chip with the letter.
+        let c = rect.center();
+        let r = size * 0.46;
+        let p = ui.painter();
+        p.circle_filled(c, r, Color32::from_rgba_unmultiplied(118, 118, 128, if active { 80 } else { 50 }));
+        p.circle_stroke(c, r, Stroke::new(1.0, Color32::from_rgba_unmultiplied(255, 255, 255, if active { 50 } else { 26 })));
+        p.text(c, egui::Align2::CENTER_CENTER, letter.to_uppercase(), FontId::proportional(size * 0.4), Color32::WHITE);
         file_badge(ui, rect, &response);
         return response;
     }
@@ -834,7 +1028,7 @@ fn file_badge(ui: &Ui, rect: Rect, response: &Response) {
     let painter = ui.painter();
     let (fill, stroke, ink) = if is_green() {
         (Color32::from_rgb(6, 34, 4), BORDER_LIGHT(), Color32::from_rgb(220, 255, 160))
-    } else if is_blades() {
+    } else if is_blades() || is_glass() {
         (Color32::from_rgba_unmultiplied(30, 30, 40, 200), Color32::from_rgba_unmultiplied(255, 255, 255, 170), Color32::WHITE)
     } else {
         (Color32::from_rgb(10, 14, 90), BORDER_LIGHT(), TEXT())
@@ -850,8 +1044,8 @@ fn file_badge(ui: &Ui, rect: Rect, response: &Response) {
     }
     if response.hovered() {
         let ring = if is_green() { Color32::from_rgb(220, 255, 100) } else { LABEL() };
-        if is_green() || is_blades() {
-            let ring = if is_blades() { Color32::WHITE } else { ring };
+        if is_green() || is_blades() || is_glass() {
+            let ring = if is_blades() || is_glass() { Color32::WHITE } else { ring };
             painter.circle_stroke(rect.center(), rect.width() * 0.5, Stroke::new(2.0, ring));
         } else {
             painter.rect_stroke(rect.expand(2.0), CornerRadius::same(4), Stroke::new(2.0, ring), StrokeKind::Outside);
@@ -863,6 +1057,15 @@ fn file_badge(ui: &Ui, rect: Rect, response: &Response) {
 /// Small outlined tag like "PRIVATE".
 pub fn tag(ui: &mut Ui, text: &str, color: Color32) -> Response {
     let font = FontId::proportional(11.0);
+    if is_glass() {
+        // A tinted capsule.
+        let galley = ui.painter().layout_no_wrap(text.to_string(), font, color);
+        let size = galley.size() + Vec2::new(16.0, 6.0);
+        let (rect, response) = ui.allocate_exact_size(size, Sense::hover());
+        ui.painter().rect_filled(rect, CornerRadius::same((size.y / 2.0) as u8), color.gamma_multiply(0.18));
+        ui.painter().galley(rect.min + Vec2::new(8.0, 3.0), galley, color);
+        return response;
+    }
     let galley = ui.painter().layout_no_wrap(text.to_string(), font, color);
     let size = galley.size() + Vec2::new(10.0, 4.0);
     let (rect, response) = ui.allocate_exact_size(size, Sense::hover());
@@ -916,6 +1119,8 @@ pub fn done_check(ui: &Ui, rect: Rect) {
     let painter = ui.painter();
     let (fill, ink) = if is_green() {
         (Color32::from_rgb(140, 255, 110), Color32::from_rgb(14, 44, 4))
+    } else if is_glass() {
+        (Color32::from_rgb(48, 209, 88), Color32::WHITE)
     } else {
         (Color32::from_rgb(70, 200, 90), Color32::WHITE)
     };
@@ -929,11 +1134,13 @@ pub fn done_check(ui: &Ui, rect: Rect) {
 pub fn update_progress(ui: &mut Ui, fraction: f32, step: &str) {
     let fraction = fraction.clamp(0.0, 1.0);
     let width = ui.available_width().clamp(240.0, 520.0);
-    let h = if is_blades() { 16.0 } else { 14.0 };
+    let h = if is_blades() { 16.0 } else if is_glass() { 8.0 } else { 14.0 };
     ui.add_space(4.0);
     let (rect, _) = ui.allocate_exact_size(Vec2::new(width, h), Sense::hover());
     let painter = ui.painter();
-    let (radius, track, edge, from, to) = if is_green() {
+    let (radius, track, edge, from, to) = if is_glass() {
+        ((h / 2.0) as u8, Color32::from_rgba_unmultiplied(118, 118, 128, 61), Color32::TRANSPARENT, Color32::from_rgb(10, 132, 255), Color32::from_rgb(64, 156, 255))
+    } else if is_green() {
         (0u8, Color32::from_rgb(0, 14, 0), Color32::from_rgb(12, 52, 6), Color32::from_rgb(79, 181, 26), Color32::from_rgb(226, 255, 106))
     } else if is_blades() {
         (
@@ -967,9 +1174,9 @@ pub fn update_progress(ui: &mut Ui, fraction: f32, step: &str) {
             mesh.add_triangle(0, 2, 3);
             painter.add(Shape::mesh(mesh));
         }
-        // Gloss on the top half.
+        // Gloss on the top half (not on flat iOS glass).
         let gloss = Rect::from_min_max(fill.min + Vec2::new(2.0, 1.5), egui::pos2(fill.right() - 2.0, fill.center().y));
-        if gloss.width() > 2.0 {
+        if gloss.width() > 2.0 && !is_glass() {
             let gr = if radius == 0 { 0 } else { (radius / 2).max(1) };
             painter.rect_filled(gloss, CornerRadius::same(gr), Color32::from_rgba_unmultiplied(255, 255, 255, 60));
         }
@@ -988,12 +1195,13 @@ pub fn update_progress(ui: &mut Ui, fraction: f32, step: &str) {
 /// whatever is behind it doesn't show through its text. Other themes are
 /// already solid.
 pub fn solid_backing<R>(ui: &mut Ui, add_contents: impl FnOnce(&mut Ui) -> R) -> R {
-    if !is_blades() {
+    if !is_blades() && !is_glass() {
         return add_contents(ui);
     }
+    let (fill, radius) = if is_glass() { (Color32::from_rgba_unmultiplied(28, 28, 34, 240), 22) } else { (Color32::from_rgba_unmultiplied(28, 24, 40, 235), 18) };
     egui::Frame::NONE
-        .fill(Color32::from_rgba_unmultiplied(28, 24, 40, 235))
-        .corner_radius(CornerRadius::same(18))
+        .fill(fill)
+        .corner_radius(CornerRadius::same(radius))
         .shadow(egui::epaint::Shadow { offset: [0, 6], blur: 18, spread: 0, color: Color32::from_black_alpha(100) })
         .show(ui, add_contents)
         .inner

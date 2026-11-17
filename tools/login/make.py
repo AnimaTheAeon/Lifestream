@@ -17,10 +17,10 @@ def build(app, head, logo, colors, mapjs, theme, action, forgot):
 FORGOT = '              <a href="{}" class="forgot">Forgot password?</a>'
 apps = {
  'midgar': lambda: build('Midgar', servarr_head('/home/claude/midgar/frontend/src/login.html'), '/Content/Images/logo.svg', BLUE,
-    "raw === 'boxofx' ? 'green' : raw === 'blades' ? 'blades' : 'ff'", '_THEME_', '',
+    "raw === 'boxofx' ? 'green' : raw === 'blades' || raw === 'glass' ? raw : 'ff'", '_THEME_', '',
     FORGOT.format('https://wiki.servarr.com/sonarr/faq#help-i-have-locked-myself-out')),
  'materia': lambda: build('Materia', servarr_head('/home/claude/materia/frontend/src/login.html'), '/Content/Images/logo.svg', BLUE,
-    "raw === 'green' ? 'green' : raw === 'blades' ? 'blades' : 'ff'", '_THEME_', '',
+    "raw === 'green' || raw === 'blades' || raw === 'glass' ? raw : 'ff'", '_THEME_', '',
     FORGOT.format('https://wiki.servarr.com/prowlarr/faq#help-i-have-locked-myself-out')),
  'lifestream': lambda: build('Lifestream', '''    <link rel="icon" type="image/png" href="/icon.png" />
     <style>
@@ -28,7 +28,7 @@ apps = {
       @font-face { font-family: Nunito; font-weight: 800 900; src: url('/fonts/nunito-800.ttf') format('truetype'); }
       @font-face { font-family: Orbitron; font-weight: 800; src: url('/fonts/orbitron-800.ttf') format('truetype'); }
     </style>''', '/icon.png', GREEN,
-    "raw === 'green' || raw === 'blades' ? raw : 'ff'", '_THEME_', ' action="/lifestream/login"',
+    "raw === 'green' || raw === 'blades' || raw === 'glass' ? raw : 'ff'", '_THEME_', ' action="/lifestream/login"',
     '              <span></span>'),
 }
 out = {'midgar': '/home/claude/midgar/frontend/src/login.html', 'materia': '/home/claude/materia/frontend/src/login.html', 'lifestream': '/home/claude/lifestream/web/login.html'}

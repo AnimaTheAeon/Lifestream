@@ -92,7 +92,7 @@ pub fn is_page(path: &str) -> bool {
 
 pub fn send_page(req: Request) {
     let theme = Settings::load().theme;
-    let theme = if theme == "green" || theme == "blades" { theme } else { "ff".to_string() };
+    let theme = if theme == "green" || theme == "blades" || theme == "glass" { theme } else { "ff".to_string() };
     let resp = Response::from_string(PAGE.replace("_THEME_", &theme))
         .with_header(header("Content-Type", "text/html; charset=UTF-8"))
         .with_header(header("Cache-Control", "no-store"))

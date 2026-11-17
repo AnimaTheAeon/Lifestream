@@ -44,7 +44,11 @@ pub fn help_icon(ui: &mut Ui, help: &str) -> egui::Response {
 pub fn section_help(ui: &mut Ui, text: &str, help: &str) {
     ui.add_space(8.0);
     ui.horizontal(|ui| {
-        ff::title(ui, text, 17.0, WARN());
+        if ff::is_glass() {
+            ff::title(ui, &text.to_uppercase(), 13.0, LABEL());
+        } else {
+            ff::title(ui, text, 17.0, WARN());
+        }
         help_icon(ui, help);
     });
     ui.add_space(2.0);
@@ -67,9 +71,15 @@ pub fn page_title(ui: &mut Ui, title: &str, subtitle: &str) {
     ff::divider(ui);
 }
 
-/// Gold section heading.
+/// Gold section heading (a small gray caption in the glass look, like iOS).
 pub fn section(ui: &mut Ui, text: &str) {
     ui.add_space(8.0);
+    if ff::is_glass() {
+        ui.add_space(4.0);
+        ff::title(ui, &text.to_uppercase(), 13.0, LABEL());
+        ui.add_space(2.0);
+        return;
+    }
     ff::title(ui, text, 17.0, WARN());
     ui.add_space(2.0);
 }
@@ -112,6 +122,8 @@ pub fn row_tagged<R>(
         [egui::pos2(rect.left(), rect.top() + 2.0), egui::pos2(rect.right(), rect.top() + 2.0)],
         if ff::is_green() {
             egui::Stroke::new(1.0, Color32::from_rgba_unmultiplied(150, 255, 70, 40))
+        } else if ff::is_glass() {
+            egui::Stroke::new(1.0, Color32::from_rgba_unmultiplied(255, 255, 255, 22))
         } else if ff::is_blades() {
             egui::Stroke::new(1.0, Color32::from_rgba_unmultiplied(255, 255, 255, 45))
         } else {
@@ -128,12 +140,84 @@ pub fn toggle(ui: &mut Ui, value: &mut bool) -> bool {
 }
 
 pub fn toggle_labeled(ui: &mut Ui, value: &mut bool, on: &str, off: &str) -> bool {
+    if ff::is_glass() {
+        return if on == "ON" && off == "OFF" { ios_switch(ui, value) } else { segmented(ui, value, on, off) };
+    }
     let (label, color) = if *value { (on, GOOD()) } else { (off, BAD()) };
     let clicked = ui
         .add(egui::Button::new(RichText::new(label).color(color).strong()).min_size(egui::vec2(64.0, 26.0)))
         .clicked();
     if clicked {
         *value = !*value;
+    }
+    clicked
+}
+
+/// iOS switch: a green capsule when on, gray when off, with a white knob
+/// that glides across.
+fn ios_switch(ui: &mut Ui, value: &mut bool) -> bool {
+    let size = egui::vec2(51.0, 31.0);
+    let (rect, mut r) = ui.allocate_exact_size(size, egui::Sense::click());
+    if r.clicked() {
+        *value = !*value;
+        r.mark_changed();
+    }
+    let t = if ff::calm() { if *value { 1.0 } else { 0.0 } } else { ui.ctx().animate_bool_with_time(r.id, *value, 0.3) };
+    let t = 1.0 - (1.0 - t).powi(3);
+    let off = Color32::from_rgba_unmultiplied(120, 120, 128, 82);
+    let on = Color32::from_rgb(48, 209, 88);
+    let mix = |a: u8, b: u8| (a as f32 + (b as f32 - a as f32) * t) as u8;
+    let track = Color32::from_rgba_premultiplied(mix(off.r(), on.r()), mix(off.g(), on.g()), mix(off.b(), on.b()), mix(off.a(), on.a()));
+    let p = ui.painter();
+    p.rect_filled(rect, egui::CornerRadius::same(16), track);
+    let x = rect.left() + 15.5 + (size.x - 31.0) * t;
+    let c = egui::pos2(x, rect.center().y);
+    p.circle_filled(c + egui::vec2(0.0, 1.5), 13.5, Color32::from_black_alpha(50));
+    p.circle_filled(c, 13.5, Color32::WHITE);
+    if r.hovered() {
+        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+    }
+    r.widget_info(|| egui::WidgetInfo::selected(egui::WidgetType::Checkbox, true, *value, ""));
+    r.clicked()
+}
+
+/// Two-choice segmented control (e.g. SIMPLE / ADVANCED); the selected half
+/// is a lighter capsule that glides between them.
+fn segmented(ui: &mut Ui, value: &mut bool, on: &str, off: &str) -> bool {
+    let cap = |s: &str| {
+        let mut c = s.to_lowercase();
+        if let Some(f) = c.get_mut(0..1) { f.make_ascii_uppercase(); }
+        c
+    };
+    let (on, off) = (cap(on), cap(off));
+    let font = egui::FontId::proportional(14.0);
+    let w = |s: &str| ui.painter().layout_no_wrap(s.to_string(), font.clone(), Color32::WHITE).size().x;
+    let seg = w(&on).max(w(&off)) + 28.0;
+    let size = egui::vec2(seg * 2.0 + 4.0, 30.0);
+    let (rect, r) = ui.allocate_exact_size(size, egui::Sense::click());
+    let mut clicked = false;
+    if r.clicked() {
+        if let Some(pos) = r.interact_pointer_pos() {
+            let want = pos.x >= rect.center().x;
+            if want != *value {
+                *value = want;
+                clicked = true;
+            }
+        }
+    }
+    let p = ui.painter();
+    p.rect_filled(rect, egui::CornerRadius::same(15), Color32::from_rgba_unmultiplied(118, 118, 128, 61));
+    let target = if *value { rect.left() + 2.0 + seg } else { rect.left() + 2.0 };
+    let x = ff::glide(ui.ctx(), r.id.with("thumb"), target);
+    let thumb = egui::Rect::from_min_size(egui::pos2(x, rect.top() + 2.0), egui::vec2(seg, size.y - 4.0));
+    p.rect_filled(thumb, egui::CornerRadius::same(13), Color32::from_rgba_unmultiplied(118, 118, 128, 150));
+    let left = egui::pos2(rect.left() + 2.0 + seg / 2.0, rect.center().y);
+    let right = egui::pos2(rect.left() + 2.0 + seg * 1.5, rect.center().y);
+    let dim = Color32::from_rgb(200, 200, 208);
+    p.text(left, egui::Align2::CENTER_CENTER, off, font.clone(), if *value { dim } else { Color32::WHITE });
+    p.text(right, egui::Align2::CENTER_CENTER, on, font, if *value { Color32::WHITE } else { dim });
+    if r.hovered() {
+        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
     }
     clicked
 }
@@ -184,8 +268,10 @@ pub fn pill(ui: &mut Ui, text: &str, selected: bool) -> egui::Response {
         (false, false) => Color32::from_rgb(12, 20, 72),
     };
     let fill = if selected && !green { Color32::from_rgb(60, 100, 200) } else { fill };
-    // Blades: glass pills.
-    let (color, fill) = if ff::is_blades() {
+    // Blades and Liquid Glass: glass pills.
+    let (color, fill) = if ff::is_glass() {
+        (if selected { Color32::WHITE } else { Color32::from_rgb(210, 210, 218) }, Color32::from_rgba_unmultiplied(118, 118, 128, if selected { 140 } else { 50 }))
+    } else if ff::is_blades() {
         (Color32::WHITE, Color32::from_rgba_unmultiplied(255, 255, 255, if selected { 95 } else { 28 }))
     } else {
         (color, fill)
@@ -193,8 +279,8 @@ pub fn pill(ui: &mut Ui, text: &str, selected: bool) -> egui::Response {
     ui.add(
         egui::Button::new(RichText::new(text).color(color).strong())
             .fill(fill)
-            .corner_radius(12.0)
-            .min_size(egui::vec2(0.0, 26.0)),
+            .corner_radius(if ff::is_glass() { 14.0 } else { 12.0 })
+            .min_size(egui::vec2(0.0, if ff::is_glass() { 28.0 } else { 26.0 })),
     )
 }
 

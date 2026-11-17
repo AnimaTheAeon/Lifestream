@@ -400,6 +400,135 @@ body.blades .fpcard { background: rgba(28, 24, 40, .92); border: 1px solid rgba(
 body.blades .fplist { border-radius: 14px; background: rgba(0, 0, 0, .25); border-color: rgba(255, 255, 255, .3); }
 body.blades .fplist button { border-radius: 12px; }
 body.blades .fplist button:hover, body.blades .fplist button:focus-visible { background: rgba(255, 255, 255, .16); }
+
+/* =====================================================================
+   Liquid Glass (dark): frosted panels over a dark, softly lit backdrop.
+   Everything hangs off body.glass. Springs: cubic-bezier(.32,.72,0,1).
+   ===================================================================== */
+html:has(body.glass) { background: #04050a; }
+body.glass {
+  --text: #ffffff; --dim: rgba(235, 235, 245, .62); --label: rgba(235, 235, 245, .62);
+  --good: #30d158; --warn: #ff9f0a; --bad: #ff453a; --well: rgba(118, 118, 128, .24);
+  --light: rgba(255, 255, 255, .2); --mid: rgba(255, 255, 255, .14); --dark: rgba(0, 0, 0, .45);
+  --accent: #0a84ff; --spring: cubic-bezier(.32, .72, 0, 1);
+  --glass: rgba(255, 255, 255, .06); --glass-hi: rgba(255, 255, 255, .12);
+  --glass-edge: inset 0 1px 0 rgba(255, 255, 255, .22), inset 0 -1px 0 rgba(0, 0, 0, .28), 0 0 0 1px rgba(0, 0, 0, .45), 0 0 0 2px rgba(255, 255, 255, .05);
+  --shadow: none;
+  background: radial-gradient(900px 640px at 10% 6%, rgba(56, 92, 255, .38), transparent 60%), radial-gradient(820px 620px at 94% 24%, rgba(168, 64, 255, .26), transparent 62%), radial-gradient(900px 700px at 58% 112%, rgba(0, 190, 170, .2), transparent 60%), #04050a;
+  background-attachment: fixed;
+  font: 500 15px/1.45 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable Text", "Segoe UI", Inter, system-ui, sans-serif;
+  text-shadow: none; color: var(--text); -webkit-font-smoothing: antialiased;
+}
+body.glass .app { padding: 16px; gap: 14px; }
+body.glass .main { flex-direction: row-reverse; gap: 16px; }
+body.glass .win {
+  background: var(--glass); border: 0; border-radius: 26px;
+  -webkit-backdrop-filter: blur(30px) saturate(170%); backdrop-filter: blur(30px) saturate(170%);
+  box-shadow: var(--glass-edge), 0 18px 48px rgba(0, 0, 0, .45);
+}
+body.glass h1 { font-size: 30px; font-weight: 800; letter-spacing: -.6px; }
+body.glass h2 { margin: 26px 0 8px; font-size: 13px; font-weight: 600; color: var(--dim); text-transform: uppercase; letter-spacing: .04em; }
+body.glass .lbl { color: var(--dim); font-weight: 600; letter-spacing: .02em; }
+body.glass .val { font-weight: 700; }
+body.glass .dimc, body.glass .sub, body.glass .field .help { color: var(--dim); }
+
+/* Sidebar: a glass column with a selection pill that glides between items. */
+body.glass .side { width: 244px; }
+body.glass nav.win { position: relative; padding: 10px; gap: 4px; }
+body.glass nav.win::before { content: ""; position: absolute; left: var(--sel-left, 10px); width: var(--sel-w, calc(100% - 20px)); top: var(--sel-top, 10px); height: var(--sel-h, 44px); border-radius: 22px; background: rgba(255, 255, 255, .16); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .28), 0 0 0 1px rgba(0, 0, 0, .35), 0 6px 18px rgba(0, 0, 0, .3); transition: top .55s var(--spring), height .55s var(--spring), left .55s var(--spring), width .55s var(--spring); pointer-events: none; }
+body.glass .mi { z-index: 1; min-height: 44px; padding: 0 16px; border-radius: 22px; font-size: 16px; font-weight: 600; text-shadow: none; transition: transform .35s var(--spring), background-color .3s ease; }
+body.glass .mi:hover, body.glass .mi:focus-visible { background: rgba(255, 255, 255, .06); }
+body.glass .mi:focus-visible { box-shadow: 0 0 0 2px var(--accent); }
+body.glass .mi:active { transform: scale(.97); }
+body.glass .mi[aria-current="page"] { background: none; }
+body.glass .mi .hand { display: none !important; }
+body.glass .info { padding: 16px 18px; gap: 8px; }
+body.glass .status { min-height: 46px; padding: 0 20px; font-size: 14px; border-radius: 23px; color: var(--dim); }
+
+/* Buttons: glass capsules that give a little when pressed. */
+body.glass .btn { min-height: 38px; padding: 0 18px; border: 0; border-radius: 19px; background: rgba(255, 255, 255, .1); color: var(--text); font-weight: 600; text-shadow: none; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .22), 0 0 0 1px rgba(0, 0, 0, .4); transition: transform .35s var(--spring), background-color .3s ease, box-shadow .3s ease; }
+body.glass .btn:hover, body.glass .btn:focus-visible { background: rgba(255, 255, 255, .17); border-color: transparent; }
+body.glass .btn:focus-visible { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .22), 0 0 0 2px var(--accent); }
+body.glass .btn:active:not(:disabled) { transform: scale(.96); }
+body.glass .btn.primary { background: var(--accent); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .35), 0 0 0 1px rgba(0, 0, 0, .35), 0 6px 18px rgba(10, 132, 255, .32); }
+body.glass .btn.primary:hover, body.glass .btn.primary:focus-visible { background: #2a95ff; }
+body.glass .btn.danger { color: #ff6961; background: rgba(255, 69, 58, .16); }
+body.glass .btn.danger:hover { background: rgba(255, 69, 58, .26); }
+body.glass .icon-btn { width: 38px; padding: 0; }
+body.glass .btn.saved, body.glass .btn.saved:hover { background: var(--good); color: #fff; }
+body.glass #pause-all { color: var(--text) !important; }
+
+/* Fields: tinted capsules; checkboxes become iOS switches. */
+body.glass input[type=text], body.glass input[type=password], body.glass input[type=number], body.glass select, body.glass textarea { min-height: 38px; padding: 0 16px; border: 0; border-radius: 19px; background: var(--well); color: var(--text); font-weight: 500; }
+body.glass textarea { padding: 9px 16px; border-radius: 16px; }
+body.glass select { padding-right: 34px; -webkit-appearance: none; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%23ebebf5' stroke-opacity='.6' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 14px center; }
+body.glass select option { background: #1c1c24; color: #fff; }
+body.glass input:focus, body.glass select:focus, body.glass textarea:focus { box-shadow: 0 0 0 2px var(--accent); }
+body.glass input::placeholder, body.glass textarea::placeholder { color: rgba(235, 235, 245, .4); }
+body.glass input[type=checkbox] { -webkit-appearance: none; appearance: none; position: relative; flex: none; width: 51px; height: 31px; margin: 0; border-radius: 16px; background: rgba(120, 120, 128, .36); cursor: pointer; transition: background-color .35s ease; }
+body.glass input[type=checkbox]::before { content: ""; position: absolute; top: 2px; left: 2px; width: 27px; height: 27px; border-radius: 50%; background: #fff; box-shadow: 0 3px 8px rgba(0, 0, 0, .3); transition: transform .45s var(--spring); }
+body.glass input[type=checkbox]:checked { background: var(--good); }
+body.glass input[type=checkbox]:checked::before { transform: translateX(20px); }
+body.glass input[type=checkbox]:focus-visible { box-shadow: 0 0 0 2px var(--accent); }
+body.glass .field input[type=checkbox] { width: 51px; height: 31px; }
+
+/* Segmented controls (Simple/Advanced, the theme picker). */
+body.glass .segs { position: relative; padding: 3px; gap: 0; border: 0; border-radius: 18px; background: var(--well); overflow: visible; }
+body.glass .seg { position: relative; z-index: 1; padding: 6px 16px; border-radius: 15px; color: var(--dim); font-weight: 600; transition: color .3s ease, background-color .4s var(--spring), box-shadow .4s var(--spring); }
+body.glass .seg[aria-pressed="true"] { color: #fff; background: rgba(255, 255, 255, .2); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .35), 0 0 0 1px rgba(0, 0, 0, .3), 0 4px 12px rgba(0, 0, 0, .35); }
+body.glass .seg:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* The torrent list: rounded rows, a progress ring-ish badge, thin capsule bars. */
+body.glass .toolbar { padding: 14px 20px; gap: 10px; border-bottom: 1px solid rgba(84, 84, 88, .5); }
+body.glass .content .scroll { padding: 18px 22px 28px; }
+@media (min-width: 901px) { body.glass .t { grid-template-columns: 48px minmax(0,1fr) 250px 120px auto; } }
+body.glass .t .gauge .lbl { white-space: nowrap; }
+body.glass .t { padding: 12px 14px; border-radius: 20px; transition: background-color .3s ease; }
+body.glass .t:hover { background: rgba(255, 255, 255, .05); }
+body.glass .sq { width: 44px; height: 44px; border: 0; border-radius: 22px; background: var(--well); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .12); font-size: 12px; font-weight: 700; }
+body.glass .name { font-size: 16px; font-weight: 600; }
+body.glass .bar { height: 6px; border: 0; border-radius: 3px; background: rgba(118, 118, 128, .32); }
+body.glass .fill { border-radius: 3px; transition: width .6s var(--spring); }
+body.glass .f-dl { background: var(--accent); }
+body.glass .f-done { background: var(--good); }
+body.glass .f-wait { background: var(--warn); }
+body.glass .f-off { background: rgba(235, 235, 245, .3); }
+body.glass .tag { border: 0; border-radius: 12px; padding: 4px 10px; font-weight: 700; font-size: 11px; background: rgba(255, 255, 255, .08); }
+body.glass .tag.good { background: rgba(48, 209, 88, .16); }
+body.glass .tag.warn { background: rgba(255, 159, 10, .16); }
+body.glass .tag.bad { background: rgba(255, 69, 58, .16); }
+body.glass .notice { border: 0; border-radius: 18px; background: rgba(255, 159, 10, .14); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .1); }
+body.glass .notice.bad { background: rgba(255, 69, 58, .14); }
+body.glass .drop { display: block; margin-top: 4px; border: 1.5px dashed rgba(235, 235, 245, .3); border-radius: 22px; }
+body.glass .drop.over { border-color: var(--accent); background: rgba(10, 132, 255, .1); }
+body.glass .logbox { border-radius: 16px; background: rgba(0, 0, 0, .3); }
+body.glass .field { margin: 10px 0; }
+
+/* Pop-ups: thicker glass, and they spring in. */
+body.glass .toast { right: 24px; bottom: 82px; padding: 12px 18px; border-radius: 22px; background: rgba(30, 32, 44, .66); -webkit-backdrop-filter: blur(30px) saturate(180%); backdrop-filter: blur(30px) saturate(180%); box-shadow: var(--glass-edge), 0 14px 36px rgba(0, 0, 0, .5); }
+body.glass .toast.bad { color: #ff9f97; }
+body.glass .upd { background: rgba(0, 0, 0, .42); }
+body.glass .upd .updcard { background: rgba(30, 32, 44, .7); border-radius: 30px; -webkit-backdrop-filter: blur(40px) saturate(180%); backdrop-filter: blur(40px) saturate(180%); box-shadow: var(--glass-edge), 0 24px 60px rgba(0, 0, 0, .6); transform: scale(.94); transition: transform .5s var(--spring); }
+body.glass .upd.on .updcard { transform: none; }
+body.glass .updtitle { font-size: 19px; font-weight: 700; }
+body.glass .updbar { height: 8px; border: 0; border-radius: 4px; background: rgba(118, 118, 128, .32); }
+body.glass .updbar i { border-radius: 4px; background: var(--accent); }
+body.glass .updbar i::after { display: none; }
+body.glass .fp { background: rgba(0, 0, 0, .42); }
+body.glass .fpcard { border-radius: 30px; background: rgba(30, 32, 44, .72); -webkit-backdrop-filter: blur(40px) saturate(180%); backdrop-filter: blur(40px) saturate(180%); box-shadow: var(--glass-edge), 0 24px 60px rgba(0, 0, 0, .6); transform: scale(.94); transition: transform .5s var(--spring); }
+body.glass .fp.on .fpcard { transform: none; }
+body.glass .fplist { border: 0; border-radius: 18px; background: rgba(0, 0, 0, .25); }
+body.glass .fplist button { border-radius: 12px; font-weight: 600; }
+
+/* Pages slide up a touch as they arrive. */
+body.glass #page > * { animation: lgIn .5s var(--spring) both; }
+@keyframes lgIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+body.glass.calm #page > *, body.glass.calm .mi, body.glass.calm .btn, body.glass.calm nav.win::before, body.glass.calm input[type=checkbox]::before, body.glass.calm .upd .updcard, body.glass.calm .fpcard { animation: none; transition: none; }
+@media (prefers-reduced-motion: reduce) { body.glass #page > * { animation: none; } body.glass nav.win::before { transition: none; } }
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) { body.glass .win { background: rgba(28, 30, 42, .92); } }
+@media (max-width: 820px) { body.glass .main { flex-direction: column; } body.glass .side { width: auto; } }
+#splash.glass { background: radial-gradient(700px 500px at 30% 30%, rgba(56, 92, 255, .4), transparent 60%), radial-gradient(700px 500px at 75% 70%, rgba(168, 64, 255, .3), transparent 60%), #04050a; --si: #ffffff; --sa: #0a84ff; --sd: rgba(235, 235, 245, .62); }
+#splash.glass .sp-title { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI Variable Display", "Segoe UI", Inter, system-ui, sans-serif; font-weight: 700; letter-spacing: .12em; padding-left: .12em; text-transform: none; }
 </style>
 </head>
 <body>
@@ -430,7 +559,7 @@ body.blades .fplist button:hover, body.blades .fplist button:focus-visible { bac
 <script>
 (function () {
   var s = document.getElementById('splash'); if (!s) return;
-  try { var t = localStorage.getItem('lifestream-theme'); if (t === 'green' || t === 'blades') s.classList.add(t); } catch (e) {}
+  try { var t = localStorage.getItem('lifestream-theme'); if (t === 'green' || t === 'blades' || t === 'glass') s.classList.add(t); } catch (e) {}
   var born = Date.now(), gone = false;
   function out() { if (gone) return; gone = true; s.classList.add('out'); setTimeout(function () { s.remove(); }, 700); }
   window.splashDone = function (theme) {
@@ -1050,7 +1179,7 @@ async function drawSettings() {
   const logBox = el('div', { class: 'log logbox' });
   // The theme switches and saves at once.
   const themeSegs = el('div', { class: 'segs', role: 'group', 'aria-label': 'Theme' });
-  const drawThemeSegs = () => themeSegs.replaceChildren(...[['ff', 'FFVII Menu'], ['green', 'Xbox'], ['blades', 'Blades']].map(([val, label]) =>
+  const drawThemeSegs = () => themeSegs.replaceChildren(...[['ff', 'FFVII Menu'], ['green', 'Xbox'], ['blades', 'Blades'], ['glass', 'Liquid Glass']].map(([val, label]) =>
     el('button', { class: 'seg', 'aria-pressed': String((state && state.theme) === val), onclick: async () => {
       if (state.theme === val) return;
       try { await api('settings', 'PUT', { theme: val }); state.theme = val; applyTheme(true); drawThemeSegs(); }
@@ -1155,13 +1284,15 @@ const calm = () => !!(state && state.reduceMotion) || matchMedia('(prefers-reduc
 /** Match the page to the saved theme. `stay` keeps the current page open (switching from Settings). */
 function applyTheme(stay) {
   document.body.classList.toggle('calm', calm());
-  const theme = isBlades() ? 'blades' : isGreen() ? 'green' : 'ff';
+  const theme = isBlades() ? 'blades' : isGreen() ? 'green' : isGlass() ? 'glass' : 'ff';
   if (theme === themeShown && !stay) return;
   const was = themeShown; themeShown = theme;
   document.body.classList.toggle('green', theme === 'green');
   document.body.classList.toggle('blades', theme === 'blades');
-  $('meta[name=theme-color]').content = theme === 'green' ? '#0a3608' : theme === 'blades' ? '#cfcfcf' : '#121e78';
+  document.body.classList.toggle('glass', theme === 'glass');
+  $('meta[name=theme-color]').content = theme === 'green' ? '#0a3608' : theme === 'blades' ? '#cfcfcf' : theme === 'glass' ? '#04050a' : '#121e78';
   if (was === 'blades' && theme !== 'blades') bladesOff();
+  if (theme === 'glass') requestAnimationFrame(glassPill);
   if (theme !== 'green') { document.body.classList.remove('ghome-on'); home = false; stopHelix(); }
   if (theme === 'blades') { bladesOn(); return; }
   if (theme !== 'green') return;
@@ -1391,6 +1522,7 @@ $('#gmode').addEventListener('click', async () => {
 // ---- Blades (the glossy silver blades theme)
 const BLADES = [['torrents', 'Torrents'], ['add', 'Add'], ['settings', 'Settings']];
 const isBlades = () => !!(state && state.theme === 'blades');
+const isGlass = () => !!(state && state.theme === 'glass');
 let bstage = null, bcur = 0, bdrag = null;
 const contentEl = () => $('section.content');
 const ARROW = (d) => `<svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16"><path d="${d}" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
@@ -1575,8 +1707,21 @@ function go(p, keepHome) {
   if (isBlades()) bladesShow(p);
   else if (isGreen() && !(keepHome && home)) leaveHome(p);
   document.querySelectorAll('.mi').forEach((b) => b.setAttribute('aria-current', b.dataset.page === p ? 'page' : 'false'));
+  glassPill();
   ({ torrents: drawTorrents, add: drawAdd, settings: drawSettings })[p]();
 }
+
+// Liquid Glass: the sidebar's selection pill glides to the current item.
+function glassPill() {
+  const cur = document.querySelector('.side .mi[aria-current="page"]');
+  const nav = document.querySelector('.side nav.win');
+  if (!cur || !nav) return;
+  nav.style.setProperty('--sel-top', cur.offsetTop + 'px');
+  nav.style.setProperty('--sel-h', cur.offsetHeight + 'px');
+  nav.style.setProperty('--sel-left', cur.offsetLeft + 'px');
+  nav.style.setProperty('--sel-w', cur.offsetWidth + 'px');
+}
+addEventListener('resize', glassPill);
 
 document.querySelectorAll('.mi').forEach((b) => b.addEventListener('click', () => go(b.dataset.page)));
 async function togglePauseAll() { await doAction(state && state.userPaused ? 'resume-all' : 'pause-all'); refresh(); }

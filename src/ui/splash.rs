@@ -128,7 +128,9 @@ fn paint(p: &Painter, rect: Rect, t: f32, out: f32) {
 /// brushed silver for Blades.
 fn backdrop(p: &Painter, rect: Rect, out: f32) {
     let a = |c: Color32| c.gamma_multiply(out);
-    if ff::is_blades() {
+    if ff::is_glass() {
+        ff::paint_glass_backdrop(p, rect, out);
+    } else if ff::is_blades() {
         let mut mesh = egui::Mesh::default();
         mesh.colored_vertex(rect.left_top(), a(Color32::from_rgb(0xcf, 0xcf, 0xcf)));
         mesh.colored_vertex(rect.right_top(), a(Color32::from_rgb(0xf2, 0xf2, 0xf2)));
