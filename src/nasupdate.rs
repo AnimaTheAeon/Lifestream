@@ -66,9 +66,10 @@ pub fn status_json(auto: bool) -> Value {
         json!({
             "current": APP_VERSION,
             "version": latest.map(|r| r.version.clone()),
-            "page": latest.map(|r| r.page_url.clone()),
-            "spk": latest.and_then(|r| r.nas.as_ref().map(|a| a.url.clone())),
-            "installer": latest.and_then(|r| r.installer.as_ref().map(|a| a.url.clone())),
+            // Downloads go through Lifestream itself (`/lifestream/api/update-package`),
+            // so the page never shows where updates come from.
+            "spk": latest.map(|r| r.nas.is_some()).unwrap_or(false),
+            "installer": latest.map(|r| r.installer.is_some()).unwrap_or(false),
             "canInstall": can_install(),
             "auto": auto,
             "busy": s.busy.clone(),
@@ -83,7 +84,7 @@ pub fn status_json(auto: bool) -> Value {
     })
 }
 
-/// Asks GitHub for a newer release. Blocking.
+/// Asks the update server for a newer release. Blocking.
 fn check() -> Option<Release> {
     if with(|s| std::mem::replace(&mut s.checking, true)) {
         return None; // another check is running
@@ -107,7 +108,10 @@ fn check() -> Option<Release> {
 pub fn check_in_background() {
     std::thread::spawn(|| match check() {
         Some(r) => crate::applog::info(format!("Lifestream {} is available.", r.version)),
-        None => crate::applog::info(format!("Update check: Lifestream {APP_VERSION} is the newest.")),
+        None => match with(|s| s.error.clone()) {
+            Some(e) => crate::applog::warn(e),
+            None => crate::applog::info(format!("Update check: Lifestream {APP_VERSION} is the newest.")),
+        },
     });
 }
 
@@ -191,7 +195,7 @@ fn stage(release: &Release) -> Result<(), String> {
     let asset = release.nas.as_ref().ok_or("This release has no Synology package.")?;
     std::fs::create_dir_all(&dir).map_err(|e| format!("Couldn't create {}: {e}", dir.display()))?;
 
-    let mut resp = updater::client()?.get(&asset.url).send().map_err(|e| format!("Download failed: {e}"))?;
+    let mut resp = updater::client()?.get(&asset.url).send().map_err(|e| format!("Download failed: {}", e.without_url()))?;
     if !resp.status().is_success() {
         return Err(format!("Download failed: HTTP {}", resp.status().as_u16()));
     }
@@ -201,7 +205,7 @@ fn stage(release: &Release) -> Result<(), String> {
     let mut bytes = Vec::new();
     let mut buf = [0u8; 64 * 1024];
     loop {
-        let n = resp.read(&mut buf).map_err(|e| format!("Download failed: {e}"))?;
+        let n = resp.read(&mut buf).map_err(|_| "Download failed: the connection dropped. Try again.".to_string())?;
         if n == 0 {
             break;
         }
@@ -247,4 +251,33 @@ fn tar(args: &[&str]) -> Result<(), String> {
     } else {
         Err(format!("Couldn't unpack the package: {}", String::from_utf8_lossy(&out.stderr).trim()))
     }
+}
+
+/// The newest release's package (`spk`) or Windows installer, fetched by
+/// Lifestream so the page can offer it without linking anywhere else.
+/// Returns the file name and its bytes.
+pub fn fetch_package(kind: &str) -> Result<(String, Vec<u8>), String> {
+    let release = with(|s| s.latest.clone()).ok_or("No update found yet. Press Check now first.")?;
+    let asset = match kind {
+        "installer" => release.installer.as_ref(),
+        _ => release.nas.as_ref(),
+    }
+    .ok_or("This update doesn't have that download.")?;
+    let mut resp = updater::client()?.get(&asset.url).send().map_err(|e| format!("Download failed: {}", e.without_url()))?;
+    if !resp.status().is_success() {
+        return Err(format!("Download failed: HTTP {}", resp.status().as_u16()));
+    }
+    let mut bytes = Vec::new();
+    resp.read_to_end(&mut bytes).map_err(|_| "Download failed: the connection dropped. Try again.".to_string())?;
+    if let Some(expected) = &asset.sha256 {
+        let actual: String = Sha256::digest(&bytes).iter().map(|b| format!("{b:02x}")).collect();
+        if &actual != expected {
+            return Err("The download was corrupted (checksum mismatch). Try again.".into());
+        }
+    }
+    let name = match kind {
+        "installer" => format!("Lifestream-Setup-{}.exe", release.version),
+        _ => format!("Lifestream-{}-x86_64.spk", release.version),
+    };
+    Ok((name, bytes))
 }

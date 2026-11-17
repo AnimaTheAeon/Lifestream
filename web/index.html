@@ -736,7 +736,9 @@ function fillUpdateLink(link, long) {
       link.onclick = (e) => { e.preventDefault(); e.stopPropagation(); installUpdate(u.version); };
     } else {
       link.textContent = long ? `UPDATE ${u.version} READY` : `UPDATE ${u.version}`;
-      link.href = (state.headless ? u.spk : u.installer) || u.page; link.target = '_blank'; link.onclick = (e) => e.stopPropagation();
+      const kind = state.headless ? 'spk' : 'installer';
+      if (u[kind]) { link.href = '/lifestream/api/update-package?kind=' + kind; link.removeAttribute('target'); link.onclick = (e) => e.stopPropagation(); }
+      else { link.href = '#'; link.removeAttribute('target'); link.onclick = (e) => { e.preventDefault(); e.stopPropagation(); }; }
       link.title = state.headless ? 'Download the new package, then in Package Center choose Manual Install. Your torrents and settings are kept.' : 'Lifestream offers this update in its own window too.';
     }
   } else link.hidden = true;
@@ -1247,7 +1249,7 @@ async function drawSettings() {
       el('button', { class: 'btn', disabled: !!(u.busy || u.checking), onclick: () => doAction('update-check', 'Checking for updates…') }, 'Check now'),
       u.version && !u.busy ? (u.canInstall
         ? el('button', { class: 'btn primary', onclick: () => installUpdate(u.version) }, 'Update now')
-        : el('a', { class: 'btn', href: u.spk || u.page, target: '_blank', rel: 'noreferrer' }, 'Download package')) : null);
+        : (u.spk ? el('a', { class: 'btn', href: '/lifestream/api/update-package?kind=spk' }, 'Download package') : null)) : null);
     updBox.replaceChildren(el('span', { class: 'lbl' }, 'VERSION'), el('div', {}, el('div', { class: u.error && !u.version ? 'warn' : '', style: 'margin-bottom:8px' }, line), buttons));
   };
   drawSettings.drawUpdates();

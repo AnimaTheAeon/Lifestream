@@ -124,11 +124,11 @@ pub fn fetch_latest() -> Result<Option<Release>, String> {
         .get(url)
         .header("Accept", "application/vnd.github+json")
         .send()
-        .map_err(|e| format!("couldn't reach GitHub: {e}"))?;
+        .map_err(|_| "Couldn't reach the update server. Check the internet connection and try again.".to_string())?;
     if !resp.status().is_success() {
-        return Err(format!("GitHub returned HTTP {}", resp.status().as_u16()));
+        return Err(format!("The update server answered with an error (HTTP {}). Try again later.", resp.status().as_u16()));
     }
-    let json: serde_json::Value = resp.json().map_err(|e| e.to_string())?;
+    let json: serde_json::Value = resp.json().map_err(|_| "The update server sent an answer Lifestream couldn't read. Try again later.".to_string())?;
     Ok(parse_release(&json).filter(|r| is_newer(&r.version, APP_VERSION)))
 }
 
@@ -247,16 +247,16 @@ pub fn install_in_background(updater: Arc<Updater>, release: Release, ctx: efram
 
 #[cfg(feature = "gui")]
 fn download(asset: &Asset, updater: &Updater, ctx: &eframe::egui::Context) -> Result<Vec<u8>, String> {
-    let mut resp = client()?.get(&asset.url).send().map_err(|e| format!("Download failed: {e}"))?;
+    let mut resp = client()?.get(&asset.url).send().map_err(|e| format!("Download failed: {}", e.without_url()))?;
     if !resp.status().is_success() {
-        return Err(format!("Download failed: HTTP {}", resp.status()));
+        return Err(format!("Download failed: HTTP {}", resp.status().as_u16()));
     }
     let total = resp.content_length().unwrap_or(asset.size);
     updater.total.store(total, Ordering::SeqCst);
     let mut bytes = Vec::with_capacity(total as usize);
     let mut buf = [0u8; 64 * 1024];
     loop {
-        let n = resp.read(&mut buf).map_err(|e| format!("Download failed: {e}"))?;
+        let n = resp.read(&mut buf).map_err(|_| "Download failed: the connection dropped. Try again.".to_string())?;
         if n == 0 {
             break;
         }
@@ -314,7 +314,7 @@ fn replace_exe(exe: &Path, new_bytes: &[u8]) -> Result<(), String> {
     let _ = std::fs::remove_file(&old);
     if let Err(e) = std::fs::rename(exe, &old) {
         let _ = std::fs::remove_file(&staged);
-        return Err(format!("Windows wouldn't let Lifestream replace itself ({e}). Download it from the release page instead."));
+        return Err(format!("Windows wouldn't let Lifestream replace itself ({e}). Close Lifestream and try again."));
     }
     if let Err(e) = std::fs::rename(&staged, exe) {
         let _ = std::fs::rename(&old, exe);

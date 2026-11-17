@@ -6,8 +6,7 @@
 #endif
 #define MyAppName "Lifestream"
 #define MyAppExe "lifestream.exe"
-#define MyAppPublisher "AnimaTheAeon"
-#define MyAppURL "https://github.com/AnimaTheAeon/Lifestream"
+#define MyAppPublisher "Lifestream"
 
 [Setup]
 AppId={{6F3C2A9E-4B1D-4E7A-9C55-1A7E0F2B8D41}
@@ -15,9 +14,6 @@ AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppVerName={#MyAppName} {#MyAppVersion}
 AppPublisher={#MyAppPublisher}
-AppPublisherURL={#MyAppURL}
-AppSupportURL={#MyAppURL}/issues
-AppUpdatesURL={#MyAppURL}/releases
 ; Per-user install: no admin prompt, lands in %LOCALAPPDATA%\Programs\Lifestream.
 PrivilegesRequired=lowest
 DefaultDirName={autopf}\{#MyAppName}

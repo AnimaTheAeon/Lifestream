@@ -990,10 +990,13 @@ impl App {
                                 if ui.button("Later").clicked() {
                                     later = true;
                                 }
-                                if !r.page_url.is_empty() {
-                                    ui.hyperlink_to("What's new", &r.page_url);
-                                }
                             });
+                            if !r.notes.trim().is_empty() {
+                                ui.add_space(6.0);
+                                egui::CollapsingHeader::new("What's new").id_salt("upd-notes").show(ui, |ui| {
+                                    ui.add(egui::Label::new(RichText::new(r.notes.trim()).color(TEXT())).wrap());
+                                });
+                            }
                         }
                         State::Downloading(r) => {
                             ff::title(ui, &format!("Updating to v{}", r.version), 22.0, TEXT());
@@ -1026,7 +1029,7 @@ impl App {
                         State::Failed(e) => {
                             ff::title(ui, "Update didn't work", 22.0, ff::BAD());
                             ui.add(egui::Label::new(RichText::new(e).color(TEXT())).wrap());
-                            ui.label(dim("Nothing was changed. You can try again later or grab it from the releases page."));
+                            ui.label(dim("Nothing was changed. You can try again later."));
                             if ui.button("OK").clicked() {
                                 later = true;
                             }

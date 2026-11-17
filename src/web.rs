@@ -154,6 +154,19 @@ pub fn handle(core: &CoreHandle, mut req: Request, setup_only: bool) {
                 None => send_json(req, 400, json!({ "error": "Unknown action." })),
             }
         }
+        (Method::Get, "/lifestream/api/update-package") => {
+            let kind = if req.url().contains("kind=installer") { "installer" } else { "spk" };
+            match crate::nasupdate::fetch_package(kind) {
+                Ok((name, bytes)) => {
+                    let resp = Response::from_data(bytes)
+                        .with_header(header("Content-Type", "application/octet-stream"))
+                        .with_header(header("Content-Disposition", &format!("attachment; filename=\"{name}\"")))
+                        .with_header(header("Cache-Control", "no-store"));
+                    let _ = req.respond(resp);
+                }
+                Err(e) => send_json(req, 502, json!({ "error": e })),
+            }
+        }
         (Method::Get, "/lifestream/api/log") => {
             let lines: Vec<Value> = crate::applog::with_lines(|all| {
                 all.iter()
