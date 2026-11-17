@@ -7,6 +7,7 @@ mod backup;
 mod blocklist;
 mod core;
 mod engine;
+mod folder_match;
 mod instance;
 mod nasupdate;
 mod netif;

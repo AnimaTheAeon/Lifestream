@@ -91,6 +91,11 @@ pub fn handle(core: &CoreHandle, mut req: Request, setup_only: bool) {
             send_json(req, 200, json!({ "ok": true }))
         }
         _ if setup_only => send_json(req, 401, json!({ "error": "Set a username and password first." })),
+        // The folder picker: the folders inside one folder.
+        (Method::Get, "/lifestream/api/folders") => {
+            let wanted = req.url().split_once("?path=").map(|(_, p)| percent_decode(p)).unwrap_or_default();
+            send_json(req, 200, list_folders(&wanted))
+        }
         (Method::Get, "/lifestream/api/settings") => send_json(req, 200, settings_json(&Settings::load())),
         (Method::Put, "/lifestream/api/settings") => {
             let Some(body) = read_json(&mut req) else {
@@ -130,6 +135,10 @@ pub fn handle(core: &CoreHandle, mut req: Request, setup_only: bool) {
                 "update-blocklist" => Some(Cmd::UpdateBlocklist),
                 "recheck" => body["hash"].as_str().map(|h| Cmd::Recheck(h.to_string())),
                 "queue-top" => body["hash"].as_str().map(|h| Cmd::QueueTop(h.to_string())),
+                "move" => match (body["hash"].as_str(), body["path"].as_str()) {
+                    (Some(h), Some(p)) if p.trim().starts_with('/') => Some(Cmd::Move { hash: h.to_string(), path: p.trim().to_string() }),
+                    _ => None,
+                },
                 // Drag a download to a new queue spot (the page's drag to reorder).
                 "queue-set" => match (body["hash"].as_str(), body["pos"].as_i64()) {
                     (Some(h), Some(pos)) if pos >= 0 => Some(Cmd::QueueSet(h.to_string(), pos as i32)),
@@ -229,6 +238,8 @@ fn state(core: &CoreHandle, setup_only: bool) -> Value {
         "leakChecking": s.leak_checking,
         "toast": s.toast.as_ref().map(|t| t.0.clone()),
         "categories": settings.categories.iter().map(|c| c.name.clone()).collect::<Vec<_>>(),
+        "downloadDir": settings.download_dir,
+        "matchFolders": settings.match_folders,
         "adapters": adapters,
         "update": crate::nasupdate::status_json(settings.auto_update),
     })
@@ -241,6 +252,7 @@ fn settings_json(s: &Settings) -> Value {
         "categories": s.categories.iter().map(|c| json!({ "name": c.name, "path": c.path })).collect::<Vec<_>>(),
         "incomplete_enabled": s.incomplete_enabled,
         "incomplete_dir": s.incomplete_dir,
+        "match_folders": s.match_folders,
         "start_paused": s.start_paused,
         "dl_limit_kb": s.dl_limit_kb,
         "ul_limit_kb": s.ul_limit_kb,
@@ -300,6 +312,14 @@ fn apply_settings(b: &Value) -> Result<Settings, String> {
                 let path = c.get("path").and_then(Value::as_str).unwrap_or("").trim().to_string();
                 (!name.is_empty()).then_some(Category { name, path })
             })
+            .collect();
+    }
+    if let Some(list) = b.get("match_folders").and_then(Value::as_array) {
+        s.match_folders = list
+            .iter()
+            .filter_map(Value::as_str)
+            .map(|p| p.trim().trim_end_matches('/').to_string())
+            .filter(|p| !p.is_empty())
             .collect();
     }
     if let Some(v) = bool_of("incomplete_enabled") {
@@ -399,4 +419,47 @@ fn apply_settings(b: &Value) -> Result<Settings, String> {
         }
     }
     Ok(s)
+}
+
+fn percent_decode(s: &str) -> String {
+    let bytes = s.split('&').next().unwrap_or("").as_bytes();
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        match bytes[i] {
+            b'+' => out.push(b' '),
+            b'%' if i + 2 < bytes.len() => match u8::from_str_radix(std::str::from_utf8(&bytes[i + 1..i + 3]).unwrap_or(""), 16) {
+                Ok(b) => {
+                    out.push(b);
+                    i += 2;
+                }
+                Err(_) => out.push(b'%'),
+            },
+            b => out.push(b),
+        }
+        i += 1;
+    }
+    String::from_utf8_lossy(&out).into_owned()
+}
+
+/// Folders inside `path` (default: the NAS's shared folders), for the picker.
+fn list_folders(path: &str) -> Value {
+    let start = if path.trim().is_empty() {
+        if std::path::Path::new("/volume1").is_dir() { "/volume1".to_string() } else { "/".to_string() }
+    } else {
+        path.trim().to_string()
+    };
+    let dir = std::path::Path::new(&start);
+    let mut folders: Vec<String> = match std::fs::read_dir(dir) {
+        Ok(entries) => entries
+            .flatten()
+            .filter(|e| e.path().is_dir())
+            .map(|e| e.file_name().to_string_lossy().to_string())
+            .filter(|n| !n.starts_with('.') && !n.starts_with('@') && !n.starts_with('#'))
+            .collect(),
+        Err(e) => return json!({ "path": start, "error": format!("Can't open this folder: {e}"), "folders": [] }),
+    };
+    folders.sort_by_key(|n| n.to_lowercase());
+    let parent = dir.parent().map(|p| p.display().to_string());
+    json!({ "path": start, "parent": parent, "folders": folders })
 }

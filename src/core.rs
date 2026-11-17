@@ -41,6 +41,8 @@ pub enum Cmd {
     QueueTop(String),
     /// Move a torrent to this download-queue position (0 = top).
     QueueSet(String, i32),
+    /// Move a torrent's files to another folder.
+    Move { hash: String, path: String },
     FilePriority { hash: String, index: i32, priority: i32 },
     AddTracker(String, String),
     WatchFiles(Option<String>),
@@ -393,6 +395,10 @@ struct Meta {
     seed_rule_done: bool,
     #[serde(default)]
     stopped: bool,
+    /// Added with no folder and no name yet (a magnet without one): pick a
+    /// matching folder once the name arrives.
+    #[serde(default)]
+    match_pending: bool,
 }
 
 fn meta_path() -> PathBuf {
@@ -695,10 +701,30 @@ impl Core {
 
     // ---------------------------------------------------------------- adding
 
-    fn add_options(&self, category: &str, choice: AddChoice, picked: Option<String>) -> (AddOptions, Option<String>) {
-        let final_path = picked
-            .filter(|p| !p.trim().is_empty())
-            .unwrap_or_else(|| self.settings.path_for_category(category));
+    /// Where a new torrent goes: the folder picked for it, else its
+    /// category's folder, else a matching folder (by name), else the default.
+    fn destination(&self, category: &str, picked: Option<String>, name: Option<&str>) -> (String, bool) {
+        if let Some(p) = picked.filter(|p| !p.trim().is_empty()) {
+            return (p, false);
+        }
+        let has_category_folder =
+            self.settings.categories.iter().any(|c| c.name == category && !c.path.trim().is_empty());
+        if !has_category_folder && !self.settings.match_folders.is_empty() {
+            match name {
+                Some(n) => {
+                    if let Some(found) = crate::folder_match::find(&self.settings.match_folders, n) {
+                        applog::info(format!("Saving \"{n}\" in its matching folder {found}"));
+                        return (found, false);
+                    }
+                }
+                // No name yet: decide when it arrives.
+                None => return (self.settings.path_for_category(category), true),
+            }
+        }
+        (self.settings.path_for_category(category), false)
+    }
+
+    fn add_options(&self, choice: AddChoice, final_path: String) -> (AddOptions, Option<String>) {
         let (save_path, final_dest) = if self.settings.incomplete_enabled
             && !self.settings.incomplete_dir.trim().is_empty()
             && !choice.skip_check
@@ -736,7 +762,7 @@ impl Core {
     fn remember(&mut self, hash: &str, category: &str, final_path: Option<String>) {
         self.meta.insert(
             hash.to_string(),
-            Meta { category: category.to_string(), final_path, seed_rule_done: false, stopped: false },
+            Meta { category: category.to_string(), final_path, seed_rule_done: false, stopped: false, match_pending: false },
         );
         self.save_meta();
     }
@@ -756,10 +782,18 @@ impl Core {
     }
 
     fn add_magnet(&mut self, uri: &str, category: &str, choice: AddChoice, picked: Option<String>) -> Result<String, String> {
-        let (opts, final_path) = self.add_options(category, choice, picked);
+        let name = crate::folder_match::magnet_name(uri);
+        let (dest, pending) = self.destination(category, picked, name.as_deref());
+        let (opts, final_path) = self.add_options(choice, dest);
         let e = self.engine().ok_or("The torrent engine isn't running.")?;
         let hash = e.add_magnet(uri.trim(), &opts).map_err(|e| e.what().to_string())?;
         self.remember(&hash, category, final_path);
+        if pending {
+            if let Some(m) = self.meta.get_mut(&hash) {
+                m.match_pending = true;
+            }
+            self.save_meta();
+        }
         Ok(hash)
     }
 
@@ -771,7 +805,9 @@ impl Core {
         priorities: Option<Vec<u8>>,
         picked: Option<String>,
     ) -> Result<String, String> {
-        let (mut opts, final_path) = self.add_options(category, choice, picked);
+        let name = ffi::parse_torrent(data).ok().map(|p| p.name);
+        let (dest, _) = self.destination(category, picked, name.as_deref());
+        let (mut opts, final_path) = self.add_options(choice, dest);
         if let Some(p) = priorities {
             opts.use_priorities = true;
             opts.file_priorities = p;
@@ -923,6 +959,27 @@ impl Core {
                 if let Some(e) = self.engine() {
                     e.queue_top(&h)
                 }
+            }
+            Cmd::Move { hash, path } => {
+                let path = path.trim().to_string();
+                if path.is_empty() {
+                    return true;
+                }
+                if let Err(e) = std::fs::create_dir_all(&path) {
+                    self.toast(format!("Couldn't use {path}: {e}"));
+                    return true;
+                }
+                if let Some(e) = self.engine() {
+                    e.move_storage(&hash, &path);
+                }
+                // A later "finished" move would undo this one.
+                if let Some(m) = self.meta.get_mut(&hash) {
+                    m.final_path = None;
+                    m.match_pending = false;
+                }
+                self.save_meta();
+                applog::info(format!("Moving a download to {path}"));
+                self.toast(format!("Moving to {path}"));
             }
             Cmd::QueueSet(h, pos) => {
                 if let Some(e) = self.engine() {
@@ -1147,6 +1204,35 @@ impl Core {
         }
     }
 
+    /// A magnet added without a name now has one: move it to its matching
+    /// folder, if there is one. Nothing has downloaded yet, so it's instant.
+    fn place_by_name(&mut self, hash: &str) {
+        if !self.meta.get(hash).is_some_and(|m| m.match_pending) {
+            return;
+        }
+        if let Some(m) = self.meta.get_mut(hash) {
+            m.match_pending = false;
+        }
+        let name = self.engine().and_then(|e| e.torrents().into_iter().find(|t| t.hash == hash).map(|t| t.name));
+        let found = name.as_deref().and_then(|n| crate::folder_match::find(&self.settings.match_folders, n));
+        if let (Some(n), Some(dest)) = (name, found) {
+            applog::info(format!("Saving \"{n}\" in its matching folder {dest}"));
+            let separate = self.meta.get(hash).is_some_and(|m| m.final_path.is_some());
+            if separate {
+                // It finishes in the unfinished folder, then moves here.
+                if let Some(m) = self.meta.get_mut(hash) {
+                    m.final_path = Some(dest);
+                }
+            } else {
+                let _ = std::fs::create_dir_all(&dest);
+                if let Some(e) = self.engine() {
+                    e.move_storage(hash, &dest);
+                }
+            }
+        }
+        self.save_meta();
+    }
+
     fn handle_alert(&mut self, line: &str) {
         let mut parts = line.splitn(3, '|');
         let kind = parts.next().unwrap_or("");
@@ -1186,7 +1272,11 @@ impl Core {
                 }
             }
             "ERROR" => applog::error(msg),
-            "METADATA" | "MOVED" | "LOG" => applog::info(msg),
+            "METADATA" => {
+                applog::info(msg);
+                self.place_by_name(&hash);
+            }
+            "MOVED" | "LOG" => applog::info(msg),
             _ => {}
         }
     }

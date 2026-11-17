@@ -51,7 +51,7 @@ h2 { margin: 22px 0 8px; font-size: 18px; color: var(--label); letter-spacing: .
 .btn.danger { color: var(--bad); border-color: var(--bad); }
 .btn:disabled { opacity: .5; cursor: default; }
 .icon-btn { width: 36px; padding: 0; }
-input[type=text], input[type=password], input[type=number], select { min-height: 36px; padding: 0 10px; border: 1px solid #5a64a0; border-radius: 4px; background: var(--well); color: var(--text); text-shadow: none; }
+input[type=text], input[type=password], input[type=number], select, textarea { min-height: 36px; padding: 0 10px; border: 1px solid #5a64a0; border-radius: 4px; background: var(--well); color: var(--text); text-shadow: none; }
 input:focus, select:focus { outline: none; border-color: var(--light); box-shadow: 0 0 0 2px rgba(112,204,255,.4); }
 .t { display: grid; grid-template-columns: 48px minmax(0,1fr) 220px 120px auto; gap: 14px; align-items: center; padding: 10px; border-radius: 6px; }
 .t:hover { background: rgba(255,255,255,.05); }
@@ -134,7 +134,7 @@ body.green .btn:hover, body.green .btn:focus-visible { background: #286e10; bord
 body.green .btn:active:not(:disabled) { background: #96dc28; color: var(--on-accent); }
 body.green .btn.primary { background: linear-gradient(#e2ff6a, #8cc81c); border-color: #f2ff9a; color: var(--on-accent); }
 body.green .btn.primary:hover { background: linear-gradient(#f0ff9a, #a6e030); }
-body.green input[type=text], body.green input[type=password], body.green input[type=number], body.green select { border-color: var(--mid); }
+body.green input[type=text], body.green input[type=password], body.green input[type=number], body.green select, body.green textarea { border-color: var(--mid); border-radius: 1px; }
 body.green input:focus, body.green select:focus { border-color: var(--light); box-shadow: 0 0 0 2px rgba(170, 255, 60, .35); }
 body.green .field input[type=checkbox] { accent-color: #96dc28; }
 body.green .segs { border-color: var(--mid); }
@@ -295,6 +295,7 @@ body.calm .bpanel::before { animation: none; }
 .bbody .btn.danger { color: #ffd2c8; border-color: rgba(255, 190, 175, .7); }
 .bbody .btn.saved, .bbody .btn.saved:hover { background: linear-gradient(180deg, rgba(220, 255, 200, .6), rgba(150, 230, 120, .3)); border-color: rgba(230, 255, 210, .9); color: #ffffff; }
 .bbody .icon-btn { width: 38px; padding: 0; border-radius: 50%; }
+.bbody textarea { border: 1px solid rgba(255, 255, 255, .45); border-radius: 16px; padding: 8px 16px; background: rgba(0, 0, 0, .22); color: #ffffff; text-shadow: none; }
 .bbody input[type=text], .bbody input[type=password], .bbody input[type=number], .bbody select { min-height: 38px; border: 1px solid rgba(255, 255, 255, .45); border-radius: 19px; padding: 0 16px; background: rgba(0, 0, 0, .22); color: #ffffff; text-shadow: none; }
 .bbody input::placeholder { color: rgba(255, 255, 255, .6); }
 .bbody input:focus, .bbody select:focus { border-color: #ffffff; box-shadow: 0 0 0 2px rgba(255, 255, 255, .35); }
@@ -373,6 +374,32 @@ body.blades .t.drag-ghost { background: linear-gradient(180deg, rgba(255, 255, 2
 .dropline::before, .dropline::after { position: absolute; top: -4px; width: 11px; height: 11px; border-radius: 50%; content: ''; background: var(--dropline); }
 .dropline::before { left: -5px; } .dropline::after { right: -5px; }
 body.dragging-row, body.dragging-row * { cursor: grabbing !important; user-select: none; }
+
+/* ---- Folder picker (all three themes) */
+.fp { position: fixed; inset: 0; z-index: 80; display: flex; align-items: center; justify-content: center; background: rgba(0, 0, 0, .45); opacity: 0; transition: opacity .4s ease; }
+.fp.on { opacity: 1; }
+.fpcard { width: min(560px, calc(100vw - 32px)); max-height: min(620px, calc(100vh - 40px)); display: flex; flex-direction: column; gap: 10px; padding: 20px 22px; }
+.fpcard h2 { margin: 0; }
+.fppath { display: flex; gap: 8px; }
+.fppath input { flex: 1; min-width: 0; }
+.fplist { flex: 1; min-height: 160px; overflow: auto; border: 1px solid var(--dark); border-radius: 8px; background: var(--well); padding: 4px; }
+.fplist button { display: block; width: 100%; text-align: left; padding: 7px 12px; border: 0; border-radius: 6px; background: none; color: inherit; font: inherit; font-weight: 700; cursor: pointer; }
+.fplist button:hover, .fplist button:focus-visible { background: rgba(255, 255, 255, .12); outline: none; }
+.fplist .fpup { color: var(--dim); }
+.fplist .empty { padding: 10px 12px; color: var(--dim); }
+.fpacts { display: flex; gap: 8px; justify-content: flex-end; }
+.fpacts .fpnote { margin-right: auto; align-self: center; font-size: 13px; color: var(--dim); }
+.folder-line { display: flex; gap: 8px; }
+.folder-line input { flex: 1; min-width: 0; }
+textarea.folders { width: 100%; min-height: 76px; padding: 8px 10px; resize: vertical; font: inherit; line-height: 1.5; }
+body.green .fplist { border-radius: 0; background: #000e00; border-color: #0c3406; }
+body.green .fplist button { border-radius: 0; }
+body.green .fplist button:hover, body.green .fplist button:focus-visible { background: rgba(160, 255, 80, .14); }
+body.blades .fp { background: rgba(40, 40, 48, .28); }
+body.blades .fpcard { background: rgba(28, 24, 40, .92); border: 1px solid rgba(255, 255, 255, .55); border-radius: 22px; box-shadow: 0 10px 30px rgba(0, 0, 0, .4), inset 0 1px 0 rgba(255, 255, 255, .25); color: #ffffff; }
+body.blades .fplist { border-radius: 14px; background: rgba(0, 0, 0, .25); border-color: rgba(255, 255, 255, .3); }
+body.blades .fplist button { border-radius: 12px; }
+body.blades .fplist button:hover, body.blades .fplist button:focus-visible { background: rgba(255, 255, 255, .16); }
 </style>
 </head>
 <body>
@@ -696,6 +723,7 @@ function torrentRow(t) {
         el('span', {}, el('span', { class: 'lbl' }, 'RATIO '), (t.uploadRatio || 0).toFixed(2)),
         t.labels && t.labels.length ? el('span', {}, el('span', { class: 'lbl' }, 'CAT '), t.labels[0]) : null,
         el('span', {}, el('span', { class: 'lbl' }, 'PEERS '), t.peersConnected),
+        t.downloadDir ? el('span', { title: t.downloadDir }, el('span', { class: 'lbl' }, 'IN '), t.downloadDir.split('/').filter(Boolean).slice(-2).join('/')) : null,
         t.errorString ? el('span', { class: 'bad' }, t.errorString) : null)),
     el('div', { class: 'gauge' },
       // Like the Windows app: no speed or time left while paused or held.
@@ -705,6 +733,7 @@ function torrentRow(t) {
     el('div', { class: 'tagcell' }, el('span', { class: 'tag ' + cls }, word)),
     el('div', { class: 'acts' },
       el('button', { class: 'btn icon-btn', title: paused ? 'Resume' : 'Pause', 'aria-label': (paused ? 'Resume ' : 'Pause ') + t.name, onclick: act(paused ? 'torrent-start' : 'torrent-stop') }, paused ? '▶' : '❚❚'),
+      el('button', { class: 'btn icon-btn', title: 'Move to another folder', 'aria-label': 'Move ' + t.name, onclick: () => moveDialog(t) }, '⇢'),
       el('button', { class: 'btn icon-btn danger', title: 'Remove', 'aria-label': 'Remove ' + t.name, onclick: () => removeDialog(t) }, '✕')));
   if (canMove) row.addEventListener('pointerdown', (e) => rowDragStart(e, row, t));
   return row;
@@ -812,6 +841,53 @@ async function rowDragEnd(e) {
   refresh();
 }
 
+
+// ---- Folder picker: walk the NAS's folders and pick one. Resolves to the
+// chosen path, or null if cancelled.
+function pickFolder(start, title = 'Choose a folder') {
+  return new Promise((resolve) => {
+    const pathIn = el('input', { type: 'text', 'aria-label': 'Folder path' });
+    const list = el('div', { class: 'fplist', role: 'list' });
+    const note = el('span', { class: 'fpnote' });
+    let cur = '';
+    const box = el('div', { class: 'fp', role: 'dialog', 'aria-modal': 'true', 'aria-label': title });
+    const close = (val) => { box.classList.remove('on'); document.removeEventListener('keydown', onKey, true); setTimeout(() => box.remove(), 400); resolve(val); };
+    const onKey = (e) => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(null); } };
+    async function open(path) {
+      list.replaceChildren(el('div', { class: 'empty' }, 'Loading…'));
+      let r;
+      try { r = await api('folders?path=' + encodeURIComponent(path || '')); } catch (e) { list.replaceChildren(el('div', { class: 'empty' }, e.message)); return; }
+      cur = r.path; pathIn.value = r.path;
+      note.textContent = r.error || '';
+      const items = [];
+      if (r.parent && r.path !== '/') items.push(el('button', { class: 'fpup', onclick: () => open(r.parent) }, '↑ Up a level'));
+      for (const f of r.folders) items.push(el('button', { onclick: () => open((r.path === '/' ? '' : r.path) + '/' + f) }, '📁  ' + f));
+      if (!r.folders.length && !r.error) items.push(el('div', { class: 'empty' }, 'No folders inside this one.'));
+      list.replaceChildren(...items);
+    }
+    pathIn.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); open(pathIn.value.trim()); } });
+    box.append(el('div', { class: 'win fpcard' },
+      el('h2', {}, title),
+      el('div', { class: 'fppath' }, pathIn, el('button', { class: 'btn', onclick: () => open(pathIn.value.trim()) }, 'Go')),
+      list,
+      el('div', { class: 'fpacts' }, note,
+        el('button', { class: 'btn', onclick: () => close(null) }, 'Cancel'),
+        el('button', { class: 'btn primary', onclick: () => close((pathIn.value.trim() || cur).replace(/\/+$/, '') || '/') }, 'Use this folder'))));
+    box.addEventListener('pointerdown', (e) => { if (e.target === box) close(null); });
+    document.body.append(box);
+    document.addEventListener('keydown', onKey, true);
+    requestAnimationFrame(() => box.classList.add('on'));
+    open(start);
+  });
+}
+
+async function moveDialog(t) {
+  const dest = await pickFolder(t.downloadDir, `Move "${t.name}" to…`);
+  if (!dest || dest === t.downloadDir) return;
+  try { await api('action', 'POST', { action: 'move', hash: t.hashString, path: dest }); toast('Moving to ' + dest); setTimeout(refresh, 800); }
+  catch (e) { toast("Couldn't move: " + e.message, true); }
+}
+
 async function removeDialog(t) {
   if (!confirm(`Remove "${t.name}" from Lifestream?`)) return;
   const del = confirm('Also delete its downloaded files?\n\nOK = delete files, Cancel = keep files');
@@ -855,7 +931,11 @@ function drawAdd() {
   const paused = el('input', { type: 'checkbox', id: 'apause' });
   const magnet = el('input', { type: 'text', id: 'amag', placeholder: 'magnet:?xt=… or https://…/file.torrent', style: 'width:100%' });
   const fileIn = el('input', { type: 'file', accept: '.torrent', multiple: true, id: 'afile', class: 'sr' });
-  const opts = () => ({ paused: paused.checked });
+  const saveTo = el('input', { type: 'text', id: 'asave', placeholder: 'Automatic', style: 'width:100%' });
+  const opts = () => ({ paused: paused.checked, ...(saveTo.value.trim() ? { 'download-dir': saveTo.value.trim() } : {}) });
+  const autoHelp = () => (state && state.matchFolders && state.matchFolders.length)
+    ? `Leave empty and Lifestream looks for a folder named like the torrent in ${state.matchFolders.join(', ')}; if none matches, it goes to ${state.downloadDir}.`
+    : `Leave empty to use ${state ? state.downloadDir : 'the download folder'}. To have torrents go to a folder named like them (Ubuntu → /volume1/OS/Ubuntu), add Matching folders in Settings.`;
   async function addFiles(files) {
     for (const f of files) {
       const buf = new Uint8Array(await f.arrayBuffer());
@@ -872,6 +952,9 @@ function drawAdd() {
   $('#page').replaceChildren(el('div', { class: 'scroll' },
     el('h1', {}, 'Add'),
     el('div', { class: 'field' }, el('label', { class: 'lbl', for: 'amag' }, 'MAGNET LINK OR URL'), magnet),
+    el('div', { class: 'field' }, el('label', { class: 'lbl', for: 'asave' }, 'SAVE TO'),
+      el('div', { class: 'folder-line' }, saveTo, el('button', { class: 'btn', onclick: async () => { const p = await pickFolder(saveTo.value.trim() || (state && state.downloadDir)); if (p) saveTo.value = p; } }, 'Browse…')),
+      el('div', { class: 'help' }, autoHelp())),
     el('div', { class: 'field' }, el('label', { class: 'lbl', for: 'apause' }, 'ADD PAUSED'), el('div', {}, paused)),
     el('div', { style: 'display:flex;gap:8px;margin:10px 0' }, el('button', { class: 'btn primary', onclick: async () => {
       const v = magnet.value.trim(); if (!v) return magnet.focus();
@@ -892,6 +975,16 @@ async function drawSettings() {
   const adapterSel = (v.adapter = el('select', { id: 'f-adapter' }, el('option', { value: '' }, 'Any (not bound)'), ...adapters.map((a) => el('option', { value: a.name, selected: a.name === s.adapter }, a.label + (a.vpn ? '  (VPN)' : '')))));
   const seedSel = (v.seed_action = el('select', { id: 'f-seed_action' }, ...[['pause', 'Pause it'], ['remove', 'Remove it (keep files)'], ['remove-delete', 'Remove it and delete files']].map(([val, t]) => el('option', { value: val, selected: s.seed_action === val }, t))));
   const encSel = (v.encryption = el('select', { id: 'f-encryption' }, ...[[0, 'Allow'], [1, 'Prefer'], [2, 'Require']].map(([val, t]) => el('option', { value: val, selected: s.encryption === val }, t))));
+  const matchBox = (v.match_folders = el('textarea', { id: 'f-match_folders', class: 'folders', rows: 3, placeholder: '/volume1/OS' }, (s.match_folders || []).join('\n')));
+  // A Browse button that fills a field (or adds a line to the list).
+  const browseInto = (target, append, label = 'Browse…') => el('button', { class: 'btn', type: 'button', onclick: async () => {
+    const box = target();
+    const lines = box.value.split('\n').map((x) => x.trim()).filter(Boolean);
+    const p = await pickFolder(append ? (lines[lines.length - 1] || '') : box.value.trim());
+    if (!p) return;
+    box.value = append ? [...lines.filter((x) => x !== p), p].join('\n') : p;
+    box.dispatchEvent(new Event('input', { bubbles: true }));
+  } }, label);
   const pass = el('input', { type: 'password', id: 'f-rpc_password', placeholder: s.rpc_password_set ? '(unchanged)' : '', autocomplete: 'new-password' });
 
   // The Save button says what happened: "Unsaved changes" once something is
@@ -922,6 +1015,7 @@ async function drawSettings() {
       else if (k === 'encryption') body[k] = Number(c.value);
       else body[k] = c.value;
     }
+    body.match_folders = String(body.match_folders || '').split('\n').map((x) => x.trim()).filter(Boolean);
     if (pass.value) body.rpc_password = pass.value;
     body.advanced_mode = advanced;
     saveBtn.disabled = true; saveBtn.textContent = 'Saving…';
@@ -991,7 +1085,10 @@ async function drawSettings() {
 
   body.append(
       el('h2', {}, 'FOLDERS'),
-      field('download_dir', 'DOWNLOAD FOLDER', text('download_dir', { style: 'width:100%' }), 'Where downloads are saved. In Docker this is a folder inside a mounted volume, like /downloads/Lifestream.'),
+      field('download_dir', 'DOWNLOAD FOLDER', el('div', { class: 'folder-line' }, text('download_dir'), browseInto(() => v.download_dir, false)),
+        'Where downloads go when nothing else decides. On the NAS, pick a shared folder like /volume1/Downloads.'),
+      field('match_folders', 'MATCHING FOLDERS', el('div', {}, matchBox, el('div', { style: 'margin-top:6px' }, browseInto(() => matchBox, true, 'Add a folder…'))),
+        'One per line. When a torrent is added without a folder, Lifestream looks in these (and one level further in) for a folder whose name is in the torrent\'s name, and saves it there: with /volume1/OS listed, "ubuntu-24.04-desktop.iso" goes to /volume1/OS/Ubuntu. No match: the download folder.'),
       adv(field('incomplete_enabled', 'KEEP UNFINISHED SEPARATE', check('incomplete_enabled')),
         field('incomplete_dir', 'UNFINISHED FOLDER', text('incomplete_dir', { style: 'width:100%' }))),
       el('h2', {}, 'VPN'),

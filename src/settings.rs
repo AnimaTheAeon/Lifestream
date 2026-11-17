@@ -98,6 +98,8 @@ pub struct Settings {
     pub categories: Vec<Category>,
     pub incomplete_enabled: bool,
     pub incomplete_dir: String,
+    /// Folders to look in for one named like the torrent (see folder_match).
+    pub match_folders: Vec<String>,
     /// The folder picked the last time a torrent was added.
     pub last_save_dir: String,
 
@@ -198,6 +200,7 @@ impl Default for Settings {
             theme: "ff".into(),
             download_dir: dl.clone(),
             categories: Vec::new(),
+            match_folders: Vec::new(),
             incomplete_enabled: false,
             incomplete_dir: PathBuf::from(&dl).join("Incomplete").display().to_string(),
             last_save_dir: String::new(),
