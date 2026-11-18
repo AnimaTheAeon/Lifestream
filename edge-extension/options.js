@@ -8,7 +8,7 @@ function applyLook(look) {
   placePill();
 }
 
-// Liquid Glass: the selection pill glides under the picked look.
+// Dark Glass: the selection pill glides under the picked look.
 function placePill() {
   const seg = document.querySelector(".seg");
   const on = seg && seg.querySelector('button[aria-pressed="true"]');

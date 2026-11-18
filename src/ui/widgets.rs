@@ -71,7 +71,7 @@ pub fn page_title(ui: &mut Ui, title: &str, subtitle: &str) {
     ff::divider(ui);
 }
 
-/// Gold section heading (a small gray caption in the glass look, like iOS).
+/// Gold section heading (a small gray caption in the glass look, like a settings list).
 pub fn section(ui: &mut Ui, text: &str) {
     ui.add_space(8.0);
     if ff::is_glass() {
@@ -153,7 +153,7 @@ pub fn toggle_labeled(ui: &mut Ui, value: &mut bool, on: &str, off: &str) -> boo
     clicked
 }
 
-/// iOS switch: a green capsule when on, gray when off, with a white knob
+/// Toggle switch: a green capsule when on, gray when off, with a white knob
 /// that glides across.
 fn ios_switch(ui: &mut Ui, value: &mut bool) -> bool {
     let size = egui::vec2(51.0, 31.0);
@@ -268,7 +268,7 @@ pub fn pill(ui: &mut Ui, text: &str, selected: bool) -> egui::Response {
         (false, false) => Color32::from_rgb(12, 20, 72),
     };
     let fill = if selected && !green { Color32::from_rgb(60, 100, 200) } else { fill };
-    // Blades and Liquid Glass: glass pills.
+    // Blades and Dark Glass: glass pills.
     let (color, fill) = if ff::is_glass() {
         (if selected { Color32::WHITE } else { Color32::from_rgb(210, 210, 218) }, Color32::from_rgba_unmultiplied(118, 118, 128, if selected { 140 } else { 50 }))
     } else if ff::is_blades() {

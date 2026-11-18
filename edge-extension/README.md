@@ -23,7 +23,7 @@ your TV and Movies folders.
   sends with Retry.
 - A small notice in the corner of the page says whether it was sent, was
   already in Lifestream, or couldn't be sent.
-- Four looks: FFVII menu, Xbox, Blades and Liquid Glass.
+- Four looks: FFVII menu, Xbox, Blades and Dark Glass.
 
 ## Install
 

@@ -92,7 +92,7 @@ body.green .btn.saved, body.green .btn.saved:hover { background: linear-gradient
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 
 /* =====================================================================
-   Box of X: the green console-dashboard theme. Everything hangs off body.green.
+   Xbox: the green console-dashboard theme. Everything hangs off body.green.
    ===================================================================== */
 @font-face { font-family: Orbitron; font-weight: 800; src: url('/fonts/orbitron-800.ttf') format('truetype'); }
 #gbg, #ghome, #gbar, #gfoot, .gonly { display: none; }
@@ -402,7 +402,7 @@ body.blades .fplist button { border-radius: 12px; }
 body.blades .fplist button:hover, body.blades .fplist button:focus-visible { background: rgba(255, 255, 255, .16); }
 
 /* =====================================================================
-   Liquid Glass (dark): frosted panels over a dark, softly lit backdrop.
+   Dark Glass (dark): frosted panels over a dark, softly lit backdrop.
    Everything hangs off body.glass. Springs: cubic-bezier(.32,.72,0,1).
    ===================================================================== */
 html:has(body.glass) { background: #04050a; }
@@ -458,7 +458,7 @@ body.glass .icon-btn { width: 38px; padding: 0; }
 body.glass .btn.saved, body.glass .btn.saved:hover { background: var(--good); color: #fff; }
 body.glass #pause-all { color: var(--text) !important; }
 
-/* Fields: tinted capsules; checkboxes become iOS switches. */
+/* Fields: tinted capsules; checkboxes become toggle switches. */
 body.glass input[type=text], body.glass input[type=password], body.glass input[type=number], body.glass select, body.glass textarea { min-height: 38px; padding: 0 16px; border: 0; border-radius: 19px; background: var(--well); color: var(--text); font-weight: 500; }
 body.glass textarea { padding: 9px 16px; border-radius: 16px; }
 body.glass select { padding-right: 34px; -webkit-appearance: none; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%23ebebf5' stroke-opacity='.6' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 14px center; }
@@ -641,7 +641,7 @@ body.glass.calm #page > *, body.glass.calm .mi, body.glass.calm .btn, body.glass
 </svg>
 
 
-<!-- Box of X: background grid and the home screen. -->
+<!-- Xbox: background grid and the home screen. -->
 <svg id="gbg" preserveAspectRatio="none" aria-hidden="true"></svg>
 <div id="ghome">
   <div class="bigorb" id="bigorb" aria-hidden="true"></div>
@@ -722,7 +722,7 @@ function badge(kind) {
 }
 function toast(text, bad) { const t = $('#toast'); t.textContent = text; t.classList.toggle('bad', !!bad); t.style.display = 'block'; clearTimeout(toast.t); toast.t = setTimeout(() => t.style.display = 'none', bad ? 8000 : 3500); }
 // Run an action; say so when it works, and always say why when it doesn't.
-// The UPDATE link in the status bar (FFVII menu) or status box (Box of X).
+// The UPDATE link in the status bar (FFVII menu) or status box (Xbox).
 function fillUpdateLink(link, long) {
   const u = (state && state.update) || {};
   if (u.busy) {
@@ -1230,7 +1230,7 @@ async function drawSettings() {
   const logBox = el('div', { class: 'log logbox' });
   // The theme switches and saves at once.
   const themeSegs = el('div', { class: 'segs', role: 'group', 'aria-label': 'Theme' });
-  const drawThemeSegs = () => themeSegs.replaceChildren(...[['ff', 'FFVII Menu'], ['green', 'Xbox'], ['blades', 'Blades'], ['glass', 'Liquid Glass']].map(([val, label]) =>
+  const drawThemeSegs = () => themeSegs.replaceChildren(...[['ff', 'FFVII Menu'], ['green', 'Xbox'], ['blades', 'Blades'], ['glass', 'Dark Glass']].map(([val, label]) =>
     el('button', { class: 'seg', 'aria-pressed': String((state && state.theme) === val), onclick: async () => {
       if (state.theme === val) return;
       const was = state.theme;
@@ -1330,7 +1330,7 @@ async function drawSettings() {
   if (advanced) loadLog();
 }
 
-// ---- Box of X (green console-dashboard theme)
+// ---- Xbox (green console-dashboard theme)
 const MENU = [['torrents', 'Torrents'], ['add', 'Add'], ['settings', 'Settings']];
 const isGreen = () => !!(state && state.theme === 'green');
 let home = false, cursor = 0, themeShown = null, zooming = false;
@@ -1353,7 +1353,7 @@ function applyTheme(stay) {
   if (theme !== 'green') return;
   drawGreenTabs();
   if (state) { const [k, t, d] = overall(); drawGreenStatus(k, t, d); }
-  // Box of X opens on its home screen.
+  // Xbox opens on its home screen.
   if (stay) leaveHome(page); else goHome();
 }
 
@@ -1766,7 +1766,7 @@ function go(p, keepHome) {
   ({ torrents: drawTorrents, add: drawAdd, settings: drawSettings })[p]();
 }
 
-// Liquid Glass: the sidebar's selection pill glides to the current item.
+// Dark Glass: the sidebar's selection pill glides to the current item.
 function glassPill() {
   const cur = document.querySelector('.side .mi[aria-current="page"]');
   const nav = document.querySelector('.side nav.win');

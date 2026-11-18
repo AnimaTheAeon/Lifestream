@@ -85,7 +85,7 @@ impl App {
             });
         });
         let opener = if ff::is_green() {
-            // Box of X easter egg.
+            // Xbox easter egg.
             "Downloading now. No Gold membership required, and no red rings."
         } else if ff::is_glass() {
             "Your downloads."
@@ -1552,7 +1552,7 @@ impl App {
                 changed |= w::toggle_labeled(ui, &mut s.advanced_mode, "ADVANCED", "SIMPLE");
             });
             row(ui, "Theme", "", |ui| {
-                // Right-to-left row: list in reverse so they read FFVII, Xbox, Blades, Liquid Glass.
+                // Right-to-left row: list in reverse so they read FFVII, Xbox, Blades, Dark Glass.
                 for theme in [ff::Theme::Glass, ff::Theme::Blades, ff::Theme::GreenDash, ff::Theme::FfMenu] {
                     let selected = ff::theme() == theme;
                     let mut text = RichText::new(theme.label()).strong();

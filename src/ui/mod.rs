@@ -689,7 +689,7 @@ impl App {
         let advanced = self.settings.advanced_mode;
         let items: Vec<_> = MENU.iter().filter(|m| advanced || !m.2).collect();
 
-        // Liquid Glass puts the sidebar on the left, like an iPad app.
+        // Dark Glass puts the sidebar on the left, like a tablet app.
         let main = if glass {
             Rect::from_min_max(pos2(full.left() + side_w + gap, full.top()), full.max)
         } else {

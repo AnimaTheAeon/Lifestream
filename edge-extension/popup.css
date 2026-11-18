@@ -57,7 +57,7 @@ body.look-blades{height:560px;overflow:hidden}
 .opts select{min-height:30px;padding:0 8px;font:inherit;font-size:13px}
 .opts .chk{margin-left:auto}
 
-/* Liquid Glass */
+/* Dark Glass */
 body.look-glass{padding:10px}
 .look-glass .main{gap:14px}
 .look-glass .status #stTitle{font-weight:600}
@@ -67,7 +67,7 @@ body.look-glass{padding:10px}
 .look-glass .status.bad #nums{color:#ff8f88}
 .look-glass .add{gap:10px}
 .look-glass .box>.lbl{margin-top:4px}
-/* Recent: an inset grouped list with hairlines, like iOS. */
+/* Recent: an inset grouped list with hairlines, like a settings list. */
 .look-glass .recent{gap:0;padding:0 14px;border-radius:18px;background:rgba(255,255,255,.05);box-shadow:inset 0 1px 0 rgba(255,255,255,.1)}
 .look-glass .recent .item,.look-glass .recent .empty{display:flex;gap:10px;padding:10px 0}
 .look-glass .recent .item+.item{border-top:.5px solid var(--lg-line)}
