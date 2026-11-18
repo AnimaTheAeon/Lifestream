@@ -274,8 +274,15 @@ fn torrent_json(i: usize, t: &TorrentView) -> Value {
         "isFinished": done && (t.seed_goal_met || (t.info.paused && !t.info.auto_managed)),
         "isPrivate": t.info.is_private,
         "uploadRatio": t.ratio,
-        "seedRatioLimit": 0,
-        "seedRatioMode": 0,
+        // Midgar and Turks remove a finished download (files too) once it is
+        // stopped and has reached its sharing limit. Lifestream's own goal
+        // (Settings › Seeding) decides that, so report it the way Transmission
+        // would: goal met = a per-torrent ratio limit it has reached; not yet =
+        // no limit. Without this they never saw anything as finished.
+        "seedRatioLimit": if t.seed_goal_met { if t.ratio.is_finite() { t.ratio.max(0.0) } else { 0.0 } } else { 0.0 },
+        "seedRatioMode": if t.seed_goal_met { 1 } else { 2 },
+        "seedIdleLimit": 0,
+        "seedIdleMode": 2,
         "secondsSeeding": t.info.seeding_secs,
         "secondsDownloading": (t.info.active_secs - t.info.seeding_secs).max(0),
         "addedDate": t.info.added_time,
