@@ -1,4 +1,5 @@
 #pragma once
+#include <chrono>
 #include <map>
 #include <memory>
 #include <set>
@@ -78,6 +79,9 @@ private:
   int listen_port_ = 0;
   int external_port_ = 0;
   std::string listen_error_;
+  // DHT contacts the engine currently knows (asked for every ~10 s); 0 when offline.
+  int dht_nodes_ = 0;
+  std::chrono::steady_clock::time_point dht_asked_{};
 };
 
 std::unique_ptr<Engine> new_engine(const LtSettings &s, bool enable_pex, rust::Str state_dir, bool start_paused);

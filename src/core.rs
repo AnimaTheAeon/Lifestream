@@ -1357,7 +1357,9 @@ impl Core {
         let (prev_dl, prev_ul) = self.snap.lock().map(|s| (s.dl_rate, s.ul_rate)).unwrap_or((0, 0));
         // LIFESTREAM_ASSUME_ONLINE=1 is for testing on a machine without internet.
         let assume_online = std::env::var("LIFESTREAM_ASSUME_ONLINE").is_ok_and(|v| v == "1");
-        let net_ok = !self.kill_hold && !self.user_paused && (assume_online || totals.dht_nodes > 0 || prev_dl > 0 || prev_ul > 0);
+        // Signs the network works: DHT contacts, any peer connected to anything, or traffic.
+        let any_peers = infos.iter().any(|i| i.num_peers > 0);
+        let net_ok = !self.kill_hold && !self.user_paused && (assume_online || totals.dht_nodes > 0 || any_peers || prev_dl > 0 || prev_ul > 0);
         let now = Instant::now();
         self.stall.retain(|h, _| infos.iter().any(|i| &i.hash == h));
         for info in infos {

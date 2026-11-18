@@ -560,7 +560,7 @@ EngineTotals Engine::totals() const {
   t.listen_port = listen_port_;
   t.external_port = external_port_;
   t.listen_error = rs(listen_error_);
-  t.dht_nodes = 0;
+  t.dht_nodes = dht_nodes_;
   return t;
 }
 
@@ -591,9 +591,21 @@ void Engine::save_session_state() {
 
 rust::Vec<rust::String> Engine::pop_alerts() {
   rust::Vec<rust::String> out;
+  auto now = std::chrono::steady_clock::now();
+  if (now - dht_asked_ > std::chrono::seconds(10)) {
+    dht_asked_ = now;
+    if (ses_->is_dht_running()) ses_->post_dht_stats();
+    else dht_nodes_ = 0;
+  }
   std::vector<lt::alert *> alerts;
   ses_->pop_alerts(&alerts);
   for (lt::alert *a : alerts) {
+    if (auto *ds = lt::alert_cast<lt::dht_stats_alert>(a)) {
+      int n = 0;
+      for (const auto &bucket : ds->routing_table) n += bucket.num_nodes;
+      dht_nodes_ = n;
+      continue;
+    }
     if (auto *r = lt::alert_cast<lt::save_resume_data_alert>(a)) {
       write_resume(r->params);
       if (pending_saves_ > 0) pending_saves_--;
