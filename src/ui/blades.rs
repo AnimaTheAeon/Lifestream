@@ -324,7 +324,7 @@ impl App {
 
         // ---- Input
         let typing = ctx.egui_wants_keyboard_input();
-        let dialog = self.confirm_remove.is_some() || self.add_open || self.popup.is_some();
+        let dialog = self.confirm_remove.is_some() || self.confirm_remove_all || self.add_open || self.popup.is_some();
         let (left, right, esc, back) = ui.input(|i| {
             (i.key_pressed(Key::ArrowLeft), i.key_pressed(Key::ArrowRight), i.key_pressed(Key::Escape), i.pointer.button_pressed(egui::PointerButton::Extra1))
         });
@@ -338,7 +338,9 @@ impl App {
         }
         // Esc and the mouse's back button step out one level: a dialog, the files pop-up, then the blade.
         if (esc && !typing) || back {
-            if self.confirm_remove.is_some() {
+            if self.confirm_remove_all {
+                self.confirm_remove_all = false;
+            } else if self.confirm_remove.is_some() {
                 self.confirm_remove = None;
             } else if self.add_open {
                 // The Add window closes itself on Esc.

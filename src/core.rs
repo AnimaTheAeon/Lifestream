@@ -47,6 +47,8 @@ pub enum Cmd {
     AddTracker(String, String),
     WatchFiles(Option<String>),
     PauseAll,
+    /// Take every torrent off the list; their files stay where they are.
+    RemoveAllKeepFiles,
     ResumeAll,
     SetTurtle(bool),
     #[cfg_attr(not(windows), allow(dead_code))]
@@ -78,6 +80,11 @@ pub struct TorrentView {
     pub seed_goal_met: bool,
     /// Stopped with the Stop button (shown as STOPPED rather than PAUSED).
     pub stopped: bool,
+    /// How long it has been trying to download without getting any data, in
+    /// seconds. Only counts while it is actually downloading and the network
+    /// works, so a queued, paused or VPN-held torrent stays at 0. Midgar and
+    /// Turks use it to give up on a dead release and pick another.
+    pub stalled_secs: i64,
 }
 
 /// Where traffic comes out on the internet, as seen by ipinfo.io.
@@ -448,6 +455,8 @@ enum Bg {
 }
 
 struct Core {
+    /// Per torrent: when it last got data (or wasn't trying to), and how much it had.
+    stall: HashMap<String, (Instant, i64)>,
     settings: Settings,
     rx: Receiver<Cmd>,
     tx: Sender<Cmd>,
@@ -496,6 +505,7 @@ impl Core {
             engine: None,
             meta: load_meta(),
             user_paused: false,
+            stall: HashMap::new(),
             kill_hold: false,
             kill_reason: String::new(),
             applied: None,
@@ -997,6 +1007,19 @@ impl Core {
                 }
             }
             Cmd::WatchFiles(h) => self.watch_files = h,
+            Cmd::RemoveAllKeepFiles => {
+                let hashes: Vec<String> = self.engine().map(|e| e.torrents().into_iter().map(|t| t.hash).collect()).unwrap_or_default();
+                for h in &hashes {
+                    if let Some(e) = self.engine() {
+                        e.remove_torrent(h, false);
+                    }
+                }
+                for h in &hashes {
+                    self.meta.remove(h);
+                }
+                self.save_meta();
+                applog::info(format!("Removed all {} torrents (files kept).", hashes.len()));
+            }
             Cmd::PauseAll => {
                 self.user_paused = true;
                 self.sync_engine();
@@ -1330,6 +1353,13 @@ impl Core {
         };
         let mut views = Vec::with_capacity(infos.len());
         let (mut dl, mut ul) = (0i64, 0i64);
+        // Is the network usable at all? If not, nothing counts as stalled.
+        let (prev_dl, prev_ul) = self.snap.lock().map(|s| (s.dl_rate, s.ul_rate)).unwrap_or((0, 0));
+        // LIFESTREAM_ASSUME_ONLINE=1 is for testing on a machine without internet.
+        let assume_online = std::env::var("LIFESTREAM_ASSUME_ONLINE").is_ok_and(|v| v == "1");
+        let net_ok = !self.kill_hold && !self.user_paused && (assume_online || totals.dht_nodes > 0 || prev_dl > 0 || prev_ul > 0);
+        let now = Instant::now();
+        self.stall.retain(|h, _| infos.iter().any(|i| &i.hash == h));
         for info in infos {
             dl += info.dl_rate as i64;
             ul += info.ul_rate as i64;
@@ -1348,7 +1378,14 @@ impl Core {
             let category = m.map(|m| m.category.clone()).unwrap_or_default();
             // A stopped torrent that's running again (e.g. via the web UI) isn't stopped.
             let stopped = info.paused && m.map(|m| m.stopped).unwrap_or(false);
-            views.push(TorrentView { info, category, ratio, eta_secs: eta, seed_goal_met: met, stopped });
+            // A magnet that hasn't got its details yet has no size, so "left" is 0.
+            let trying = !info.paused && (info.state == 1 || info.state == 2) && (left > 0 || !info.has_metadata);
+            let mark = self.stall.entry(info.hash.clone()).or_insert((now, info.total_done));
+            if !trying || !net_ok || info.total_done > mark.1 || info.dl_rate > 0 {
+                *mark = (now, info.total_done);
+            }
+            let stalled_secs = now.duration_since(mark.0).as_secs() as i64;
+            views.push(TorrentView { info, category, ratio, eta_secs: eta, seed_goal_met: met, stopped, stalled_secs });
         }
         views.sort_by_key(|v| (v.info.queue_position < 0, v.info.queue_position, v.info.added_time));
         self.apply_seed_rules(&views);

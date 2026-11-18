@@ -66,6 +66,14 @@ impl App {
                 {
                     self.core.send(Cmd::SetTurtle(!turtle));
                 }
+                if !self.snap.torrents.is_empty()
+                    && ui
+                        .button("Remove all…")
+                        .on_hover_text("Take every torrent off the list in one go. Their files stay where they are.")
+                        .clicked()
+                {
+                    self.confirm_remove_all = true;
+                }
                 let (label, color) = if paused_all { ("ALL: PAUSED", WARN()) } else { ("ALL: RUNNING", GOOD()) };
                 if ui
                     .button(RichText::new(label).color(color).strong())
@@ -672,6 +680,41 @@ impl App {
     }
 
     pub(super) fn remove_dialog(&mut self, ctx: &egui::Context) {
+        if self.confirm_remove_all {
+            let n = self.snap.torrents.len();
+            let mut close = false;
+            egui::Area::new(egui::Id::new("remove_all_dialog"))
+                .order(egui::Order::Foreground)
+                .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
+                .show(ctx, |ui| {
+                    ff::window(ui, |ui| {
+                        ui.set_width(420.0);
+                        ff::title(ui, "Remove all torrents?", 20.0, TEXT());
+                        ui.add(
+                            egui::Label::new(
+                                RichText::new(format!("All {n} come off the list. Their files stay where they are.")).color(TEXT_DIM()),
+                            )
+                            .wrap(),
+                        );
+                        ui.add_space(8.0);
+                        ui.horizontal(|ui| {
+                            if ui.button("Cancel").clicked() {
+                                close = true;
+                            }
+                            if ui.button("Remove all, keep files").clicked() {
+                                self.core.send(Cmd::RemoveAllKeepFiles);
+                                self.selected.clear();
+                                self.popup = None;
+                                close = true;
+                            }
+                        });
+                    });
+                });
+            if close || ctx.input(|i| i.key_pressed(egui::Key::Escape)) {
+                self.confirm_remove_all = false;
+            }
+            return;
+        }
         let Some((hashes, name)) = self.confirm_remove.clone() else { return };
         let many = hashes.len() > 1;
         let mut close = false;

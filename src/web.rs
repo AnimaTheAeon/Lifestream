@@ -127,6 +127,7 @@ pub fn handle(core: &CoreHandle, mut req: Request, setup_only: bool) {
             }
             let cmd = match body["action"].as_str().unwrap_or("") {
                 "pause-all" => Some(Cmd::PauseAll),
+                "remove-all-keep" => Some(Cmd::RemoveAllKeepFiles),
                 "resume-all" => Some(Cmd::ResumeAll),
                 "turtle-on" => Some(Cmd::SetTurtle(true)),
                 "turtle-off" => Some(Cmd::SetTurtle(false)),

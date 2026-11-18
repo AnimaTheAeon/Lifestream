@@ -281,6 +281,8 @@ fn torrent_json(i: usize, t: &TorrentView) -> Value {
         // no limit. Without this they never saw anything as finished.
         "seedRatioLimit": if t.seed_goal_met { if t.ratio.is_finite() { t.ratio.max(0.0) } else { 0.0 } } else { 0.0 },
         "seedRatioMode": if t.seed_goal_met { 1 } else { 2 },
+        // Lifestream's own: seconds spent trying to download with no data at all.
+        "lifestreamStalledSecs": t.stalled_secs,
         "seedIdleLimit": 0,
         "seedIdleMode": 2,
         "secondsSeeding": t.info.seeding_secs,

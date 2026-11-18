@@ -1087,6 +1087,7 @@ function drawTorrents(opts = {}) {
         el('label', { class: 'sr', for: 'flt' }, 'Filter torrents'),
         el('input', { id: 'flt', type: 'text', placeholder: 'Filter…', value: filter, oninput: (e) => { filter = e.target.value.toLowerCase(); drawTorrents(); } }),
         el('button', { class: 'btn gonly', id: 't-pause', onclick: togglePauseAll }, state && state.userPaused ? 'Resume all' : 'Pause all'),
+        el('button', { class: 'btn', id: 't-remove-all', title: 'Take every torrent off the list in one go. Their files stay where they are.', onclick: removeAllKeepFiles }, 'Remove all'),
         el('button', { class: 'btn', onclick: () => go('add') }, 'Add torrent')),
       el('div', { class: 'scroll', id: 'tlist' }));
     list = root.querySelector('#tlist');
@@ -1778,6 +1779,14 @@ function glassPill() {
 addEventListener('resize', glassPill);
 
 document.querySelectorAll('.mi').forEach((b) => b.addEventListener('click', () => go(b.dataset.page)));
+// One question, files always kept: for clearing out the list after Midgar/Turks have filed everything.
+async function removeAllKeepFiles() {
+  const n = torrents.length;
+  if (!n) { toast('The list is already empty.'); return; }
+  if (!confirm(`Remove all ${n} torrent${n === 1 ? '' : 's'} from Lifestream?\n\nTheir files stay where they are.`)) return;
+  try { await api('action', 'POST', { action: 'remove-all-keep' }); toast(`Removed ${n} torrent${n === 1 ? '' : 's'}. Files kept.`); setTimeout(refresh, 600); }
+  catch (e) { toast(e.message, true); }
+}
 async function togglePauseAll() { await doAction(state && state.userPaused ? 'resume-all' : 'pause-all'); refresh(); }
 $('#pause-all').addEventListener('click', togglePauseAll);
 $('#setup-form').addEventListener('submit', async (e) => {

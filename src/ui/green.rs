@@ -468,7 +468,9 @@ impl App {
         let esc = !typing && ui.input(|i| i.key_pressed(Key::Escape));
         let mouse_back = ui.input(|i| i.pointer.button_pressed(egui::PointerButton::Extra1));
         if esc || mouse_back {
-            if self.confirm_remove.is_some() {
+            if self.confirm_remove_all {
+                self.confirm_remove_all = false;
+            } else if self.confirm_remove.is_some() {
                 self.confirm_remove = None;
             } else if self.add_open {
                 // The Add window closes itself on Esc.

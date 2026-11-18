@@ -118,6 +118,8 @@ pub struct App {
     pub popup_tab: u8,
     /// Torrents waiting on the remove dialog: (hashes, what to call them).
     pub confirm_remove: Option<(Vec<String>, String)>,
+    /// "Remove all, keep files" is waiting for a yes.
+    pub confirm_remove_all: bool,
     /// Torrents ticked for bulk actions.
     pub selected: std::collections::BTreeSet<String>,
     pub add: AddState,
@@ -211,6 +213,7 @@ impl App {
             popup: None,
             popup_tab: 0,
             confirm_remove: None,
+            confirm_remove_all: false,
             selected: Default::default(),
             add: AddState { magnet: String::new(), preview: None, error: None },
             add_open: false,
