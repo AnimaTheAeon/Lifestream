@@ -114,6 +114,7 @@ impl App {
         let n_paused = ts.iter().filter(|t| t.info.paused).count();
         let shown: Vec<String> = ts.iter().filter(|t| self.filter_matches(t)).map(|t| t.info.hash.clone()).collect();
         ui.add_space(6.0);
+        let mut sort_wrapped = false;
         ui.horizontal_wrapped(|ui| {
             // Tick everything shown (pick Finished first to clear out completed ones).
             let all = !shown.is_empty() && shown.iter().all(|h| self.selected.contains(h));
@@ -139,30 +140,21 @@ impl App {
                     self.filter = f;
                 }
             }
-            ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                // A plain menu rather than egui's ComboBox: the ComboBox wraps its
-                // list in a scroll area that grew on every repaint (mouse move)
-                // with this app's non-floating scroll bars.
-                let button = egui::Button::new(format!("{}      ", sort_name(self.sort))).min_size(egui::vec2(124.0, 24.0));
-                let (resp, _) = egui::containers::menu::MenuButton::from_button(button).ui(ui, |ui| {
-                    ui.set_width(190.0);
-                    for s in [Sort::Queue, Sort::Name, Sort::Health, Sort::DownSpeed, Sort::Ratio, Sort::Added] {
-                        if ui.add(egui::Button::selectable(self.sort == s, sort_name(s))).clicked() {
-                            self.sort = s;
-                            ui.close();
-                        }
-                    }
-                });
-                // Drop-down arrow on the button's right edge.
-                let c = egui::pos2(resp.rect.right() - 14.0, resp.rect.center().y);
-                ui.painter().add(egui::Shape::convex_polygon(
-                    vec![c + egui::vec2(-5.0, -3.0), c + egui::vec2(5.0, -3.0), c + egui::vec2(0.0, 3.5)],
-                    TEXT(),
-                    egui::Stroke::NONE,
-                ));
-                ff::stat_label(ui, "SORT");
-            });
+            // Too narrow for the sort box on this row (MC360's page pane,
+            // small windows): it goes on its own row underneath instead of
+            // drawing over the filter pills.
+            // Width measured when it was last drawn (first frame: a safe guess).
+            let need = ui.ctx().data(|d| d.get_temp::<f32>(egui::Id::new("sort-box-width"))).unwrap_or(240.0);
+            // (In a wrapping row available_width() is the whole row, so use the cursor.)
+            sort_wrapped = ui.max_rect().right() - ui.cursor().left() < need + 12.0;
+            if !sort_wrapped {
+                ui.with_layout(Layout::right_to_left(Align::Center), |ui| sort_box(ui, &mut self.sort));
+            }
         });
+        if sort_wrapped {
+            let row = egui::vec2(ui.available_width(), 26.0);
+            ui.allocate_ui_with_layout(row, Layout::right_to_left(Align::Center), |ui| sort_box(ui, &mut self.sort));
+        }
         ff::divider(ui);
 
         let mut list: Vec<TorrentView> = self
@@ -1965,4 +1957,31 @@ fn leak_report(ui: &mut egui::Ui, r: &crate::core::LeakResult, adapter: &str) {
             }
         }
     });
+}
+
+/// The SORT label and its drop-down menu (laid out right to left).
+fn sort_box(ui: &mut egui::Ui, sort: &mut Sort) {
+    // A plain menu rather than egui's ComboBox: the ComboBox wraps its
+    // list in a scroll area that grew on every repaint (mouse move)
+    // with this app's non-floating scroll bars.
+    let button = egui::Button::new(format!("{}      ", sort_name(*sort))).min_size(egui::vec2(124.0, 24.0));
+    let (resp, _) = egui::containers::menu::MenuButton::from_button(button).ui(ui, |ui| {
+        ui.set_width(190.0);
+        for s in [Sort::Queue, Sort::Name, Sort::Health, Sort::DownSpeed, Sort::Ratio, Sort::Added] {
+            if ui.add(egui::Button::selectable(*sort == s, sort_name(s))).clicked() {
+                *sort = s;
+                ui.close();
+            }
+        }
+    });
+    // Drop-down arrow on the button's right edge.
+    let c = egui::pos2(resp.rect.right() - 14.0, resp.rect.center().y);
+    ui.painter().add(egui::Shape::convex_polygon(
+        vec![c + egui::vec2(-5.0, -3.0), c + egui::vec2(5.0, -3.0), c + egui::vec2(0.0, 3.5)],
+        TEXT(),
+        egui::Stroke::NONE,
+    ));
+    ff::stat_label(ui, "SORT");
+    let used = ui.min_rect().width();
+    ui.ctx().data_mut(|d| d.insert_temp(egui::Id::new("sort-box-width"), used));
 }
