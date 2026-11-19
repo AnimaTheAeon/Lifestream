@@ -679,13 +679,16 @@ impl App {
     }
 
     fn layout(&mut self, ui: &mut egui::Ui) {
+        // MC360 starts fresh (on the open page's menu) each time it's picked.
+        if !ff::is_mc360() {
+            self.mc = None;
+        }
         if ff::is_green() {
             return self.green_layout(ui);
         }
         if ff::is_mc360() {
             return self.mc360_layout(ui);
         }
-        self.mc = None;
         if ff::is_blades() {
             return self.blades_layout(ui);
         }

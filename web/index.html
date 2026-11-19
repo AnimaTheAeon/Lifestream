@@ -1668,7 +1668,8 @@ async function mcOn() {
   });
   mc.host.classList.add('bbody');
   const b = mcBladeOf(page);
-  if (page === 'torrents') mc.home(b); else mc.showPage(b, (MC_BLADES[b].items.find((it) => it.page === page) || {}).id);
+  // Start on the menu of the blade the current page belongs to; Enter opens the page.
+  mc.home(b);
 }
 function mcOff() { if (mc) { mc.destroy(); mc = null; } }
 /** After go(): show the page on its blade and jump to the picked part of it. */
