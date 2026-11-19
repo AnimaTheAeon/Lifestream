@@ -94,7 +94,7 @@ function renderRecent(list) {
     if (e.state === "failed" && e.error) text += ": " + e.error;
     if (e.state === "refused" && e.reason) text += ": " + e.reason;
     if (e.state === "held" && e.reason) text = e.reason;
-    if (e.paused && e.state !== "failed") text += " (paused)";
+    if (e.paused && !ext && e.state !== "failed") text += " (paused)";
     if (e.state !== "sending") text += " · " + ago(e.at);
     sub.append(text);
     if (e.state === "refused") {

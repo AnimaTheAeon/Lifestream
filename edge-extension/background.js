@@ -106,11 +106,15 @@ async function openApp(target) {
   else chrome.runtime.openOptionsPage();
 }
 
+// Each notice update is numbered, so the page can ignore one that arrives late
+// (a "Sending…" that lands after the result would otherwise stay up).
+let toastCount = 0;
+
 // The notice always shows in the tab's top page, even for links inside frames.
 // Returns whether it could be shown.
 async function toast(tabId, entry, look) {
   if (tabId === undefined || tabId === null || tabId < 0) return false;
-  const msg = { type: "toast", entry, look };
+  const msg = { type: "toast", entry: { ...entry }, look, rev: Date.now() * 1000 + (toastCount++ % 1000) };
   try {
     await chrome.tabs.sendMessage(tabId, msg, { frameId: 0 });
     return true;

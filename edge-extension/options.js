@@ -93,7 +93,9 @@ async function start() {
       r.textContent = "Checking…";
       try {
         const st = await appStatus(app, c);
-        const version = String(st.version).replace(/^5\./, "");
+        // Midgar gives its own number as appVersion (version is the Sonarr base);
+        // Turks gives "5." + its own number as version.
+        const version = st.appVersion ? String(st.appVersion) : String(st.version).replace(/^5\./, "");
         r.className = "sub good";
         r.textContent = `Connected · ${name} ${version}`;
       } catch (e) {

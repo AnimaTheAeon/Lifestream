@@ -20,11 +20,12 @@
       if (!a || !/^magnet:/i.test(a.href)) return;
       e.preventDefault();
       e.stopPropagation();
+      const href = a.href;
       try {
-        chrome.runtime.sendMessage({ type: "send", url: a.href });
+        chrome.runtime.sendMessage({ type: "send", url: href }).catch(() => (location.href = href));
       } catch {
         // The extension was reloaded; this old copy can't reach it. Let the page handle it.
-        location.href = a.href;
+        location.href = href;
       }
     },
     true
@@ -33,7 +34,7 @@
   if (window.top !== window) return; // notices only in the top page
 
   chrome.runtime.onMessage.addListener((msg) => {
-    if (msg.type === "toast") show(msg.entry, msg.look || settings.look);
+    if (msg.type === "toast") show(msg.entry, msg.look || settings.look, msg.rev || 0);
   });
 
   let fontsAdded = false;
@@ -154,6 +155,12 @@ button:focus-visible{outline:2px solid currentColor;outline-offset:2px}
   }
 
   const APP = { lifestream: "Lifestream", midgar: "Midgar", turks: "Turks" };
+  // Messages to the extension from the notice's buttons.
+  function tell(msg) {
+    try {
+      chrome.runtime.sendMessage(msg).catch(() => {});
+    } catch {}
+  }
   function titleFor(entry) {
     const app = APP[entry.target] || "Lifestream";
     if (entry.target === "midgar" || entry.target === "turks") {
@@ -170,7 +177,11 @@ button:focus-visible{outline:2px solid currentColor;outline-offset:2px}
     return b;
   }
 
-  function show(entry, look) {
+  const lastRev = new Map(); // entry id -> newest update shown
+
+  function show(entry, look, rev) {
+    if (rev && rev < (lastRev.get(entry.id) || 0)) return; // an older update arriving late
+    if (rev) lastRev.set(entry.id, rev);
     addFonts();
     ensureHost();
     let item = shown.get(entry.id);
@@ -183,7 +194,7 @@ button:focus-visible{outline:2px solid currentColor;outline-offset:2px}
       });
       el.addEventListener("mouseleave", () => {
         item.hover = false;
-        if (!item.sticky) schedule(entry.id, item, 2500);
+        if (!item.sticky && !item.sending) schedule(entry.id, item, 2500);
       });
       wrap.appendChild(el);
       shown.set(entry.id, item);
@@ -217,8 +228,8 @@ button:focus-visible{outline:2px solid currentColor;outline-offset:2px}
       pick.className = "pick";
       for (const [t, label] of [["midgar", "Midgar · TV"], ["turks", "Turks · Movie"], ["lifestream", "Lifestream"]]) {
         const b = button(label, () => {
-          hide(entry.id, true);
-          chrome.runtime.sendMessage({ type: "send", url: entry.url, target: t, paused: entry.paused });
+          hide(entry.id);
+          tell({ type: "send", url: entry.url, target: t, paused: entry.paused });
         }, "choice" + (t === entry.guess ? " guess" : ""));
         if (t === entry.guess) b.title = "Suggested from the name";
         pick.append(b);
@@ -253,21 +264,22 @@ button:focus-visible{outline:2px solid currentColor;outline-offset:2px}
       acts.className = "acts";
       const toLifestream = () => {
         hide(entry.id);
-        chrome.runtime.sendMessage({ type: "send", url: entry.url, target: "lifestream" });
+        tell({ type: "send", url: entry.url, target: "lifestream" });
       };
-      if (entry.state === "failed") acts.append(button("Retry", () => chrome.runtime.sendMessage({ type: "retry", id: entry.id })));
+      if (entry.state === "failed") acts.append(button("Retry", () => tell({ type: "retry", id: entry.id })));
       if (external && entry.state === "refused") acts.append(button("Send to Lifestream anyway", toLifestream));
       else if (external && entry.state === "failed") acts.append(button("Send to Lifestream instead", toLifestream));
-      if (external && entry.state !== "failed") acts.append(button(`Open ${APP[entry.target]}`, () => chrome.runtime.sendMessage({ type: "open", target: entry.target })));
-      if (!external) acts.append(button("Open Lifestream", () => chrome.runtime.sendMessage({ type: "open" })));
+      if (external && entry.state !== "failed") acts.append(button(`Open ${APP[entry.target]}`, () => tell({ type: "open", target: entry.target })));
+      if (!external) acts.append(button("Open Lifestream", () => tell({ type: "open" })));
       if (external && entry.state === "refused") acts.append(button("Dismiss", () => hide(entry.id)));
       el.append(acts);
     }
     // A refusal or a question stays until you close it, so it can be read.
     clearTimeout(item.timer);
     item.sticky = entry.state === "refused" || entry.state === "choose";
-    const wait = entry.state === "failed" || entry.state === "held" ? 12000 : 5000;
-    if (entry.state !== "sending" && !item.hover && !item.sticky) schedule(entry.id, item, wait);
+    item.sending = entry.state === "sending";
+    const wait = entry.state === "sending" ? 90000 : entry.state === "failed" || entry.state === "held" ? 12000 : 5000;
+    if (!item.hover && !item.sticky) schedule(entry.id, item, wait);
   }
 
   function schedule(id, item, ms) {
