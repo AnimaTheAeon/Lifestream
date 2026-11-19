@@ -1,6 +1,9 @@
 //! The party-menu style window.
 
 mod blades;
+mod mc360;
+mod mc360_app;
+mod mc360_data;
 mod green;
 mod pages;
 mod splash;
@@ -165,6 +168,8 @@ pub struct App {
     pub blades_anim: Option<(usize, Instant)>,
     /// Blades: the blade shown last frame (a page change starts a slide).
     pub blades_last: usize,
+    /// The MC360 look, while it is on.
+    pub mc: Option<mc360::Mc360>,
     /// Blades: how far the current sideways drag has gone.
     pub blades_drag: f32,
     /// The start screen shown over the window at launch.
@@ -250,6 +255,7 @@ impl App {
             green_unzoom: None,
             blades_anim: None,
             blades_last: 0,
+            mc: None,
             blades_drag: 0.0,
             splash: if start_hidden { splash::Splash::skipped() } else { splash::Splash::default() },
         }
@@ -676,6 +682,10 @@ impl App {
         if ff::is_green() {
             return self.green_layout(ui);
         }
+        if ff::is_mc360() {
+            return self.mc360_layout(ui);
+        }
+        self.mc = None;
         if ff::is_blades() {
             return self.blades_layout(ui);
         }
@@ -1093,6 +1103,7 @@ fn configure_fonts(ctx: &egui::Context) {
         egui::FontFamily::Name("display".into()),
         vec!["Orbitron".to_owned(), "Nunito".to_owned(), "Inter".to_owned()],
     );
+    mc360::add_font(&mut fonts);
     ctx.set_fonts(fonts);
 }
 

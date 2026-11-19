@@ -184,3 +184,48 @@ a:hover{text-decoration:underline}
 .look-glass .seg button[aria-pressed=true]{color:#fff}
 @keyframes lgIn{from{opacity:0;transform:translateY(10px) scale(.985)}to{opacity:1;transform:none}}
 @media (prefers-reduced-motion:reduce){.look-glass .panel{animation:none}.look-glass *,.look-glass *::before,.look-glass *::after{transition:none!important}}
+
+/* ---------- MC360 (the MC360 dashboard skin) ---------- */
+@font-face{font-family:LsMc360;src:url(fonts/mc360.ttf) format("truetype")}
+.look-mc360{color:#000;background:#000;font:400 14px/1.35 LsMc360,Tahoma,"Segoe UI",sans-serif}
+.look-mc360 .only-blades{display:revert}
+.look-mc360 .edge{position:fixed;top:0;right:0;bottom:0;width:14px;background:linear-gradient(90deg,#8a8a8a,#e6e6e6 45%,#b0b0b0);box-shadow:inset 2px 0 3px rgba(0,0,0,.35)}
+.look-mc360 .tab{position:fixed;top:0;bottom:0;left:0;width:56px;background:url(mc360/blade.png) left center/100% 100% no-repeat;z-index:2}
+.look-mc360 .grip{position:absolute;top:22%;left:30px;height:200px}
+.look-mc360 .grip span{writing-mode:vertical-rl;color:#000;font-size:15px}
+.look-mc360 .panel{position:fixed;top:0;bottom:0;left:30px;right:14px;display:flex;flex-direction:column;overflow:hidden;border-radius:26px 0 0 26px/50%;
+  background:linear-gradient(180deg,rgba(255,255,255,.55) 0,rgba(255,255,255,0) 64px,rgba(255,255,255,0) calc(100% - 64px),rgba(255,255,255,.4) 100%),
+  linear-gradient(180deg,rgba(53,139,37,.82),rgba(86,190,58,.75) 50%,rgba(53,139,37,.82)),url(mc360/swirl.jpg) center/cover}
+.look-mc360 .top{flex:none;height:60px;display:flex;align-items:center;gap:10px;padding:0 12px 0 40px}
+.look-mc360 .top .orb,.look-mc360 .xorb{display:none}
+.look-mc360 h1{margin:0;flex:1;font-size:23px;font-weight:400;color:#fff;text-shadow:1px 1px 0 #000,0 0 3px rgba(0,0,0,.55)}
+.look-mc360 .pill{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:12px;background:linear-gradient(180deg,#fdf06a,#d8c21a);color:#111;font-size:13px;box-shadow:inset 0 1px 0 rgba(255,255,255,.7),0 1px 2px rgba(0,0,0,.35)}
+.look-mc360 .pill.ok .dot{background:#2f8f1a;box-shadow:none}
+.look-mc360 .pill.bad .dot{background:#b8251c;box-shadow:none}
+.look-mc360 .gear{border:1px solid rgba(0,0,0,.35);border-radius:50%;background:linear-gradient(180deg,#fff,#cfcfcf);color:#333;box-shadow:0 1px 2px rgba(0,0,0,.35)}
+.look-mc360 .main{position:relative;flex:1;min-height:0;display:flex;flex-direction:column;gap:10px;padding:10px 16px 10px 40px;overflow:hidden auto}
+.look-mc360 .orbdeco{display:none}
+.look-mc360 .lbl,.look-mc360 .k{font-size:15px;color:#000;text-shadow:1px 1px 0 rgba(218,218,218,.63)}
+.look-mc360 .status{font-size:13px;color:#fff;text-shadow:1px 1px 0 #000}
+.look-mc360 .status .dot,.look-mc360 .status #stTitle{display:none}
+.look-mc360 select{min-height:28px;padding:0 8px;border:1px solid #8c8c8c;border-radius:3px;background:#fff;color:#000;font:400 13px "Segoe UI",Tahoma,sans-serif}
+.look-mc360 input[type=text],.look-mc360 input[type=password],.look-mc360 input[type=url]{height:34px;padding:0 10px;border:1px solid #8c8c8c;border-radius:3px;background:#fff;color:#000;font:400 14px "Segoe UI",Tahoma,sans-serif}
+.look-mc360 input:focus{outline:0;border-color:#4a9a32;box-shadow:0 0 0 2px rgba(108,196,72,.55)}
+.look-mc360 .btn{height:34px;padding:0 16px;border:1px solid #2f6b1c;border-radius:4px;background:linear-gradient(180deg,#8fd36a,#4a9a32 55%,#357a22);color:#fff;font:400 16px LsMc360,Tahoma,sans-serif;text-shadow:1px 1px 0 rgba(0,0,0,.6)}
+.look-mc360 .btn:hover:not(:disabled){background:linear-gradient(180deg,#a2e07e,#56aa3c 55%,#3f8a2a)}
+.look-mc360 .chk{color:#000}
+.look-mc360 .chk input{accent-color:#4a9a32}
+.look-mc360 a,.look-mc360 .retry{color:#fff;text-shadow:1px 1px 0 #000}
+.look-mc360 .sub,.look-mc360 .note{font-size:12px;color:#111}
+.look-mc360 .item{padding:6px 10px;border-top:1px solid rgba(0,0,0,.25);background:none;color:#000;text-shadow:1px 1px 0 rgba(218,218,218,.63)}
+.look-mc360 .item:first-child{border-top:0;background:linear-gradient(180deg,rgba(255,255,255,.75),rgba(255,255,255,.35));border-radius:3px}
+.look-mc360 .item .dot{display:none}
+.look-mc360 .item.st-failed .sub{color:#8a1410}
+.look-mc360 .foot{flex:none;height:46px;display:flex;align-items:center;gap:6px;padding:0 16px 0 40px;color:#fff;text-shadow:1px 1px 0 #000,0 0 3px rgba(0,0,0,.55);font-size:15px}
+.look-mc360 .key{width:21px;height:21px;padding:0;border:0;font-size:0;background:url(mc360/button-a.png) center/contain no-repeat}
+.look-mc360 .key+span+.key{margin-left:8px;background-image:url(mc360/button-b.png)}
+.look-mc360 .foot a{margin-left:auto}
+.look-mc360 .seg{border:1px solid #8c8c8c;border-radius:4px;overflow:hidden;background:rgba(255,255,255,.55)}
+.look-mc360 .seg button{border:0;background:none;color:#000;padding:7px 12px;font:400 15px LsMc360,Tahoma,sans-serif}
+.look-mc360 .seg button[aria-pressed=true]{background:linear-gradient(180deg,#8fd36a,#4a9a32);color:#fff;text-shadow:1px 1px 0 rgba(0,0,0,.6)}
+.look-mc360 .good{color:#1d5f0e}.look-mc360 .badtxt{color:#8a1410}

@@ -10,6 +10,7 @@ mod engine;
 mod folder_match;
 mod instance;
 mod nasupdate;
+mod mc360_web;
 mod netif;
 mod rpc;
 mod rss;

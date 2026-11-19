@@ -529,6 +529,27 @@ body.glass.calm #page > *, body.glass.calm .mi, body.glass.calm .btn, body.glass
 @media (max-width: 820px) { body.glass .main { flex-direction: column; } body.glass .side { width: auto; } }
 #splash.glass { background: radial-gradient(700px 500px at 30% 30%, rgba(56, 92, 255, .4), transparent 60%), radial-gradient(700px 500px at 75% 70%, rgba(168, 64, 255, .3), transparent 60%), #04050a; --si: #ffffff; --sa: #0a84ff; --sd: rgba(235, 235, 245, .62); }
 #splash.glass .sp-title { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI Variable Display", "Segoe UI", Inter, system-ui, sans-serif; font-weight: 700; letter-spacing: .12em; padding-left: .12em; text-transform: none; }
+
+/* MC360: the engine (/mc360/) draws the skin; the page sits on the open blade in a
+   dark see-through pane, styled like the Blades page (it hangs off .bbody). */
+.mc360-root .mc-host.bbody { opacity: 1; transform: none; transition: none; padding: 10px 14px; background: rgba(8, 12, 22, .5); border: 1px solid rgba(255, 255, 255, .3); border-radius: 10px; }
+body.mc360 .toast, body.mc360 .fp, body.mc360 .upd { z-index: 1000; }
+body.mc360 .toast { position: fixed; right: 40px; bottom: 80px; z-index: 60; max-width: min(560px, calc(100vw - 60px)); background: rgba(28, 24, 40, .92); border: 1px solid rgba(255, 255, 255, .55); border-radius: 16px; box-shadow: 0 6px 18px rgba(0, 0, 0, .4); color: #ffffff; }
+body.mc360 .toast.bad { color: #ffd2c8; }
+body.mc360 .upd { background: rgba(40, 40, 48, .28); }
+body.mc360 .updcard { background: rgba(28, 24, 40, .9); border: 1px solid rgba(255, 255, 255, .55); border-radius: 22px; box-shadow: 0 10px 30px rgba(0, 0, 0, .4), inset 0 1px 0 rgba(255, 255, 255, .25); color: #ffffff; }
+body.mc360 .updbar { height: 16px; border-radius: 8px; background: rgba(0, 0, 0, .3); border: 1px solid rgba(255, 255, 255, .35); }
+body.mc360 .updbar i { border-radius: 8px; background: linear-gradient(90deg, rgba(255, 255, 255, .75), #ffffff); box-shadow: 0 0 10px rgba(255, 255, 255, .35); }
+body.mc360 .updbar i::after { border-radius: 8px 8px 0 0; background: rgba(255, 255, 255, .45); }
+body.mc360 .updnote { color: rgba(255, 255, 255, .78); }
+body.mc360 .upd.bad .updtitle { color: #ffb4a8; }
+body.mc360 { --dropline: #ffffff; }
+body.mc360 .t.drag-ghost { background: linear-gradient(180deg, rgba(255, 255, 255, .24), rgba(255, 255, 255, .08)), rgba(0, 0, 0, .16); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); border-color: rgba(255, 255, 255, .7); }
+body.mc360 .fp { background: rgba(40, 40, 48, .28); }
+body.mc360 .fpcard { background: rgba(28, 24, 40, .92); border: 1px solid rgba(255, 255, 255, .55); border-radius: 22px; box-shadow: 0 10px 30px rgba(0, 0, 0, .4), inset 0 1px 0 rgba(255, 255, 255, .25); color: #ffffff; }
+body.mc360 .fplist { border-radius: 14px; background: rgba(0, 0, 0, .25); border-color: rgba(255, 255, 255, .3); }
+body.mc360 .fplist button { border-radius: 12px; }
+body.mc360 .fplist button:hover, body.mc360 .fplist button:focus-visible { background: rgba(255, 255, 255, .16); }
 </style>
 </head>
 <body>
@@ -1230,7 +1251,7 @@ async function drawSettings() {
   const logBox = el('div', { class: 'log logbox' });
   // The theme switches and saves at once.
   const themeSegs = el('div', { class: 'segs', role: 'group', 'aria-label': 'Theme' });
-  const drawThemeSegs = () => themeSegs.replaceChildren(...[['ff', 'FFVII Menu'], ['green', 'Xbox'], ['blades', 'Blades'], ['glass', 'Dark Glass']].map(([val, label]) =>
+  const drawThemeSegs = () => themeSegs.replaceChildren(...[['ff', 'FFVII Menu'], ['green', 'Xbox'], ['blades', 'Blades'], ['glass', 'Dark Glass'], ['mc360', 'MC360']].map(([val, label]) =>
     el('button', { class: 'seg', 'aria-pressed': String((state && state.theme) === val), onclick: async () => {
       if (state.theme === val) return;
       const was = state.theme;
@@ -1305,7 +1326,7 @@ async function drawSettings() {
       field('reduce_motion', 'CALMER MOTION', check('reduce_motion'), 'Pages switch with no zoom, and the orb on the Xbox home screen holds still.'),
       el('h2', {}, 'UPDATES'),
       updBox,
-      (state && state.update && state.update.canInstall) ? field('auto_update', 'UPDATE AUTOMATICALLY', check('auto_update'), 'Checks every 6 hours and installs new versions by itself. Downloads pause for a few seconds while it restarts.') : null,
+      (state && state.update && state.update.canInstall) ? field('auto_update', 'UPDATE AUTOMATICALLY', check('auto_update'), 'Checks every 6 hours and installs new versions by itself. Downloads pause for a few seconds while it restarts.') : '',
       el('h2', {}, 'REMOTE CONTROL (MIDGAR, TURKS, MATERIA)'),
       el('p', { class: 'help', style: 'margin:0 0 12px' }, `Always on: this sign-in is also what other apps use to send downloads here. In Midgar, Turks or Materia add a download client of type Transmission: Host ${location.hostname} (or localhost when the app runs on this same machine), Port ${location.port || 9091}, URL base /transmission/, and the username and password below.`),
       field('rpc_username', 'USERNAME', text('rpc_username')),
@@ -1339,14 +1360,16 @@ const calm = () => !!(state && state.reduceMotion) || matchMedia('(prefers-reduc
 /** Match the page to the saved theme. `stay` keeps the current page open (switching from Settings). */
 function applyTheme(stay) {
   document.body.classList.toggle('calm', calm());
-  const theme = isBlades() ? 'blades' : isGreen() ? 'green' : isGlass() ? 'glass' : 'ff';
+  const theme = isMc360() ? 'mc360' : isBlades() ? 'blades' : isGreen() ? 'green' : isGlass() ? 'glass' : 'ff';
   if (theme === themeShown && !stay) return;
   const was = themeShown; themeShown = theme;
   document.body.classList.toggle('green', theme === 'green');
   document.body.classList.toggle('blades', theme === 'blades');
   document.body.classList.toggle('glass', theme === 'glass');
-  $('meta[name=theme-color]').content = theme === 'green' ? '#0a3608' : theme === 'blades' ? '#cfcfcf' : theme === 'glass' ? '#04050a' : '#121e78';
+  $('meta[name=theme-color]').content = theme === 'green' ? '#0a3608' : theme === 'blades' ? '#cfcfcf' : theme === 'glass' ? '#04050a' : theme === 'mc360' ? '#2d7a1c' : '#121e78';
   if (was === 'blades' && theme !== 'blades') bladesOff();
+  if (theme !== 'mc360') mcOff();
+  if (theme === 'mc360') { document.body.classList.remove('ghome-on'); home = false; stopHelix(); mcOn(); return; }
   if (theme === 'glass') requestAnimationFrame(glassPill);
   if (theme !== 'green') { document.body.classList.remove('ghome-on'); home = false; stopHelix(); }
   if (theme === 'blades') { bladesOn(); return; }
@@ -1574,6 +1597,98 @@ $('#gmode').addEventListener('click', async () => {
   catch (e) { toast(e.message, true); }
 });
 
+
+// ---- MC360 (the MC360 dashboard skin's blades; the engine is served from /mc360/)
+let mc = null, mcLoading = null, mcItem = null;
+const isMc360 = () => !!(state && state.theme === 'mc360');
+const MC_LOOKS = [['ff', 'FFVII Menu'], ['green', 'Xbox'], ['blades', 'Blades'], ['glass', 'Dark Glass'], ['mc360', 'MC360']];
+const MC_BLADES = [
+  { key: 'torrents', color: 'green', items: [
+    { id: 'torrents', label: 'All torrents', icon: 'list', hint: 'Every torrent, with pause, move and remove.', page: 'torrents' },
+    { id: 'removeall', label: 'Remove all, keep files…', icon: 'trash', hint: 'One confirm, files stay.', page: 'torrents', run: () => removeAllKeepFiles() },
+  ] },
+  { key: 'add', color: 'orange', items: [
+    { id: 'add', label: 'Magnet or link', icon: 'plus', hint: 'Paste a magnet link or a .torrent address.', page: 'add', focus: '#amag' },
+    { id: 'upload', label: 'Upload .torrent', icon: 'up', hint: 'Upload .torrent files.', page: 'add', click: '#afile' },
+  ] },
+  { key: 'settings', color: 'purple', items: [
+    { id: 'folders', label: 'Folders', icon: 'folder', hint: 'Where downloads go.', page: 'settings', section: 'FOLDERS' },
+    { id: 'vpn', label: 'VPN', icon: 'shield', hint: 'Kill switch and the network torrents use.', page: 'settings', section: 'VPN' },
+    { id: 'speed', label: 'Speed limits', icon: 'gauge', hint: 'Download and upload limits.', page: 'settings', section: 'SPEED' },
+    { id: 'seeding', label: 'Seeding', icon: 'up', hint: 'When to stop sharing.', page: 'settings', section: 'SEEDING' },
+    { id: 'look', label: 'Look and sound', icon: 'palette', hint: "Five looks; MC360's skin and sounds are in the guide (G).", page: 'settings', section: 'LOOK' },
+    { id: 'updates', label: 'Updates', icon: 'refresh', hint: 'Check now and Update now.', page: 'settings', section: 'UPDATES' },
+    { id: 'remote', label: 'Remote control', icon: 'plug', hint: 'How Midgar, Turks and Materia reach Lifestream.', page: 'settings', section: 'REMOTE CONTROL' },
+  ] },
+];
+const mcBladeOf = (p) => Math.max(0, MC_BLADES.findIndex((b) => b.items.some((it) => it.page === p)));
+function mcLoad() {
+  if (window.MC360) return Promise.resolve();
+  if (mcLoading) return mcLoading;
+  const v = (state && state.version) || '';
+  document.head.append(el('link', { rel: 'stylesheet', href: '/mc360/mc360.css?v=' + v }));
+  mcLoading = new Promise((resolve, reject) => { const js = el('script', { src: '/mc360/mc360.js?v=' + v }); js.onload = resolve; js.onerror = reject; document.head.append(js); });
+  return mcLoading;
+}
+async function mcOn() {
+  if (mc) return;
+  try { await mcLoad(); } catch (e) { toast("The MC360 look couldn't load its files.", true); return; }
+  if (mc || !isMc360()) return;
+  mc = MC360.mount({
+    base: '/mc360/',
+    app: { name: 'Lifestream', plat: 'NAS', ver: (state && state.version) || '', icon: 'swirl' },
+    blades: MC_BLADES,
+    card: () => {
+      if (!state) return ['Connecting…'];
+      const [, title, detail] = overall();
+      const held = state.killHold || state.userPaused;
+      return [title.charAt(0) + title.slice(1).toLowerCase().replace(/\bvpn\b/, 'VPN'), `↓ ${rate(held ? 0 : state.dlRate)} · ↑ ${rate(held ? 0 : state.ulRate)}`, `${state.torrentCount} torrents`];
+    },
+    host: () => contentEl(),
+    onOpen: (b, item) => { mcItem = item; go(item.page); },
+    popupOpen: () => !!document.querySelector('.fp, .upd.on, [role=dialog][aria-modal=true]'),
+    looks: MC_LOOKS.map(([, l]) => l),
+    setLook: async (label) => {
+      const val = (MC_LOOKS.find(([, l]) => l === label) || ['ff'])[0];
+      if (!state || state.theme === val) return;
+      const was = state.theme;
+      state.theme = val; applyTheme(true);
+      try { await api('settings', 'PUT', { theme: val }); } catch (e) { state.theme = was; applyTheme(true); toast("Couldn't switch: " + e.message, true); }
+    },
+    checkUpdates: async () => {
+      await doAction('update-check', 'Checking for updates…');
+      for (let i = 0; i < 30; i++) {
+        await new Promise((r) => setTimeout(r, 500));
+        await refresh();
+        const u = (state && state.update) || {};
+        if (!u.checking) return u.version ? `Version ${u.version} is ready: see Settings > Updates` : `Lifestream ${state.version} is the newest version`;
+      }
+      return 'Still checking: see Settings > Updates';
+    },
+  });
+  mc.host.classList.add('bbody');
+  const b = mcBladeOf(page);
+  if (page === 'torrents') mc.home(b); else mc.showPage(b, (MC_BLADES[b].items.find((it) => it.page === page) || {}).id);
+}
+function mcOff() { if (mc) { mc.destroy(); mc = null; } }
+/** After go(): show the page on its blade and jump to the picked part of it. */
+function mcShow(p) {
+  if (!mc) return;
+  const it = mcItem && mcItem.page === p ? mcItem : null;
+  mcItem = null;
+  const b = mcBladeOf(p);
+  mc.showPage(b, (it || MC_BLADES[b].items.find((x) => x.page === p)).id);
+  requestAnimationFrame(() => {
+    const sc = mc && mc.host.querySelector('.scroll');
+    if (!it) { if (sc) sc.scrollTop = 0; return; }
+    if (it.section) { const h = [...mc.host.querySelectorAll('h2')].find((x) => x.textContent.trim().startsWith(it.section)); if (h) h.scrollIntoView({ block: 'start' }); }
+    else if (sc) sc.scrollTop = 0;
+    if (it.focus) { const f = $(it.focus); if (f) f.focus(); }
+    if (it.click) { const c = $(it.click); if (c) c.click(); }
+    if (it.run) it.run();
+  });
+}
+
 // ---- Blades (the glossy silver blades theme)
 const BLADES = [['torrents', 'Torrents'], ['add', 'Add'], ['settings', 'Settings']];
 const isBlades = () => !!(state && state.theme === 'blades');
@@ -1763,7 +1878,8 @@ function go(p, keepHome) {
   else if (isGreen() && !(keepHome && home)) leaveHome(p);
   document.querySelectorAll('.mi').forEach((b) => b.setAttribute('aria-current', b.dataset.page === p ? 'page' : 'false'));
   glassPill();
-  ({ torrents: drawTorrents, add: drawAdd, settings: drawSettings })[p]();
+  const drawn = ({ torrents: drawTorrents, add: drawAdd, settings: drawSettings })[p]();
+  if (mc) Promise.resolve(drawn).then(() => mcShow(p));
 }
 
 // Dark Glass: the sidebar's selection pill glides to the current item.

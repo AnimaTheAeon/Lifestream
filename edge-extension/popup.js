@@ -121,6 +121,13 @@ chrome.storage.onChanged.addListener((ch) => {
   if (ch.recent) renderRecent(ch.recent.newValue || []);
 });
 
+// MC360: the skin's sounds for sending and for a bad link.
+function mcSound(name) {
+  if (settings && settings.look === "mc360") {
+    try { const a = new Audio(`mc360/${name}.mp3`); a.volume = 0.6; a.play().catch(() => {}); } catch {}
+  }
+}
+
 $("form").addEventListener("submit", async (ev) => {
   ev.preventDefault();
   const url = $("mag").value.trim();
@@ -128,9 +135,11 @@ $("form").addEventListener("submit", async (ev) => {
   if (!isSendable(url)) {
     err.textContent = url ? "That doesn't look like a magnet link." : "Paste a magnet link first.";
     err.classList.remove("hidden");
+    mcSound("back");
     return;
   }
   err.classList.add("hidden");
+  mcSound("select");
   $("mag").value = "";
   $("send").disabled = true;
   try {

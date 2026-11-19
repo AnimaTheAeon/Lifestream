@@ -23,7 +23,7 @@ your TV and Movies folders.
   sends with Retry.
 - A small notice in the corner of the page says whether it was sent, was
   already in Lifestream, or couldn't be sent.
-- Four looks: FFVII menu, Xbox, Blades and Dark Glass.
+- Five looks: FFVII menu, Xbox, Blades, Dark Glass and MC360 (the MC360 dashboard skin, with its sounds when you send).
 
 ## Install
 

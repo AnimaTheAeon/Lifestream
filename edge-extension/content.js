@@ -49,6 +49,7 @@
     f("LsNunito", "nunito-700.woff2", "700");
     f("LsNunito", "nunito-800.woff2", "800");
     f("LsOrbitron", "orbitron-800.ttf", "800");
+    f("LsMc360", "mc360.ttf", "400");
   }
 
   const CSS = `
@@ -90,6 +91,15 @@ button:focus-visible{outline:2px solid currentColor;outline-offset:2px}
 .xbox button{font:800 11px/1.3 LsOrbitron,"Segoe UI",sans-serif;letter-spacing:.12em;text-transform:uppercase;color:#c8ff4a}
 .xbox .err{color:#ffb49c}
 
+.mc360{padding:10px 16px 10px 14px;border-radius:30px;background:linear-gradient(180deg,#f4f4f4 0%,#d9d9d9 55%,#bdbdbd 100%);border:1px solid rgba(255,255,255,.9);box-shadow:0 6px 18px rgba(0,0,0,.45),inset 0 1px 0 #fff;color:#111;font:400 14px/1.35 LsMc360,Tahoma,"Segoe UI",sans-serif}
+.mc360 .title{font-weight:400;font-size:15px}
+.mc360 button{color:#245f9c;font-weight:400}
+.mc360 .err{color:#8a1410}
+.mc360 .dot{width:14px;height:14px;border:3px solid #6c6c6c;background:#fff;box-shadow:none}
+.mc360.st-sent .dot{border-color:#3d9b25}
+.mc360.st-failed .dot{border-color:#b8251c}
+.mc360 .pick .choice{border-radius:4px;background:rgba(255,255,255,.7);color:#111;border-color:#8c8c8c}
+.mc360 .pick .choice.guess{background:linear-gradient(180deg,#8fd36a,#4a9a32);color:#fff}
 .blades{padding:12px 18px;border:1px solid rgba(255,255,255,.55);border-radius:18px;background:linear-gradient(160deg,#4a9a32 0%,#357a22 45%,#2a6619 100%);box-shadow:inset 0 1px 0 rgba(255,255,255,.5),0 8px 20px rgba(0,0,0,.3);color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.35)}
 .blades button{color:#fff}
 .blades .err{color:#ffe0dc}

@@ -6,7 +6,7 @@ export const DEFAULTS = {
   password: "",
   intercept: true, // magnet links you click go straight to Lifestream
   paused: false, // add downloads paused
-  look: "ffvii", // ffvii | xbox | blades | glass
+  look: "ffvii", // ffvii | xbox | blades | glass | mc360
   midgarAddress: "http://192.168.1.127:8990",
   midgarKey: "",
   turksAddress: "http://192.168.1.127:7878",
@@ -19,7 +19,7 @@ export const ROUTES = ["lifestream", "auto", "ask"];
 export const TARGETS = ["lifestream", "midgar", "turks"];
 export const APP_NAME = { lifestream: "Lifestream", midgar: "Midgar", turks: "Turks" };
 
-export const LOOKS = ["ffvii", "xbox", "blades", "glass"];
+export const LOOKS = ["ffvii", "xbox", "blades", "glass", "mc360"];
 
 export async function getSettings() {
   const s = await chrome.storage.local.get(Object.keys(DEFAULTS));

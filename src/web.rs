@@ -68,6 +68,11 @@ pub fn handle(core: &CoreHandle, mut req: Request, setup_only: bool) {
                 .with_header(header("Cache-Control", "max-age=86400"));
             let _ = req.respond(resp);
         }
+        (Method::Get, p) if p.starts_with("/mc360/") => {
+            if let Err(req) = crate::mc360_web::serve(req, p) {
+                send_json(req, 404, json!({ "error": "Not found." }));
+            }
+        }
         (Method::Get, "/lifestream/api/state") => send_json(req, 200, state(core, setup_only)),
         (Method::Post, "/lifestream/api/setup") => {
             if !setup_only {
@@ -232,7 +237,7 @@ fn state(core: &CoreHandle, setup_only: bool) -> Value {
         "ulRate": s.ul_rate,
         "torrentCount": s.torrents.len(),
         "userPaused": s.user_paused,
-        "theme": match settings.theme.as_str() { "green" => "green", "blades" => "blades", "glass" => "glass", _ => "ff" },
+        "theme": match settings.theme.as_str() { "green" => "green", "blades" => "blades", "glass" => "glass", "mc360" => "mc360", _ => "ff" },
         "advanced": settings.advanced_mode,
         "reduceMotion": settings.reduce_motion,
         "killHold": s.kill_hold,
@@ -368,7 +373,7 @@ fn apply_settings(b: &Value) -> Result<Settings, String> {
         s.max_peers_global = clamp(v, 10, 10_000);
     }
     if let Some(v) = str_of("theme") {
-        s.theme = match v.as_str() { "green" => "green".into(), "blades" => "blades".into(), "glass" => "glass".into(), _ => "ff".into() };
+        s.theme = match v.as_str() { "green" => "green".into(), "blades" => "blades".into(), "glass" => "glass".into(), "mc360" => "mc360".into(), _ => "ff".into() };
     }
     if let Some(v) = str_of("adapter") {
         s.adapter = v;

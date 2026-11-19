@@ -39,3 +39,7 @@ body.look-blades{padding:0;align-items:stretch}
 .look-glass .routes .chk{padding:10px 0}
 .look-glass .routes .chk+.chk{border-top:.5px solid var(--lg-line)}
 .look-glass .chk.two>span>span:first-child{font-weight:600}
+body.look-mc360{padding:0;align-items:stretch}
+.look-mc360 .panel{position:relative;inset:auto;width:680px;margin:30px 0;border-radius:40px 0 0 40px/120px;padding-bottom:8px}
+.look-mc360 .top{height:72px;padding:0 24px 0 48px}
+.look-mc360 .main{padding:20px 28px 20px 48px;overflow:visible}
