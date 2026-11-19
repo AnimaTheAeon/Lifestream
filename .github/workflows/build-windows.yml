@@ -2,8 +2,9 @@ name: Build Windows and Synology
 
 on:
   push:
+    # Only main. A version tag pushed or moved by hand used to rebuild that old
+    # version (and try to re-attach its files); releases are made from main.
     branches: [main]
-    tags: ["v*"]
   pull_request:
   workflow_dispatch:
   release:
