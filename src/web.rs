@@ -232,6 +232,7 @@ fn state(core: &CoreHandle, setup_only: bool) -> Value {
         "setup": false,
         "version": crate::updater::APP_VERSION,
         "headless": cfg!(not(feature = "gui")),
+        "vpnLock": crate::settings::vpn_lock(),
         "uptimeSecs": s.started.elapsed().as_secs(),
         "dlRate": s.dl_rate,
         "ulRate": s.ul_rate,
@@ -437,6 +438,10 @@ fn apply_settings(b: &Value) -> Result<Settings, String> {
             s.rpc_password = v.to_string();
         }
     }
+    if let Some(e) = crate::settings::vpn_lock_refuses(&s.adapter, s.kill_switch) {
+        return Err(e);
+    }
+    s.apply_vpn_lock();
     Ok(s)
 }
 

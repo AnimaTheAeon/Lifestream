@@ -602,7 +602,11 @@ impl Core {
         } else if s.bind_only && self.adapter_ip.is_some() {
             let ip = self.adapter_ip.clone().unwrap();
             let listen = if ip.contains(':') { format!("[{ip}]:{port}") } else { format!("{ip}:{port}") };
-            (listen, ip)
+            // On Linux, tie outgoing connections to the tunnel device itself (SO_BINDTODEVICE),
+            // not just its address: if the tunnel goes away they can't send at all, rather than
+            // falling back to another route in the moment before the kill switch notices.
+            let outgoing = if cfg!(target_os = "linux") && !s.adapter.is_empty() { s.adapter.clone() } else { ip };
+            (listen, outgoing)
         } else if s.disable_ipv6 {
             (format!("0.0.0.0:{port}"), String::new())
         } else {

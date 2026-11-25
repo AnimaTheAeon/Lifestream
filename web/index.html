@@ -1172,6 +1172,7 @@ async function drawSettings() {
   const text = (k, attrs = {}) => (v[k] = el('input', { type: 'text', id: 'f-' + k, value: s[k] ?? '', ...attrs }));
   const num = (k, attrs = {}) => (v[k] = el('input', { type: 'number', id: 'f-' + k, value: s[k] ?? 0, style: 'width:140px', ...attrs }));
   const check = (k) => (v[k] = el('input', { type: 'checkbox', id: 'f-' + k, checked: !!s[k] }));
+  const lockIt = (node) => { if (state && state.vpnLock) node.disabled = true; return node; };
   const field = (k, label, control, help) => el('div', { class: 'field' }, el('label', { class: 'lbl', for: 'f-' + k }, label), control, help ? el('div', { class: 'help' }, help) : null);
   const adapterSel = (v.adapter = el('select', { id: 'f-adapter' }, el('option', { value: '' }, 'Any (not bound)'), ...adapters.map((a) => el('option', { value: a.name, selected: a.name === s.adapter }, a.label + (a.vpn ? '  (VPN)' : '')))));
   const seedSel = (v.seed_action = el('select', { id: 'f-seed_action' }, ...[['pause', 'Pause it'], ['remove', 'Remove it (keep files)'], ['remove-delete', 'Remove it and delete files']].map(([val, t]) => el('option', { value: val, selected: s.seed_action === val }, t))));
@@ -1297,8 +1298,12 @@ async function drawSettings() {
       adv(field('incomplete_enabled', 'KEEP UNFINISHED SEPARATE', check('incomplete_enabled')),
         field('incomplete_dir', 'UNFINISHED FOLDER', text('incomplete_dir', { style: 'width:100%' }))),
       el('h2', {}, 'VPN'),
-      field('adapter', 'VPN ADAPTER', adapterSel, 'Torrent traffic only uses this connection. In Docker behind Barrier, pick tun0.'),
-      field('kill_switch', 'KILL SWITCH', check('kill_switch'), 'If the adapter drops (or none is picked), everything pauses until it is back.'),
+      field('adapter', 'VPN ADAPTER', lockIt(adapterSel), state && state.vpnLock
+        ? 'Locked to Barrier\'s tunnel (' + state.vpnLock + '). Lifestream lives inside Barrier and never uses any other connection.'
+        : 'Torrent traffic only uses this connection. In Docker behind Barrier, pick tun0.'),
+      field('kill_switch', 'KILL SWITCH', lockIt(check('kill_switch')), state && state.vpnLock
+        ? 'Always on inside Barrier: if the tunnel drops, everything pauses until it is back.'
+        : 'If the adapter drops (or none is picked), everything pauses until it is back.'),
       adv(field('listen_port', 'LISTENING PORT', num('listen_port')),
         field('follow_vpn_port', 'USE VPN PORT FORWARDING', check('follow_vpn_port')),
         field('natpmp', 'NAT-PMP', check('natpmp')),

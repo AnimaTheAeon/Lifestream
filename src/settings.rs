@@ -276,7 +276,40 @@ impl Default for Settings {
     }
 }
 
+/// In Docker inside Barrier (LIFESTREAM_ADAPTER is set by the package), Lifestream is
+/// locked to that tunnel: the adapter and the kill switch can't be changed or turned off.
+pub fn vpn_lock() -> Option<String> {
+    if cfg!(feature = "gui") {
+        return None;
+    }
+    std::env::var("LIFESTREAM_ADAPTER").ok().map(|a| a.trim().to_string()).filter(|a| !a.is_empty())
+}
+
+/// What a change to these settings would break while locked, if anything.
+pub fn vpn_lock_refuses(adapter: &str, kill_switch: bool) -> Option<String> {
+    lock_refuses(vpn_lock().as_deref(), adapter, kill_switch)
+}
+
+fn lock_refuses(lock: Option<&str>, adapter: &str, kill_switch: bool) -> Option<String> {
+    let lock = lock?;
+    if adapter != lock || !kill_switch {
+        return Some(format!(
+            "Lifestream runs inside Barrier here, so it's locked to {lock} with the kill switch on: it must never download outside the VPN."
+        ));
+    }
+    None
+}
+
 impl Settings {
+    /// Force the Barrier lock (see vpn_lock) onto these settings.
+    pub fn apply_vpn_lock(&mut self) {
+        if let Some(lock) = vpn_lock() {
+            self.adapter = lock;
+            self.kill_switch = true;
+            self.bind_only = true;
+        }
+    }
+
     pub fn path() -> PathBuf {
         data_dir().join("settings.json")
     }
@@ -290,10 +323,12 @@ impl Settings {
                 });
                 // "Only use this adapter" and the kill switch are one switch now.
                 s.bind_only = s.kill_switch;
+                s.apply_vpn_lock();
                 s
             }
             Err(_) => {
-                let s = Self::default();
+                let mut s = Self::default();
+                s.apply_vpn_lock();
                 s.save();
                 s
             }
@@ -317,5 +352,20 @@ impl Settings {
             .find(|c| c.name == category && !c.path.trim().is_empty())
             .map(|c| c.path.clone())
             .unwrap_or_else(|| self.download_dir.clone())
+    }
+}
+
+
+#[cfg(test)]
+mod lock_tests {
+    use super::lock_refuses;
+
+    #[test]
+    fn locked_to_the_tunnel_inside_barrier() {
+        assert!(lock_refuses(Some("tun0"), "tun0", true).is_none(), "the locked settings themselves are fine");
+        assert!(lock_refuses(Some("tun0"), "tun0", false).is_some(), "the kill switch can't be turned off");
+        assert!(lock_refuses(Some("tun0"), "", true).is_some(), "the adapter can't be cleared");
+        assert!(lock_refuses(Some("tun0"), "eth0", true).is_some(), "the adapter can't be switched");
+        assert!(lock_refuses(None, "", false).is_none(), "outside Barrier nothing is locked");
     }
 }
