@@ -843,7 +843,10 @@ function drawUpdateProgress(lost) {
 try { const v = sessionStorage.getItem('ls-updated'); if (v) { sessionStorage.removeItem('ls-updated'); setTimeout(() => toast(`Lifestream updated to ${v}.`), 800); } } catch (e) { /* private mode */ }
 
 // ---- state
-let state = null, torrents = [], page = location.hash.slice(1) || 'torrents';
+// Always open on Torrents; a page name left in the address (an old bookmark or a
+// reload on Settings) is dropped rather than reopened.
+if (location.hash) history.replaceState(null, '', location.pathname + location.search);
+let state = null, torrents = [], page = 'torrents';
 const FIELDS = ['id','hashString','name','status','percentDone','totalSize','leftUntilDone','rateDownload','rateUpload','eta','uploadRatio','labels','errorString','downloadDir','peersConnected','isPrivate','queuePosition'];
 
 // A theme picked while a refresh was on its way wins over that refresh's older copy.
@@ -1879,7 +1882,7 @@ for (const type of ['mousedown', 'mouseup']) {
 addEventListener('resize', () => { if (isBlades()) bladesPlace(true); });
 
 function go(p, keepHome) {
-  page = p; history.replaceState(null, '', '#' + p);
+  page = p;
   if (isBlades()) bladesShow(p);
   else if (isGreen() && !(keepHome && home)) leaveHome(p);
   document.querySelectorAll('.mi').forEach((b) => b.setAttribute('aria-current', b.dataset.page === p ? 'page' : 'false'));
