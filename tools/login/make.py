@@ -32,8 +32,16 @@ apps = {
     </style>''', '/icon.png', GREEN,
     "raw === 'green' || raw === 'blades' || raw === 'glass' ? raw : 'ff'", '_THEME_', ' action="/lifestream/login"',
     '              <span></span>'),
+ 'turks': lambda: build('Turks', '''    <link rel="icon" type="image/png" href="/images/turks_64.png" />
+    <style>
+      @font-face { font-family: Nunito; font-weight: 400 700; src: url('/fonts/nunito-700.woff2') format('woff2'); }
+      @font-face { font-family: Nunito; font-weight: 800 900; src: url('/fonts/nunito-800.woff2') format('woff2'); }
+      @font-face { font-family: Orbitron; font-weight: 800; src: url('/fonts/orbitron-800.woff2') format('woff2'); }
+    </style>''', '/images/turks_256.png', BLUE,
+    "raw === 'green' || raw === 'blades' || raw === 'glass' ? raw : 'ff'", '_THEME_', ' action="/login"',
+    '              <span></span>'),
 }
-out = {'midgar': os.path.join(REPOS, 'midgar/frontend/src/login.html'), 'materia': os.path.join(REPOS, 'materia/frontend/src/login.html'), 'lifestream': os.path.join(REPOS, 'lifestream/web/login.html')}
+out = {'midgar': os.path.join(REPOS, 'midgar/frontend/src/login.html'), 'materia': os.path.join(REPOS, 'materia/frontend/src/login.html'), 'lifestream': os.path.join(REPOS, 'lifestream/web/login.html'), 'turks': os.path.join(REPOS, 'turks/src/nas/login.html')}
 for a in (sys.argv[1:] or apps):
     html = apps[a]()
     open(out[a], 'w').write(html)
